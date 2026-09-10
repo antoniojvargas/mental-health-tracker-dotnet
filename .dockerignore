@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/dist/
+**/coverage/
+**/node_modules/
+.git/
+.gitignore
+**/.env
+**/.env.*
+**/appsettings.*.local.json
+**/secrets/*.txt
