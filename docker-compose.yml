@@ -27,6 +27,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/MentalHealthTracker.Api/bin
+      - /app/MentalHealthTracker.Api/obj
+      - /app/MentalHealthTracker.Domain/bin
+      - /app/MentalHealthTracker.Domain/obj
+      - /app/MentalHealthTracker.Infrastructure/bin
+      - /app/MentalHealthTracker.Infrastructure/obj
+      - /app/tests/MentalHealthTracker.UnitTests/bin
+      - /app/tests/MentalHealthTracker.UnitTests/obj
+      - /app/tests/MentalHealthTracker.IntegrationTests/bin
+      - /app/tests/MentalHealthTracker.IntegrationTests/obj
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 5s
@@ -44,6 +56,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   postgres-data:
