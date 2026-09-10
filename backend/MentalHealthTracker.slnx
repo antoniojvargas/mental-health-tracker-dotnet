@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="MentalHealthTracker.Api/MentalHealthTracker.Api.csproj" />
+  <Project Path="MentalHealthTracker.Domain/MentalHealthTracker.Domain.csproj" />
+  <Project Path="MentalHealthTracker.Infrastructure/MentalHealthTracker.Infrastructure.csproj" />
+</Solution>
