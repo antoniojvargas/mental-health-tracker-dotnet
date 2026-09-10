@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/coverage/
+.git/
+.gitignore
+**/.env
+**/.env.*
+**/appsettings.*.local.json

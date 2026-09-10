@@ -17,3 +17,26 @@ Con base en esos registros, la aplicación genera tendencias semanales y mensual
 | Tailwind     | —             | Estilos y diseño                 |
 | SignalR      | —             | Comunicación en tiempo real      |
 | Docker       | —             | Contenedores y despliegue local  |
+
+## Arranque con Docker
+
+Para levantar el entorno de desarrollo completo:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+El stack levanta tres servicios con hot-reload (los cambios en el código se aplican sin reconstruir la imagen).
+
+### Puertos expuestos
+
+| Servicio  | Puerto            | Descripción                    |
+| --------- | ----------------- | ------------------------------ |
+| Frontend  | `5173`            | App Vue 3 + Vite (dev server)  |
+| API       | `3000`            | Backend .NET (dotnet watch)    |
+| Postgres  | `5432`            | Base de datos PostgreSQL 16    |
+
+### Documentación de la API
+
+Disponible en desarrollo en `http://localhost:3000/openapi/v1.json` (OpenAPI generado por ASP.NET Core).

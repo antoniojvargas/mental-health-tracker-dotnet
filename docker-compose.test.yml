@@ -1,0 +1,12 @@
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: mental-health-tracker-postgres-test
+    environment:
+      POSTGRES_USER: mht_test
+      POSTGRES_PASSWORD: mht_test
+      POSTGRES_DB: mht_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
