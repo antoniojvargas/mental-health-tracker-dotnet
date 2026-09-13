@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,11 +32,14 @@ builder.Services.AddOptions<AppUrlsOptions>()
 
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseRequestId();
 
 // Configure the HTTP request pipeline.
