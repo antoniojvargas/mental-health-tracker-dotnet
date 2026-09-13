@@ -1,6 +1,8 @@
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
+using Microsoft.Extensions.Options;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,7 +33,6 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateOnStart();
 
 builder.Services.AddControllers();
-builder.Services.AddHealthChecks();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -54,6 +55,37 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapHealthChecks("/api/health");
+var startedAt = DateTimeOffset.UtcNow;
+
+// Health check con prueba real de conectividad: devolver un literal "ok" fijo no basta
+// porque los orquestadores (Docker healthcheck, load balancers) usan este endpoint para
+// decidir si el contenedor está sano. Un 200 constante enmascara caídas de la base de
+// datos: no se reiniciaría el contenedor, no habría alertas y los clientes fallarían
+// después con errores confusos. Solo un SELECT 1 real refleja la disponibilidad real.
+app.MapGet("/api/health", async (
+    IOptions<DatabaseOptions> databaseOptions,
+    ILogger<Program> logger) =>
+{
+    var uptime = DateTimeOffset.UtcNow - startedAt;
+
+    try
+    {
+        await using var connection = new NpgsqlConnection(databaseOptions.Value.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT 1";
+        await command.ExecuteScalarAsync();
+    }
+    catch (Exception exception)
+    {
+        logger.LogError(exception, "Database health check failed");
+        return Results.Json(
+            new { status = "error", db = "unreachable" },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+
+    return Results.Json(
+        new { status = "ok", uptime = (int)uptime.TotalSeconds });
+});
 
 app.Run();
