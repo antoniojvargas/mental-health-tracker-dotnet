@@ -109,4 +109,14 @@ app.MapGet("/api/health", async (
         new { status = "ok", uptime = (int)uptime.TotalSeconds });
 });
 
+await InitializeDatabaseAsync(app);
+
 app.Run();
+
+static async Task InitializeDatabaseAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatabaseInitializer).FullName ?? "DatabaseInitializer");
+    await DatabaseInitializer.MigrateAsync(dbContext, logger);
+}
