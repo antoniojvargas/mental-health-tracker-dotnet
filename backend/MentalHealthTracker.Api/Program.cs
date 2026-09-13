@@ -35,6 +35,15 @@ builder.Services.AddOptions<AppUrlsOptions>()
 builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+
+const string CorsPolicyName = "Frontend";
+var appUrls = builder.Configuration
+    .GetSection(AppUrlsOptions.SectionName)
+    .Get<AppUrlsOptions>();
+builder.Services.AddCors(options =>
+    options.AddPolicy(CorsPolicyName, policy =>
+        policy.WithOrigins(appUrls?.FrontendUrl ?? string.Empty).AllowCredentials()));
+
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
@@ -42,6 +51,8 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseRequestId();
+app.UseSecurityHeaders();
+app.UseCors(CorsPolicyName);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
