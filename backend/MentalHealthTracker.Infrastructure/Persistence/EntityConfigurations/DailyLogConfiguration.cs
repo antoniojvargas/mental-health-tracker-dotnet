@@ -19,6 +19,11 @@ public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
             .HasColumnType("uuid");
         builder.Property(log => log.UserId).HasColumnName("user_id").HasColumnType("uuid");
         builder.Property(log => log.LogDate).HasColumnName("log_date").HasColumnType("date");
+        // Las escalas numéricas (mood_rating, anxiety_level, stress_level, sleep_quality) se
+        // modelan como smallint con el rango validado en la capa de aplicación y no como ENUM
+        // de Postgres: son valores que se promedian y grafican en tendencias, no categorías
+        // cerradas, y evitar el ENUM ahorra una migración de esquema cada vez que se agrega
+        // un valor al rango.
         builder.Property(log => log.MoodRating).HasColumnName("mood_rating").HasColumnType("smallint");
         builder.Property(log => log.AnxietyLevel).HasColumnName("anxiety_level").HasColumnType("smallint");
         builder.Property(log => log.StressLevel).HasColumnName("stress_level").HasColumnType("smallint");
