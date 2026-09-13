@@ -4,6 +4,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddSecretFileConfiguration();
 
+builder.Host.UseSerilogLogging();
+
 // Add services to the container.
 
 builder.Services.AddOptions<DatabaseOptions>()
