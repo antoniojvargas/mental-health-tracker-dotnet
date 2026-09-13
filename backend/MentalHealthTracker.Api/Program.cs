@@ -34,6 +34,8 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddScoped<DatabaseSeeder>();
+
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     var connectionString = builder.Configuration
@@ -111,7 +113,23 @@ app.MapGet("/api/health", async (
 
 await InitializeDatabaseAsync(app);
 
+// Modo demo: dotnet run --seed aplica migraciones y carga el usuario demo con 60 días
+// de registros (ver DatabaseSeeder). Se resuelve un scope propio y se sale antes de
+// arrancar Kestrel.
+if (args.Contains("--seed"))
+{
+    await SeedDatabaseAsync(app);
+    return;
+}
+
 app.Run();
+
+static async Task SeedDatabaseAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    await seeder.SeedAsync();
+}
 
 static async Task InitializeDatabaseAsync(WebApplication app)
 {

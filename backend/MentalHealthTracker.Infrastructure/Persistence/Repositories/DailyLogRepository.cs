@@ -69,12 +69,12 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
         var sleepDisturbances = new Converters.EnumListToStringArrayConverter<SleepDisturbance>()
             .ConvertToProvider(log.SleepDisturbances) as List<string>;
         command.Parameters.Add(new NpgsqlParameter("@sleep_disturbances", NpgsqlDbType.Array | NpgsqlDbType.Text)
-            { Value = sleepDisturbances?.ToArray() });
+            { Value = (object?)sleepDisturbances?.ToArray() ?? DBNull.Value });
 
         var activityType = new Converters.EnumSnakeCaseConverter<ActivityType>()
             .ConvertToProvider(log.ActivityType);
         command.Parameters.Add(new NpgsqlParameter("@activity_type", NpgsqlDbType.Text)
-            { Value = activityType });
+            { Value = (object?)activityType ?? DBNull.Value });
 
         command.Parameters.Add(new NpgsqlParameter("@activity_minutes", NpgsqlDbType.Smallint)
             { Value = (object?)log.ActivityMinutes ?? DBNull.Value });
@@ -91,7 +91,10 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
         command.Parameters.Add(new NpgsqlParameter("@created_at", NpgsqlDbType.TimestampTz) { Value = now });
         command.Parameters.Add(new NpgsqlParameter("@updated_at", NpgsqlDbType.TimestampTz) { Value = now });
 
-        await connection.OpenAsync(cancellationToken);
+        if (connection.State != System.Data.ConnectionState.Open)
+        {
+            await connection.OpenAsync(cancellationToken);
+        }
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
 
