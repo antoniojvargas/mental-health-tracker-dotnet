@@ -1,0 +1,54 @@
+using MentalHealthTracker.Domain.Entities;
+using MentalHealthTracker.Domain.Enums;
+using MentalHealthTracker.Domain.ValueObjects;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace MentalHealthTracker.Infrastructure.Persistence.EntityConfigurations;
+
+public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
+{
+    public void Configure(EntityTypeBuilder<DailyLog> builder)
+    {
+        builder.ToTable("daily_logs");
+
+        builder.HasKey(log => log.Id);
+
+        builder.Property(log => log.Id)
+            .HasColumnName("id")
+            .HasColumnType("uuid");
+        builder.Property(log => log.UserId).HasColumnName("user_id").HasColumnType("uuid");
+        builder.Property(log => log.LogDate).HasColumnName("log_date").HasColumnType("date");
+        builder.Property(log => log.MoodRating).HasColumnName("mood_rating").HasColumnType("smallint");
+        builder.Property(log => log.AnxietyLevel).HasColumnName("anxiety_level").HasColumnType("smallint");
+        builder.Property(log => log.StressLevel).HasColumnName("stress_level").HasColumnType("smallint");
+        builder.Property(log => log.SleepHours).HasColumnName("sleep_hours").HasPrecision(3, 1);
+        builder.Property(log => log.SleepQuality).HasColumnName("sleep_quality").HasColumnType("smallint");
+        builder.Property(log => log.SleepDisturbances)
+            .HasColumnName("sleep_disturbances")
+            .HasColumnType("jsonb")
+            .HasConversion<Converters.JsonListConverter<SleepDisturbance>>();
+        builder.Property(log => log.ActivityType)
+            .HasColumnName("activity_type")
+            .HasConversion<Converters.EnumSnakeCaseConverter<ActivityType>>();
+        builder.Property(log => log.ActivityMinutes).HasColumnName("activity_minutes").HasColumnType("smallint");
+        builder.Property(log => log.SocialFrequency)
+            .HasColumnName("social_frequency")
+            .HasConversion<Converters.EnumSnakeCaseConverter<SocialFrequency>>();
+        builder.Property(log => log.Symptoms)
+            .HasColumnName("symptoms")
+            .HasColumnType("jsonb")
+            .HasConversion<Converters.JsonListConverter<Symptom>>();
+        builder.Property(log => log.Notes).HasColumnName("notes").HasMaxLength(1000);
+        builder.Property(log => log.CreatedAt).HasColumnName("created_at");
+        builder.Property(log => log.UpdatedAt).HasColumnName("updated_at");
+
+        builder.HasIndex(log => log.UserId);
+        builder.HasIndex(log => new { log.UserId, log.LogDate }).IsUnique();
+
+        builder.HasOne<User>()
+            .WithMany()
+            .HasForeignKey(log => log.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
