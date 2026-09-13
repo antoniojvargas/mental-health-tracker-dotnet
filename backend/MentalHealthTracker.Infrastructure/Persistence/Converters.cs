@@ -35,4 +35,24 @@ internal static class Converters
         {
         }
     }
+
+    internal sealed class EnumListToStringArrayConverter<TEnum> : ValueConverter<List<TEnum>, List<string>>
+        where TEnum : struct, Enum
+    {
+        public EnumListToStringArrayConverter()
+            : base(
+                value => value
+                    .Select(item => JsonNamingPolicy.SnakeCaseLower.ConvertName(item.ToString() ?? string.Empty))
+                    .ToList(),
+                value => value
+                    .Select(item => Enum.Parse<TEnum>(Enum
+                        .GetNames<TEnum>()
+                        .First(name => string.Equals(
+                            JsonNamingPolicy.SnakeCaseLower.ConvertName(name),
+                            item,
+                            StringComparison.OrdinalIgnoreCase))))
+                    .ToList())
+        {
+        }
+    }
 }

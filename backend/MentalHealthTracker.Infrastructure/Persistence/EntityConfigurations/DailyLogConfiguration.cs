@@ -26,8 +26,8 @@ public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
         builder.Property(log => log.SleepQuality).HasColumnName("sleep_quality").HasColumnType("smallint");
         builder.Property(log => log.SleepDisturbances)
             .HasColumnName("sleep_disturbances")
-            .HasColumnType("jsonb")
-            .HasConversion<Converters.JsonListConverter<SleepDisturbance>>();
+            .HasColumnType("text[]")
+            .HasConversion<Converters.EnumListToStringArrayConverter<SleepDisturbance>>();
         builder.Property(log => log.ActivityType)
             .HasColumnName("activity_type")
             .HasConversion<Converters.EnumSnakeCaseConverter<ActivityType>>();
@@ -35,6 +35,9 @@ public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
         builder.Property(log => log.SocialFrequency)
             .HasColumnName("social_frequency")
             .HasConversion<Converters.EnumSnakeCaseConverter<SocialFrequency>>();
+        // Symptoms se guardan como JSON en el propio log y no se normalizan a una tabla
+        // hija: siempre se leen y escriben completos junto al log, y nunca se consultan
+        // por un síntoma aislado. Una tabla hija añadiría joins y complejidad sin valor real.
         builder.Property(log => log.Symptoms)
             .HasColumnName("symptoms")
             .HasColumnType("jsonb")
