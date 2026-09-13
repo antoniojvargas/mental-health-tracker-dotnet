@@ -2,6 +2,8 @@ using MentalHealthTracker.Api.Core.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Configuration.AddSecretFileConfiguration();
+
 // Add services to the container.
 
 builder.Services.AddOptions<DatabaseOptions>()
