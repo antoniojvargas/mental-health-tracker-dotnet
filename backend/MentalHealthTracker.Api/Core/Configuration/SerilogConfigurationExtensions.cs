@@ -10,6 +10,7 @@ public static class SerilogConfigurationExtensions
     {
         return hostBuilder.UseSerilog((context, services, configuration) =>
             configuration
+                .Destructure.With(new RedactSensitiveHeadersPolicy())
                 .Enrich.FromLogContext()
                 .MinimumLevel.Is(ReadMinimumLevel())
                 .ConsoleFormatter(context.HostingEnvironment));
