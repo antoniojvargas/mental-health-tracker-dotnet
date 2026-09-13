@@ -32,7 +32,8 @@ public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
         builder.Property(log => log.SleepDisturbances)
             .HasColumnName("sleep_disturbances")
             .HasColumnType("text[]")
-            .HasConversion<Converters.EnumListToStringArrayConverter<SleepDisturbance>>();
+            .HasConversion<Converters.EnumListToStringArrayConverter<SleepDisturbance>>()
+            .Metadata.SetValueComparer(Converters.ListComparer<SleepDisturbance>());
         builder.Property(log => log.ActivityType)
             .HasColumnName("activity_type")
             .HasConversion<Converters.EnumSnakeCaseConverter<ActivityType>>();
@@ -46,7 +47,8 @@ public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
         builder.Property(log => log.Symptoms)
             .HasColumnName("symptoms")
             .HasColumnType("jsonb")
-            .HasConversion<Converters.JsonListConverter<Symptom>>();
+            .HasConversion<Converters.JsonListConverter<Symptom>>()
+            .Metadata.SetValueComparer(Converters.ListComparer<Symptom>());
         builder.Property(log => log.Notes).HasColumnName("notes").HasMaxLength(1000);
         builder.Property(log => log.CreatedAt).HasColumnName("created_at");
         builder.Property(log => log.UpdatedAt).HasColumnName("updated_at");

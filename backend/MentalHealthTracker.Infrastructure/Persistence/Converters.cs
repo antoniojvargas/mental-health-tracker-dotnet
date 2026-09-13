@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace MentalHealthTracker.Infrastructure.Persistence;
@@ -54,5 +55,13 @@ internal static class Converters
                     .ToList())
         {
         }
+    }
+
+    internal static ValueComparer<List<TItem>> ListComparer<TItem>()
+    {
+        return new ValueComparer<List<TItem>>(
+            (left, right) => left!.SequenceEqual(right!),
+            values => values!.Aggregate(0, (hash, item) => HashCode.Combine(hash, item)),
+            values => values!.ToList());
     }
 }
