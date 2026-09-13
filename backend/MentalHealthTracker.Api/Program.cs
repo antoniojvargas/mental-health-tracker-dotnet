@@ -1,6 +1,8 @@
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
+using MentalHealthTracker.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 
@@ -31,6 +33,16 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .Bind(builder.Configuration.GetSection(AppUrlsOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
+
+builder.Services.AddScoped<DatabaseSeeder>();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+{
+    var connectionString = builder.Configuration
+        .GetSection(DatabaseOptions.SectionName)
+        .Get<DatabaseOptions>()?.ConnectionString;
+    options.UseNpgsql(connectionString);
+});
 
 builder.Services.AddControllers();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -99,4 +111,30 @@ app.MapGet("/api/health", async (
         new { status = "ok", uptime = (int)uptime.TotalSeconds });
 });
 
+await InitializeDatabaseAsync(app);
+
+// Modo demo: dotnet run --seed aplica migraciones y carga el usuario demo con 60 días
+// de registros (ver DatabaseSeeder). Se resuelve un scope propio y se sale antes de
+// arrancar Kestrel.
+if (args.Contains("--seed"))
+{
+    await SeedDatabaseAsync(app);
+    return;
+}
+
 app.Run();
+
+static async Task SeedDatabaseAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
+    await seeder.SeedAsync();
+}
+
+static async Task InitializeDatabaseAsync(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatabaseInitializer).FullName ?? "DatabaseInitializer");
+    await DatabaseInitializer.MigrateAsync(dbContext, logger);
+}
