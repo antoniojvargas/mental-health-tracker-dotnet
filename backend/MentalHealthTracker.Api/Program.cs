@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Api.Core.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,6 +35,8 @@ builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+app.UseRequestId();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

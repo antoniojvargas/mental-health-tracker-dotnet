@@ -10,6 +10,7 @@ public static class SerilogConfigurationExtensions
     {
         return hostBuilder.UseSerilog((context, services, configuration) =>
             configuration
+                .Enrich.FromLogContext()
                 .MinimumLevel.Is(ReadMinimumLevel())
                 .ConsoleFormatter(context.HostingEnvironment));
     }
@@ -21,7 +22,7 @@ public static class SerilogConfigurationExtensions
         if (environment.IsDevelopment())
         {
             return configuration.WriteTo.Console(
-                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}");
+                outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{RequestId}] {SourceContext}: {Message:lj}{NewLine}{Exception}");
         }
 
         return configuration.WriteTo.Console(new CompactJsonFormatter());
