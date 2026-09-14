@@ -1,7 +1,10 @@
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
+using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
+using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -35,6 +38,10 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateOnStart();
 
 builder.Services.AddScoped<DatabaseSeeder>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddSingleton<JwtService>();
+builder.Services.AddSingleton<AuthCookieOptions>();
+builder.Services.AddHttpClient<GoogleOAuthClient>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -74,9 +81,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthorization();
+app.UseRouting();
+
+app.UseRequireAuth();
 
 app.MapControllers();
+
+if (app.Environment.IsEnvironment("Testing"))
+{
+    app.MapTestAuthEndpoints();
+}
 
 var startedAt = DateTimeOffset.UtcNow;
 
@@ -138,3 +152,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatabaseInitializer).FullName ?? "DatabaseInitializer");
     await DatabaseInitializer.MigrateAsync(dbContext, logger);
 }
+
+// Clase generada por los top-level statements. Se declara pública para que
+// WebApplicationFactory<Program> (tests de integración) pueda usarla como entry point.
+public partial class Program { }
