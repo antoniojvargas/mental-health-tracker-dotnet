@@ -2,7 +2,9 @@ using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
+using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -36,6 +38,7 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateOnStart();
 
 builder.Services.AddScoped<DatabaseSeeder>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddHttpClient<GoogleOAuthClient>();
 
