@@ -5,6 +5,7 @@ using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -42,6 +43,12 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<AuthCookieOptions>();
 builder.Services.AddHttpClient<GoogleOAuthClient>();
+builder.Services
+    .AddAuthentication(SessionCookieAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, SessionCookieAuthenticationHandler>(
+        SessionCookieAuthenticationHandler.SchemeName,
+        displayName: "Session cookie JWT",
+        configureOptions: _ => { });
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -80,6 +87,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 

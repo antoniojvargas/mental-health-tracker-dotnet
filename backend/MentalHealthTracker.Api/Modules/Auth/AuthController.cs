@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Domain.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -53,6 +55,32 @@ public sealed class AuthController(
             logger.LogError(exception, "Google OAuth callback failed");
             return RedirectToLogin();
         }
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var user = await userRepository.FindByIdAsync(userId, cancellationToken);
+        if (user is null)
+        {
+            logger.LogWarning("Session token references user {UserId} that no longer exists", userId);
+            return Unauthorized();
+        }
+
+        return Ok(new
+        {
+            id = user.Id,
+            email = user.Email,
+            name = user.Name,
+            avatarUrl = user.AvatarUrl,
+        });
     }
 
     private bool StateMatches(string? receivedState)
