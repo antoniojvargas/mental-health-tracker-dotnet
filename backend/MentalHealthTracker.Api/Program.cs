@@ -152,3 +152,7 @@ static async Task InitializeDatabaseAsync(WebApplication app)
     var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatabaseInitializer).FullName ?? "DatabaseInitializer");
     await DatabaseInitializer.MigrateAsync(dbContext, logger);
 }
+
+// Clase generada por los top-level statements. Se declara pública para que
+// WebApplicationFactory<Program> (tests de integración) pueda usarla como entry point.
+public partial class Program { }
