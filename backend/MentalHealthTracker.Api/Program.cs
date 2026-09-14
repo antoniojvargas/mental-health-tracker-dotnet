@@ -87,6 +87,11 @@ app.UseRequireAuth();
 
 app.MapControllers();
 
+if (app.Environment.IsEnvironment("Testing"))
+{
+    app.MapTestAuthEndpoints();
+}
+
 var startedAt = DateTimeOffset.UtcNow;
 
 // Health check con prueba real de conectividad: devolver un literal "ok" fijo no basta
