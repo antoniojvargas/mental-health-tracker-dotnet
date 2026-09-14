@@ -3,7 +3,6 @@ using System.Security.Cryptography;
 using System.Text;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Domain.Repositories;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 
@@ -58,7 +57,7 @@ public sealed class AuthController(
     }
 
     [HttpGet("me")]
-    [Authorize]
+    [RequireAuth]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
