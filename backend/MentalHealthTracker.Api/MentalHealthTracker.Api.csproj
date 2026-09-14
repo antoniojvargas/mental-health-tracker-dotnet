@@ -14,6 +14,10 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
   </ItemGroup>
 
+<ItemGroup>
+    <InternalsVisibleTo Include="MentalHealthTracker.UnitTests" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MentalHealthTracker.Infrastructure\MentalHealthTracker.Infrastructure.csproj" />
   </ItemGroup>

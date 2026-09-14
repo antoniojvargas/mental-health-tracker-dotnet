@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Google.Apis.Auth;
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Domain.Models;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
@@ -20,11 +21,23 @@ public sealed class GoogleOAuthClient
 
     private readonly HttpClient _httpClient;
     private readonly GoogleOAuthOptions _options;
+    private readonly Func<string, Task<GoogleJsonWebSignature.Payload>> _idTokenValidator;
 
     public GoogleOAuthClient(HttpClient httpClient, IOptions<GoogleOAuthOptions> options)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _idTokenValidator = ValidateIdTokenAsync;
+    }
+
+    internal GoogleOAuthClient(
+        HttpClient httpClient,
+        IOptions<GoogleOAuthOptions> options,
+        Func<string, Task<GoogleJsonWebSignature.Payload>> idTokenValidator)
+    {
+        _httpClient = httpClient;
+        _options = options.Value;
+        _idTokenValidator = idTokenValidator;
     }
 
     public string BuildAuthUrl(string state)
@@ -46,7 +59,14 @@ public sealed class GoogleOAuthClient
     public async Task<GoogleProfile> ExchangeCodeForProfileAsync(string code, CancellationToken cancellationToken = default)
     {
         var tokenResponse = await ExchangeCodeAsync(code, cancellationToken);
-        var validatedPayload = await ValidateIdTokenAsync(tokenResponse);
+        var idToken = tokenResponse.IdToken
+            ?? throw new InvalidOperationException("Token endpoint did not return an id_token");
+
+        var validatedPayload = await _idTokenValidator(idToken);
+        if (string.IsNullOrEmpty(validatedPayload.Subject))
+        {
+            throw new UnauthorizedException("Validated id_token is missing the sub claim");
+        }
 
         return new GoogleProfile(
             validatedPayload.Subject,
@@ -73,18 +93,15 @@ public sealed class GoogleOAuthClient
             ?? throw new InvalidOperationException("Token endpoint returned empty response");
     }
 
-    private async Task<GoogleJsonWebSignature.Payload> ValidateIdTokenAsync(TokenResponse tokenResponse)
+    private Task<GoogleJsonWebSignature.Payload> ValidateIdTokenAsync(string idToken)
     {
-        var idToken = tokenResponse.IdToken
-            ?? throw new InvalidOperationException("Token endpoint did not return an id_token");
-
         var validationSettings = new GoogleJsonWebSignature.ValidationSettings
         {
             Audience = [_options.ClientId],
             ForceGoogleCertRefresh = false,
         };
 
-        return await GoogleJsonWebSignature.ValidateAsync(idToken, validationSettings);
+        return GoogleJsonWebSignature.ValidateAsync(idToken, validationSettings);
     }
 
     private sealed class TokenResponse
