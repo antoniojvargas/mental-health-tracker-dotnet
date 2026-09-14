@@ -1,6 +1,7 @@
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
+using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -35,6 +36,7 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateOnStart();
 
 builder.Services.AddScoped<DatabaseSeeder>();
+builder.Services.AddSingleton<JwtService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
