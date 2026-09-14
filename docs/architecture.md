@@ -69,3 +69,34 @@ se envían con `SameSite=Lax` y **no requieren un token CSRF adicional**. Motivo
 se sirvieran desde sitios distintos (p. ej. `app.com` y `api.app.com`), la cookie
 `SameSite=Lax` no llegaría en las llamadas `fetch` de la SPA y habría que migrar a
 `SameSite=None; Secure` o a un header de autorización, y revisar esta conclusión de CSRF.
+
+### Sin refresh tokens ni token CSRF explícito (omisión consciente)
+
+El sistema **no implementa refresh tokens ni un token CSRF explícito**. Es una omisión
+consciente, no un pendiente:
+
+1. **Access token de 7 días como única credencial de sesión**. El JWT se emite con
+   `SessionCookieMaxAge` de 7 días en la cookie `httpOnly`. Al expirar, el usuario
+   vuelve a pasar por el flujo OAuth de Google (que re-presenta la pantalla de
+   consentimiento si es necesario). No hay rotación de tokens ni un segundo token de
+   larga duración que renovarlo.
+2. **Sin tabla de tokens ni revocación**. No existe una tabla de sesiones/refresh tokens
+   que persista, rote o revoque credenciales. La sesión es puramente stateless: vive solo
+   en la firma del JWT y en la cookie. El cierre de sesión borra la cookie en el cliente;
+   no invalida un token en el servidor.
+3. **CSRF cubierto por `SameSite=Lax`**. La omisión del token CSRF explícito se justifica
+   en la sección anterior: con frontend y API en el mismo `site`, la cookie `SameSite=Lax`
+   ya bloquea las peticiones cross-site, que es el vector que un token CSRF mitiga.
+
+**Por qué esta omisión completa el alcance**: para un producto de autorreporte personal
+con un flujo de login mediado por Google, agregar rotación/revocación implicaría una
+infraestructura de sesiones (tabla de tokens, jobs de limpieza, endpoints de refresh)
+que hoy no aporta protección adicional proporcional al riesgo: el mismo `state` del OAuth
+y el `SameSite=Lax` ya cubren los ataques de login-CSRF y CSRF clásico, y el acceso
+indefinido post-logout no es alcanzable sin que el atacante posea previamente la cookie
+`httpOnly` (que es inaccesible a JavaScript).
+
+**Cuándo reconsiderar**: si la app necesitara el usuario "siempre autenticado" más allá de
+7 días sin re-consentimiento (p. ej. apps móviles o sesiones de clientes longevas), o si
+el alcance creciera a operaciones administrativas, se debería introducir refresh tokens
+con rotación y revocación server-side.
