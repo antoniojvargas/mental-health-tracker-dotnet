@@ -83,6 +83,13 @@ public sealed class AuthController(
         });
     }
 
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        Response.Cookies.Delete(JwtService.SessionCookieName, cookieOptions.Create());
+        return NoContent();
+    }
+
     private bool StateMatches(string? receivedState)
     {
         var expectedState = Request.Cookies[OAuthStateCookieName];
