@@ -37,7 +37,7 @@ builder.Services.AddOptions<AppUrlsOptions>()
 
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddSingleton<JwtService>();
-builder.Services.AddSingleton<GoogleOAuthClient>();
+builder.Services.AddHttpClient<GoogleOAuthClient>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
