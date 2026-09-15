@@ -1,7 +1,12 @@
+using FluentValidation;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
+using MentalHealthTracker.Api.Core.Validation;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.DailyLog;
+using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
+using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
@@ -39,6 +44,7 @@ builder.Services.AddOptions<AppUrlsOptions>()
 
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDailyLogRepository, DailyLogRepository>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<AuthCookieOptions>();
 builder.Services.AddHttpClient<GoogleOAuthClient>();
@@ -51,7 +57,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString);
 });
 
-builder.Services.AddControllers();
+builder.Services.AddScoped<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
+builder.Services.AddScoped<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
+builder.Services.AddScoped<IDailyLogService, DailyLogService>();
+
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<FluentValidationActionFilter>();
+});
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
