@@ -13,4 +13,8 @@ public interface IDailyLogService
         Guid userId,
         ListDailyLogsQuery query,
         CancellationToken cancellationToken = default);
+
+    Task<DailyLogResponse?> GetTodayAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
 }

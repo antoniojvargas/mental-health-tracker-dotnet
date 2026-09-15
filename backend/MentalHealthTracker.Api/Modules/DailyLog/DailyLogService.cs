@@ -34,6 +34,16 @@ public sealed class DailyLogService(IDailyLogRepository repository) : IDailyLogS
             new DailyLogListMeta(from, to, query.Limit, query.Offset, result.Total));
     }
 
+    public async Task<DailyLogResponse?> GetTodayAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var log = await repository.FindByUserAndDateAsync(userId, today, cancellationToken);
+
+        return log?.ToResponse();
+    }
+
     private static DailyLog MapToEntity(Guid userId, CreateDailyLogRequest request) => new()
     {
         UserId = userId,
