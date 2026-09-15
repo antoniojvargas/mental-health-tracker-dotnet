@@ -1,6 +1,6 @@
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
-using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Repositories;
+using DailyLogEntity = MentalHealthTracker.Domain.Entities.DailyLog;
 
 namespace MentalHealthTracker.Api.Modules.DailyLog;
 
@@ -44,7 +44,7 @@ public sealed class DailyLogService(IDailyLogRepository repository) : IDailyLogS
         return log?.ToResponse();
     }
 
-    private static DailyLog MapToEntity(Guid userId, CreateDailyLogRequest request) => new()
+    private static DailyLogEntity MapToEntity(Guid userId, CreateDailyLogRequest request) => new()
     {
         UserId = userId,
         LogDate = request.LogDate,

@@ -19,18 +19,18 @@ public sealed class CreateDailyLogValidator : AbstractValidator<CreateDailyLogRe
             .Must(x => x <= DateOnly.FromDateTime(DateTime.UtcNow))
             .WithMessage("logDate no puede estar en el futuro.");
 
-        RuleFor(x => x.MoodRating).InclusiveBetween(1, 5);
+        RuleFor(x => x.MoodRating).InclusiveBetween((short)1, (short)5);
 
-        RuleFor(x => x.AnxietyLevel).InclusiveBetween(1, 10);
+        RuleFor(x => x.AnxietyLevel).InclusiveBetween((short)1, (short)10);
 
-        RuleFor(x => x.StressLevel).InclusiveBetween(1, 10);
+        RuleFor(x => x.StressLevel).InclusiveBetween((short)1, (short)10);
 
-        RuleFor(x => x.SleepHours).InclusiveBetween(0, 24);
+        RuleFor(x => x.SleepHours).InclusiveBetween(0m, 24m);
 
-        RuleFor(x => x.SleepQuality).InclusiveBetween(1, 5);
+        RuleFor(x => x.SleepQuality).InclusiveBetween((short)1, (short)5);
 
         RuleFor(x => x.ActivityMinutes)
-            .InclusiveBetween(0, 600)
+            .InclusiveBetween((short)0, (short)600)
             .When(x => x.ActivityMinutes.HasValue);
 
         RuleFor(x => x.Notes).MaximumLength(1000);

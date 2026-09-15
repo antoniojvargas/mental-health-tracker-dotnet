@@ -27,7 +27,7 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
 
     [HttpGet]
     public async Task<IActionResult> List(
-        [AsParameters] ListDailyLogsQuery query,
+        [FromQuery] ListDailyLogsQuery query,
         CancellationToken cancellationToken)
     {
         var response = await dailyLogService.ListAsync(UserId, query, cancellationToken);

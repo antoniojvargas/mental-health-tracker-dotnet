@@ -44,6 +44,7 @@ builder.Services.AddOptions<AppUrlsOptions>()
 
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDailyLogRepository, DailyLogRepository>();
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<AuthCookieOptions>();
 builder.Services.AddHttpClient<GoogleOAuthClient>();

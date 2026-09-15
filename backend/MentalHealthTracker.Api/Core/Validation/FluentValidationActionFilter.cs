@@ -1,6 +1,6 @@
 using FluentValidation;
-using MentalHealthTracker.Domain.Errors;
 using Microsoft.AspNetCore.Mvc.Filters;
+using ValidationException = MentalHealthTracker.Domain.Errors.ValidationException;
 
 namespace MentalHealthTracker.Api.Core.Validation;
 

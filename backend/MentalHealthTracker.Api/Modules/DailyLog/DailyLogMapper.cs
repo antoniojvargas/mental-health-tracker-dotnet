@@ -1,12 +1,12 @@
 using System.Globalization;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
-using MentalHealthTracker.Domain.Entities;
+using DailyLogEntity = MentalHealthTracker.Domain.Entities.DailyLog;
 
 namespace MentalHealthTracker.Api.Modules.DailyLog;
 
 public static class DailyLogMapper
 {
-    public static DailyLogResponse ToResponse(this DailyLog log) => new(
+    public static DailyLogResponse ToResponse(this DailyLogEntity log) => new(
         Id: log.Id,
         LogDate: log.LogDate,
         MoodRating: log.MoodRating,
@@ -22,3 +22,4 @@ public static class DailyLogMapper
         Notes: log.Notes,
         CreatedAt: log.CreatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
         UpdatedAt: log.UpdatedAt.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+}

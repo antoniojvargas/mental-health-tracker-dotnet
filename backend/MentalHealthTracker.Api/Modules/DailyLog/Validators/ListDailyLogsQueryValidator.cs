@@ -24,7 +24,7 @@ public sealed class ListDailyLogsQueryValidator : AbstractValidator<ListDailyLog
 
         RuleFor(x => x)
             .Must(query => !query.From.HasValue || !query.To.HasValue ||
-                           (query.To.Value - query.From.Value).Days <= MaxRangeDays)
+                           (query.To.Value.DayNumber - query.From.Value.DayNumber) <= MaxRangeDays)
             .WithMessage($"El rango entre from y to no puede exceder {MaxRangeDays} días.");
     }
 }
