@@ -19,11 +19,12 @@ public sealed class ListDailyLogsQueryValidator : AbstractValidator<ListDailyLog
             .WithMessage("offset no puede ser negativo.");
 
         RuleFor(x => x.From)
-            .Must((query, from) => from <= query.To)
+            .Must((query, from) => !from.HasValue || !query.To.HasValue || from.Value <= query.To.Value)
             .WithMessage("from debe ser menor o igual que to.");
 
         RuleFor(x => x)
-            .Must(query => (query.To - query.From).Days <= MaxRangeDays)
+            .Must(query => !query.From.HasValue || !query.To.HasValue ||
+                           (query.To.Value - query.From.Value).Days <= MaxRangeDays)
             .WithMessage($"El rango entre from y to no puede exceder {MaxRangeDays} días.");
     }
 }

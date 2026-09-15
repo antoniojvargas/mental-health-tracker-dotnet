@@ -8,4 +8,9 @@ public interface IDailyLogService
         Guid userId,
         CreateDailyLogRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<DailyLogListResponse> ListAsync(
+        Guid userId,
+        ListDailyLogsQuery query,
+        CancellationToken cancellationToken = default);
 }
