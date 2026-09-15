@@ -178,6 +178,44 @@ public sealed class DailyLogEndpointsTests : IClassFixture<ApiWebApplicationFact
         Assert.Equal(1, await CountAsync(page3));
     }
 
+    [Fact]
+    public async Task Logs_AreIsolatedPerUser()
+    {
+        var (userA, tokenA) = await CreateAuthenticatedSessionAsync();
+        var (_, tokenB) = await CreateAuthenticatedSessionAsync();
+
+        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3).ToString("yyyy-MM-dd");
+        Assert.NotNull(userA);
+
+        var createdToday = await PostLogAsync(tokenA, Body());
+        var createdPast = await PostLogAsync(tokenA, Body(moodRating: 4, logDate: threeDaysAgo));
+        Assert.Equal(HttpStatusCode.Created, createdToday.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, createdPast.StatusCode);
+
+        var logsA = await GetLogsAsync(tokenA);
+        Assert.Equal(HttpStatusCode.OK, logsA.StatusCode);
+        Assert.Equal(2, await TotalAsync(logsA));
+
+        var todayA = await GetTodayAsync(tokenA);
+        Assert.Equal(HttpStatusCode.OK, todayA.StatusCode);
+
+        var logsB = await GetLogsAsync(tokenB);
+        Assert.Equal(HttpStatusCode.OK, logsB.StatusCode);
+        Assert.Equal(0, await TotalAsync(logsB));
+        Assert.Equal(0, await CountAsync(logsB));
+
+        var todayB = await GetTodayAsync(tokenB);
+        Assert.Equal(HttpStatusCode.NotFound, todayB.StatusCode);
+    }
+
+    private async Task<HttpResponseMessage> GetTodayAsync(string token)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs/today");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+
+        return await _factory.CreateClient().SendAsync(request);
+    }
+
     private async Task<int> TotalAsync(HttpResponseMessage response)
     {
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -244,9 +282,9 @@ public sealed class DailyLogEndpointsTests : IClassFixture<ApiWebApplicationFact
         return (user, jwtService.Sign(user.Id, user.Email));
     }
 
-    private static object Body(int moodRating = 3, string? notes = null) => new
+    private static object Body(int moodRating = 3, string? notes = null, string? logDate = null) => new
     {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+        logDate = logDate ?? DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
         moodRating,
         anxietyLevel = 5,
         stressLevel = 5,
