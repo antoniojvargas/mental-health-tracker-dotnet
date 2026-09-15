@@ -1,7 +1,11 @@
+using FluentValidation;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
+using MentalHealthTracker.Api.Core.Validation;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
+using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
@@ -51,7 +55,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString);
 });
 
-builder.Services.AddControllers();
+builder.Services.AddScoped<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
+builder.Services.AddScoped<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
+
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<FluentValidationActionFilter>();
+});
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
