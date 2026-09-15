@@ -100,3 +100,55 @@ indefinido post-logout no es alcanzable sin que el atacante posea previamente la
 7 días sin re-consentimiento (p. ej. apps móviles o sesiones de clientes longevas), o si
 el alcance creciera a operaciones administrativas, se debería introducir refresh tokens
 con rotación y revocación server-side.
+
+### Separación de capas: controller → service → repository
+
+La API se organiza en tres capas con una responsabilidad estricta por capa:
+
+| Capa         | Responsabilidad                                                                 |
+| ------------ | ------------------------------------------------------------------------------- |
+| Controller   | Única capa que conoce HTTP: rutas, verbos, `IActionResult`, status codes y `[RequireAuth]`. Extrae el `userId` de los claims del principio de autenticación; nunca lo acepta del cuerpo ni del query. |
+| Service      | Orquesta casos de uso (mapeo request→entidad, invocación al repositorio, mapeo entidad→DTO). No conoce HTTP: no devuelve DTOs con status codes ni lanza errores atados a un código HTTP. Solo puede fallar lanzando excepciones de dominio (`MentalHealthTracker.Domain.Errors`), que el manejador global traduce. |
+| Repository   | Única capa que toca EF Core / ADO.NET. Expone operaciones de persistencia atómicas y aisladas de la vía HTTP. |
+
+**Flujo típico**: `DailyLogController` (status codes + claims) → `DailyLogService`
+(mapeo y orquestación) → `IDailyLogRepository` (único con `AppDbContext`). La validación
+FluentValidation se ejecuta como filtro global antes del controller y entrega sus errores
+en el mismo cuerpo que el manejador global, sin que el controller maneje validación.
+
+**Por qué composición explícita y no un framework que la imponga por convención**
+
+1. **Explícito vs. mágico**: soluciones como vertical slices con scaffolding o frameworks
+   tipo *feature-first* (MediatR, handlers con atributos) imponen el flujo por convención
+   y localización (carpetas, nombres, registros en un bus). El rastro controller → service
+   → repository queda diseminado. Aquí la transición es visible en el código llamada a
+   llamada y se puede auditar con una lectura lineal de cada módulo.
+2. **Dependencias mínimas y reversibles**: la composición explícita no exige inyectar un
+   contenedor de mensajes ni una librería de atributos; son interfaces C# corrientes
+   (`IDailyLogService`, `IDailyLogRepository`) con registros DI verbosos. Se puede
+   reemplazar una capa de forma aislada (p. ej. cambiar EF Core por ADO.NET) sin reescribir
+   el framework del pipeline.
+3. **Excepciones de dominio como único contrato de error**: al mantener el servicio libre
+   de HTTP, el mismo caso de uso es reutilizable si en el futuro hay un cliente distinto
+   (CLI, jobs, e2e). Un framework que enruta por convención tiende a pegar la lógica a
+   `HttpContext` o al resultado de acción.
+4. **Coste bajo para este alcance**: con tres módulos y un puñado de endpoints, el
+   "andamiaje" de un framework de request pipelines superaría el tamaño del dominio.
+   La regla "1 capa = 1 responsabilidad" se cumple sin frameworks.
+
+**Implicaciones técnicas**
+
+- Solo los controllers declaran `[RequireAuth]` y leen claims; servicios y repositorios
+  reciben el `userId` como parámetro y no confían en el contexto HTTP.
+- Los repositorios exponen operaciones atómicas (p. ej. el `ON CONFLICT ... DO UPDATE`
+  con flag `was_inserted` de `DailyLogRepository`), de modo que el servicio no tenga que
+  decidir entre insert/update leyendo primero: la carrera se resuelve en la base.
+- FluentValidation se ejecuta como filtro de acción global (`FluentValidationActionFilter`)
+  y traduce fallos a `ValidationException`; el manejador global produce el cuerpo
+  `{ error: { code: "VALIDATION_ERROR", ... } }`. Ninguna capa propaga errores HTTP a mano.
+
+**Cuándo reconsiderar**: si el número de módulos creciera hasta el punto de que la
+inyección manual de dependencias por módulo se vuelva ruido, o si aparecieran
+proyecciones/reads complejos que no son "un caso de uso por endpoint", podría evaluarse
+un bus de comandos (MediatR) o CQRS — manteniendo siempre esta regla: el controller es lo
+único que conoce HTTP y el repositorio lo único que toca la infraestructura de datos.
