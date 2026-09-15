@@ -59,6 +59,27 @@ public sealed class DailyLogEndpointsTests : IClassFixture<ApiWebApplicationFact
     }
 
     [Fact]
+    public async Task PostLog_ConcurrentPostsForSameDate_BothSucceed_OneRowExactly_OneCreated()
+    {
+        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var logDate = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var tasks = new[] { PostLogAsync(token, Body(moodRating: 3)), PostLogAsync(token, Body(moodRating: 4)) };
+        var results = await Task.WhenAll(tasks);
+
+        Assert.All(results, r => Assert.True(r.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK));
+
+        var createdCount = results.Count(r => r.StatusCode == HttpStatusCode.Created);
+        Assert.Equal(1, createdCount);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDailyLogRepository>();
+        var log = await repository.FindByUserAndDateAsync(user.Id, logDate);
+
+        Assert.NotNull(log);
+    }
+
+    [Fact]
     public async Task PostLog_WhenBodyIsInvalid_Returns400WithFieldDetail()
     {
         var (_, token) = await CreateAuthenticatedSessionAsync();
