@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Domain.Entities;
+using MentalHealthTracker.Domain.Enums;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -96,6 +98,120 @@ public sealed class DailyLogEndpointsTests : IClassFixture<ApiWebApplicationFact
             detail => detail.GetProperty("field").GetString() == "MoodRating");
     }
 
+    [Fact]
+    public async Task GetLogs_WhenRangeProvided_ReturnsOnlyLogsWithinRange()
+    {
+        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await SeedLogAsync(user.Id, today.AddDays(-30), 1);
+        await SeedLogAsync(user.Id, today.AddDays(-20), 2);
+        await SeedLogAsync(user.Id, today.AddDays(-10), 3);
+        await SeedLogAsync(user.Id, today, 4);
+
+        var response = await GetLogsAsync(
+            token,
+            $"from={today.AddDays(-25):yyyy-MM-dd}&to={today.AddDays(-15):yyyy-MM-dd}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement;
+        Assert.Equal(1, root.GetProperty("meta").GetProperty("total").GetInt32());
+        Assert.Equal(1, root.GetProperty("data").GetArrayLength());
+        Assert.Equal(
+            today.AddDays(-20).ToString("yyyy-MM-dd"),
+            root.GetProperty("data")[0].GetProperty("logDate").GetString());
+    }
+
+    [Fact]
+    public async Task GetLogs_ReturnsLogsOrderedAscendingByDate()
+    {
+        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        await SeedLogAsync(user.Id, today, 5);
+        await SeedLogAsync(user.Id, today.AddDays(-5), 1);
+        await SeedLogAsync(user.Id, today.AddDays(-2), 3);
+
+        var response = await GetLogsAsync(token);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var data = document.RootElement.GetProperty("data");
+        Assert.Equal(3, data.GetArrayLength());
+        Assert.Equal(3, document.RootElement.GetProperty("meta").GetProperty("total").GetInt32());
+
+        var dates = data.EnumerateArray()
+            .Select(e => DateOnly.Parse(e.GetProperty("logDate").GetString()!))
+            .ToArray();
+        for (var i = 1; i < dates.Length; i++)
+        {
+            Assert.True(dates[i - 1] <= dates[i]);
+        }
+    }
+
+    [Fact]
+    public async Task GetLogs_WhenLimitAndOffsetProvided_PaginatesAndKeepsMetaTotalConsistent()
+    {
+        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        for (var i = 0; i < 5; i++)
+        {
+            await SeedLogAsync(user.Id, today.AddDays(-(2 * i)), i + 1);
+        }
+
+        var page1 = await GetLogsAsync(token, "limit=2&offset=0");
+        var page2 = await GetLogsAsync(token, "limit=2&offset=2");
+        var page3 = await GetLogsAsync(token, "limit=2&offset=4");
+
+        var pageSizes = new[] { page1, page2, page3 }.Select(r => r.StatusCode).ToList();
+        Assert.All(pageSizes, c => Assert.Equal(HttpStatusCode.OK, c));
+
+        var total1 = await TotalAsync(page1);
+        var total2 = await TotalAsync(page2);
+        var total3 = await TotalAsync(page3);
+
+        Assert.Equal(5, total1);
+        Assert.Equal(5, total2);
+        Assert.Equal(5, total3);
+
+        Assert.Equal(2, await CountAsync(page1));
+        Assert.Equal(2, await CountAsync(page2));
+        Assert.Equal(1, await CountAsync(page3));
+    }
+
+    private async Task<int> TotalAsync(HttpResponseMessage response)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return document.RootElement.GetProperty("meta").GetProperty("total").GetInt32();
+    }
+
+    private async Task<int> CountAsync(HttpResponseMessage response)
+    {
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return document.RootElement.GetProperty("data").GetArrayLength();
+    }
+
+    private async Task SeedLogAsync(Guid userId, DateOnly date, int mood)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDailyLogRepository>();
+        await repository.UpsertAsync(new DailyLog
+        {
+            UserId = userId,
+            LogDate = date,
+            MoodRating = (short)mood,
+            AnxietyLevel = 3,
+            StressLevel = 3,
+            SleepHours = 7m,
+            SleepQuality = 3,
+            SleepDisturbances = [],
+            ActivityType = null,
+            ActivityMinutes = null,
+            SocialFrequency = SocialFrequency.Occasional,
+            Symptoms = [],
+            Notes = null,
+        });
+    }
+
     private async Task<HttpResponseMessage> PostLogAsync(string token, object body)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
@@ -105,9 +221,11 @@ public sealed class DailyLogEndpointsTests : IClassFixture<ApiWebApplicationFact
         return await _factory.CreateClient().SendAsync(request);
     }
 
-    private async Task<HttpResponseMessage> GetLogsAsync(string token)
+    private async Task<HttpResponseMessage> GetLogsAsync(string token, string? query = null)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs?limit=366");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"/api/logs{(query is null ? "" : $"?{query}")}");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
 
         return await _factory.CreateClient().SendAsync(request);
