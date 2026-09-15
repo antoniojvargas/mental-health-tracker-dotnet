@@ -9,7 +9,7 @@ public sealed record DailyLogResponse(
     short MoodRating,
     short AnxietyLevel,
     short StressLevel,
-    decimal SleepHours,
+    double SleepHours,
     short SleepQuality,
     List<SleepDisturbance> SleepDisturbances,
     ActivityType? ActivityType,
@@ -17,5 +17,5 @@ public sealed record DailyLogResponse(
     SocialFrequency SocialFrequency,
     List<Symptom> Symptoms,
     string? Notes,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    string CreatedAt,
+    string UpdatedAt);
