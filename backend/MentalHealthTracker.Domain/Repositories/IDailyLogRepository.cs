@@ -15,5 +15,5 @@ public interface IDailyLogRepository
         int offset,
         CancellationToken cancellationToken = default);
 
-    Task<DailyLog> UpsertAsync(DailyLog log, CancellationToken cancellationToken = default);
+    Task<UpsertedDailyLog> UpsertAsync(DailyLog log, CancellationToken cancellationToken = default);
 }

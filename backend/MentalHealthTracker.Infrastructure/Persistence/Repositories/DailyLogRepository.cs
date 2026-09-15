@@ -25,7 +25,7 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
     // transacción que insertó la fila, y una fila recién insertada en esta transacción
     // tiene xmax = 0. (xmax = 0) AS was_inserted devuelve entonces true si esta sentencia
     // creó la fila y false si solo la actualizó.
-    public async Task<DailyLog> UpsertAsync(DailyLog log, CancellationToken cancellationToken = default)
+    public async Task<UpsertedDailyLog> UpsertAsync(DailyLog log, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -98,14 +98,15 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
 
+        var wasInserted = reader.GetBoolean(1);
         log.Id = reader.GetGuid(0);
         log.UpdatedAt = now;
-        if (reader.GetBoolean(1))
+        if (wasInserted)
         {
             log.CreatedAt = now;
         }
 
-        return log;
+        return new UpsertedDailyLog(log, wasInserted);
     }
     public async Task<DailyLog?> FindByUserAndDateAsync(Guid userId, DateOnly date, CancellationToken cancellationToken = default)
         => await dbContext.DailyLogs

@@ -4,6 +4,7 @@ using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Core.Validation;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Domain.Repositories;
@@ -57,6 +58,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
 builder.Services.AddScoped<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
+builder.Services.AddScoped<IDailyLogService, DailyLogService>();
 
 builder.Services.AddControllers(options =>
 {
