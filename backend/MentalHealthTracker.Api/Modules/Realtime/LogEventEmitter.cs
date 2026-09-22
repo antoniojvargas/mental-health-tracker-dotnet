@@ -12,7 +12,7 @@ public sealed class LogEventEmitter(IHubContext<LogsHub> hubContext) : ILogEvent
     {
         await hubContext.Clients
             .Group(LogsHub.GroupNameFor(userId))
-            .SendAsync("LogCreated", log, cancellationToken);
+            .SendAsync("log:created", log, cancellationToken);
     }
 
     public async Task EmitLogUpdatedAsync(
@@ -22,6 +22,6 @@ public sealed class LogEventEmitter(IHubContext<LogsHub> hubContext) : ILogEvent
     {
         await hubContext.Clients
             .Group(LogsHub.GroupNameFor(userId))
-            .SendAsync("LogUpdated", log, cancellationToken);
+            .SendAsync("log:updated", log, cancellationToken);
     }
 }
