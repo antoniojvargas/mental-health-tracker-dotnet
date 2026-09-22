@@ -101,6 +101,39 @@ indefinido post-logout no es alcanzable sin que el atacante posea previamente la
 el alcance creciera a operaciones administrativas, se debería introducir refresh tokens
 con rotación y revocación server-side.
 
+### Canal de tiempo real (SignalR): misma cookie de sesión, sin segundo mecanismo de auth
+
+El canal de tiempo real (`/hub/logs`, hub SignalR `LogsHub`) se autentica con la **misma
+cookie de sesión `access_token`** que el resto de la API, verificada durante el handshake
+de la conexión con `JwtService`. **No existe un segundo mecanismo de autenticación para el
+canal de tiempo real.**
+
+**Mecanismo**
+
+| Capa                     | Detalle                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| Atributo `[RequireAuth]` | `LogsHub` lo declara igual que los controllers; SignalR lo propaga a los metadatos del endpoint |
+| Middleware               | `RequireAuthMiddleware` lo detecta y valida la cookie `access_token` con `JwtService`           |
+| Handshake                | La validación corre en el *negotiate* y en el *upgrade* a WebSocket: sin token válido la conexión se rechaza con `401` |
+
+**Motivos**
+
+1. **Un solo token de sesión para toda la app.** El mismo JWT `httpOnly` que autentica los
+   endpoints HTTP autentica la conexión en tiempo real. El frontend no necesita gestionar un
+   fixture de credenciales extra (ni `accessTokenFactory`, ni queries con token) y no se
+   introduce superficie de ataque nueva para transportar un segundo secreto.
+2. **SameSite=Lax no bloquea el WebSocket.** La cookie viaja en el handshake porque es una
+   navegación same-site (frontend y API en el mismo `site`), igual que en el resto del flujo
+   HTTP; la conclusión de CSRF de arriba se mantiene intacta.
+
+**Implicaciones técnicas**
+
+- Los hubs declaran `[RequireAuth]` y se benefician del mismo pipeline que los controllers:
+  una sola ruta de verificación, testeo y transporte de claims hacia `context.User`.
+- Si no hay cookie o el JWT no verifica (caducado, alterado o firmado mal), el handshake
+  devuelve `401` y el cliente jamás establece la conexión: no hay "conexión anónima" con
+  autorización diferida por hub.
+
 ### Separación de capas: controller → service → repository
 
 La API se organiza en tres capas con una responsabilidad estricta por capa:
