@@ -1,10 +1,13 @@
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
+using MentalHealthTracker.Api.Modules.Realtime;
 using MentalHealthTracker.Domain.Repositories;
 using DailyLogEntity = MentalHealthTracker.Domain.Entities.DailyLog;
 
 namespace MentalHealthTracker.Api.Modules.DailyLog;
 
-public sealed class DailyLogService(IDailyLogRepository repository) : IDailyLogService
+public sealed class DailyLogService(
+    IDailyLogRepository repository,
+    ILogEventEmitter logEventEmitter) : IDailyLogService
 {
     public async Task<(DailyLogResponse Response, bool Created)> UpsertAsync(
         Guid userId,
@@ -14,7 +17,18 @@ public sealed class DailyLogService(IDailyLogRepository repository) : IDailyLogS
         var log = MapToEntity(userId, request);
         var result = await repository.UpsertAsync(log, cancellationToken);
 
-        return (result.Log.ToResponse(), result.Created);
+        var response = result.Log.ToResponse();
+
+        if (result.Created)
+        {
+            await logEventEmitter.EmitLogCreatedAsync(userId, response, cancellationToken);
+        }
+        else
+        {
+            await logEventEmitter.EmitLogUpdatedAsync(userId, response, cancellationToken);
+        }
+
+        return (response, result.Created);
     }
 
     public async Task<DailyLogListResponse> ListAsync(
