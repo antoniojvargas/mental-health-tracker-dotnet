@@ -101,6 +101,74 @@ indefinido post-logout no es alcanzable sin que el atacante posea previamente la
 el alcance creciera a operaciones administrativas, se debería introducir refresh tokens
 con rotación y revocación server-side.
 
+### Canal de tiempo real (SignalR): misma cookie de sesión, sin segundo mecanismo de auth
+
+El canal de tiempo real (`/hub/logs`, hub SignalR `LogsHub`) se autentica con la **misma
+cookie de sesión `access_token`** que el resto de la API, verificada durante el handshake
+de la conexión con `JwtService`. **No existe un segundo mecanismo de autenticación para el
+canal de tiempo real.**
+
+**Mecanismo**
+
+| Capa                     | Detalle                                                                                         |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| Atributo `[RequireAuth]` | `LogsHub` lo declara igual que los controllers; SignalR lo propaga a los metadatos del endpoint |
+| Middleware               | `RequireAuthMiddleware` lo detecta y valida la cookie `access_token` con `JwtService`           |
+| Handshake                | La validación corre en el *negotiate* y en el *upgrade* a WebSocket: sin token válido la conexión se rechaza con `401` |
+
+**Motivos**
+
+1. **Un solo token de sesión para toda la app.** El mismo JWT `httpOnly` que autentica los
+   endpoints HTTP autentica la conexión en tiempo real. El frontend no necesita gestionar un
+   fixture de credenciales extra (ni `accessTokenFactory`, ni queries con token) y no se
+   introduce superficie de ataque nueva para transportar un segundo secreto.
+2. **SameSite=Lax no bloquea el WebSocket.** La cookie viaja en el handshake porque es una
+   navegación same-site (frontend y API en el mismo `site`), igual que en el resto del flujo
+   HTTP; la conclusión de CSRF de arriba se mantiene intacta.
+
+**Implicaciones técnicas**
+
+- Los hubs declaran `[RequireAuth]` y se benefician del mismo pipeline que los controllers:
+  una sola ruta de verificación, testeo y transporte de claims hacia `context.User`.
+- Si no hay cookie o el JWT no verifica (caducado, alterado o firmado mal), el handshake
+  devuelve `401` y el cliente jamás establece la conexión: no hay "conexión anónima" con
+  autorización diferida por hub.
+
+### Escalado horizontal del canal en tiempo real: señalada limitación, sin backplane (decisión de alcance)
+
+El canal en tiempo real **no está preparado para correr en varias réplicas de la API**:
+no hay backplane (p. ej. Azure SignalR Service o Redis) detrás de SignalR. Su estado de
+grupos y conexiones vive **en memoria de cada instancia**. Es una **decisión consciente de
+alcance**, no un olvido.
+
+**Qué implica**
+
+| Escenario                           | Comportamiento actual                                                   |
+| ----------------------------------- | ----------------------------------------------------------------------- |
+| Una sola réplica                    | Los grupos `user:{userId}` y el broadcast por conexión funcionan porque todo vive en la misma memoria |
+| Varias réplicas sin backplane       | Un usuario conectado a la instancia A recibe el evento de una escritura de su propio log solo si esa escritura también la procesó A; si la procesa la instancia B, el evento no llega porque `user:{userId}` no existe en la memoria de B |
+
+**Motivos para aceptar la limitación hoy**
+
+1. **El estado real sigue siendo correcto.** La falla es solo de *entrega inmediata* del
+   evento: el log quedó persistido por B y un refresco HTTP (`GET /api/logs`) devuelve el
+   dato actualizado venga de la réplica que venga. No hay pérdida de datos ni divergencia.
+2. **Una sola instancia es el despliegue actual.** El componente API se ejecuta como un
+   único contenedor (ver `docker-compose.yml`); no hay load balancer ni autoscaling que
+   justifique el costo operativo de un backplane hoy.
+3. **SameSite=Lax y WebSockets encajan con un backend único.** El patrón de sesión por
+   cookie y conexiones persistentes asume un `site` y un backend; un backplane solo tendría
+   sentido cuando el escalado cuantitativo lo exija.
+
+**Cuándo y cómo se resolvería**
+
+Si la app creciera a varias réplicas, la mitigación directa es introducir un backplane
+SignalR (Redis o Azure SignalR Service) registrado en `AddSignalR()`; los grupos
+`user:{userId}` se sincronizarían entre instancias y el escenario "usuario en A, escritura
+en B" volvería a entregar el evento. El diseño actual no impide este cambio: el emisor
+(`ILogEventEmitter`) no conoce el transporte, así que el backplane sería un detalle de la
+implementación en infraestructura.
+
 ### Separación de capas: controller → service → repository
 
 La API se organiza en tres capas con una responsabilidad estricta por capa:

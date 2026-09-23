@@ -7,6 +7,7 @@ using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Api.Modules.DailyLog.Validators;
+using MentalHealthTracker.Api.Modules.Realtime;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
@@ -60,11 +61,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
 builder.Services.AddScoped<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
 builder.Services.AddScoped<IDailyLogService, DailyLogService>();
+builder.Services.AddScoped<ILogEventEmitter, LogEventEmitter>();
 
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<FluentValidationActionFilter>();
 });
+builder.Services.AddSignalR();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
@@ -99,6 +102,8 @@ app.UseRouting();
 app.UseRequireAuth();
 
 app.MapControllers();
+
+app.MapHub<LogsHub>("/hub/logs");
 
 if (app.Environment.IsEnvironment("Testing"))
 {
