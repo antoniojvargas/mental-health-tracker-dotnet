@@ -90,6 +90,18 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1",
         Description = "API del Mental Health Tracker: autenticación y registro diario del bienestar.",
     });
+
+    options.AddSecurityDefinition(
+        JwtService.SessionCookieName,
+        new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.ApiKey,
+            Name = JwtService.SessionCookieName,
+            In = ParameterLocation.Cookie,
+            Description = "Cookie de sesión emitida tras iniciar sesión con Google.",
+        });
+
+    options.OperationFilter<RequireAuthSecurityOperationFilter>();
 });
 
 var app = builder.Build();
