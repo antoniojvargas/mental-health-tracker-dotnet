@@ -169,6 +169,46 @@ en B" volvería a entregar el evento. El diseño actual no impide este cambio: e
 (`ILogEventEmitter`) no conoce el transporte, así que el backplane sería un detalle de la
 implementación en infraestructura.
 
+### Rate limiting en memoria: mismo backplane pendiente que SignalR (decisión de alcance)
+
+Las políticas de rate limiting (`auth`: 20 req/15 min por IP en `GET /api/auth/google/callback`;
+`write`: 30 req/15 min por id de usuario en `POST /api/logs`) usan `AddRateLimiter` con
+`FixedWindowRateLimiter`. El estado de la ventana (el contador de cada partición) vive
+**en memoria de la instancia**: `System.Threading.RateLimiting` no persiste contadores en
+ningún store compartido.
+
+**Qué implica**
+
+| Escenario                    | Comportamiento actual                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| Una sola réplica             | El contador es local y exacto: la cuota se aplica de forma firme por IP o por id de usuario. |
+| Varias réplicas sin store    | Cada instancia cuenta por separado, de modo que un cliente repartido entre réplicas puede consumir hasta una ventana por réplica; el límite deja de ser una **garantía global** y pasa a ser probabilístico. |
+
+**Motivos para aceptar la limitación hoy**
+
+1. **La mitigación real es la misma pieza de infraestructura que resolvería el backplane de
+   SignalR: Redis.** El contador de ventana distribuido (p. ej. `INCR` + `EXPIRE` con una
+   clave `rl:{ip}` / `rl:user:{id}`) y el backplane de grupos `user:{userId}` son la misma
+   dependencia operativa. Tratar **ambas limitaciones como una sola decisión** evita añadir
+   infraestructura por partida doble o escalar una réplica de SignalR y "olvidar" el rate
+   limiting global (o al revés).
+2. **El despliegue actual es una única réplica.** El componente API corre en un contenedor
+   (ver `docker-compose.yml`); hoy el contador en memoria es exacto y no hay pérdida de
+   comportamiento frente al objetivo declarado.
+3. **Best-effort es aceptable en esta categoría.** El rate limiting mitiga abuso (fuerza
+   bruta sobre OAuth, saturación de escrituras), no garantiza un SLA de consumo; el
+   deterioro bajo réplicas sin compartir es un límite más laxo, no una falla de seguridad.
+
+**Cuándo y cómo se resolvería**
+
+Si la app pasara a varias réplicas, se introduciría **Redis** una sola vez como infraestructura
+compartida: contadores de ventana (las particiones de `AddRateLimiter` apuntan a Redis) y, al
+mismo tiempo, backplane de SignalR (`AddStackExchangeRedis`). Las políticas pueden particionar
+contra Redis sin cambiar el contrato HTTP (mismas cabeceras `RateLimit-*` y `429`), igual que
+el backplane es un detalle de implementación para `ILogEventEmitter`. Hasta entonces, el estado
+operativo entre instancias depende de una decisión única: SignalR y rate limiting escalan
+**juntos**, con la misma pieza, o ninguno lo garantiza.
+
 ### Separación de capas: controller → service → repository
 
 La API se organiza en tres capas con una responsabilidad estricta por capa:

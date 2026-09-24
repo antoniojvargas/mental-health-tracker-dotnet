@@ -2,8 +2,10 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
@@ -18,11 +20,19 @@ public sealed class AuthController(
     IOptions<AppUrlsOptions> appUrls,
     ILogger<AuthController> logger) : ControllerBase
 {
+    internal const string AuthRateLimitPolicy = "auth";
+
     private const string OAuthStateCookieName = "oauth_state";
 
     private const string LoginErrorRoute = "/login?error=auth_failed";
 
     [HttpGet("google/callback")]
+    [EnableRateLimiting(AuthRateLimitPolicy)]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GoogleCallback(
         [FromQuery] string? state,
         [FromQuery] string? code,
@@ -58,6 +68,11 @@ public sealed class AuthController(
 
     [HttpGet("me")]
     [RequireAuth]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -83,6 +98,11 @@ public sealed class AuthController(
     }
 
     [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public IActionResult Logout()
     {
         Response.Cookies.Delete(JwtService.SessionCookieName, cookieOptions.Create());
