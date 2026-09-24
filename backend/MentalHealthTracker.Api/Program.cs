@@ -210,7 +210,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options =>
     {
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "Mental Health Tracker API v1");
-        options.RoutePrefix = "api/docs";
+        options.RoutePrefix = SecurityHeadersMiddleware.DocsRoutePrefix;
     });
 }
 
