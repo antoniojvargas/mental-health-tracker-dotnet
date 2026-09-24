@@ -23,6 +23,7 @@ public sealed class AuthController(
     private const string LoginErrorRoute = "/login?error=auth_failed";
 
     [HttpGet("google/callback")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
     public async Task<IActionResult> GoogleCallback(
         [FromQuery] string? state,
         [FromQuery] string? code,
@@ -58,6 +59,8 @@ public sealed class AuthController(
 
     [HttpGet("me")]
     [RequireAuth]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -83,6 +86,7 @@ public sealed class AuthController(
     }
 
     [HttpPost("logout")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
     public IActionResult Logout()
     {
         Response.Cookies.Delete(JwtService.SessionCookieName, cookieOptions.Create());

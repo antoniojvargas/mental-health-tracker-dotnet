@@ -13,6 +13,7 @@ using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -79,8 +80,17 @@ builder.Services.AddCors(options =>
     options.AddPolicy(CorsPolicyName, policy =>
         policy.WithOrigins(appUrls?.FrontendUrl ?? string.Empty).AllowCredentials()));
 
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Mental Health Tracker API",
+        Version = "v1",
+        Description = "API del Mental Health Tracker: autenticación y registro diario del bienestar.",
+    });
+});
 
 var app = builder.Build();
 
@@ -92,7 +102,12 @@ app.UseCors(CorsPolicyName);
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Mental Health Tracker API v1");
+        options.RoutePrefix = "api/docs";
+    });
 }
 
 app.UseHttpsRedirection();
