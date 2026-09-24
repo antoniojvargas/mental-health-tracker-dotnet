@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Npgsql;
+using System.Globalization;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -92,6 +93,30 @@ builder.Services.AddRateLimiter(options =>
         }
 
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        var permitLimit = context.HttpContext.GetEndpoint()?
+            .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName switch
+        {
+            AuthController.AuthRateLimitPolicy => 20,
+            DailyLogController.WriteRateLimitPolicy => 30,
+            _ => 0,
+        };
+
+        context.HttpContext.Response.Headers["RateLimit-Limit"] =
+            permitLimit.ToString(CultureInfo.InvariantCulture);
+        context.HttpContext.Response.Headers["RateLimit-Remaining"] = "0";
+
+        // El limiter fija la metadata RETRY_AFTER con el tiempo restante hasta que se
+        // reabra la ventana; es lo que alimenta RateLimit-Reset y Retry-After.
+        if (context.Lease.TryGetMetadata("RETRY_AFTER", out var retryAfter) &&
+            retryAfter is TimeSpan retryDelay)
+        {
+            var seconds = Math.Max(0, (int)Math.Ceiling(retryDelay.TotalSeconds))
+                .ToString(CultureInfo.InvariantCulture);
+            context.HttpContext.Response.Headers["RateLimit-Reset"] = seconds;
+            context.HttpContext.Response.Headers.RetryAfter = seconds;
+        }
+
         await context.HttpContext.Response.WriteAsJsonAsync(
             new ErrorResponse(new ErrorBody("RATE_LIMITED", "Too many requests. Please try again later.", [])),
             cancellationToken);
