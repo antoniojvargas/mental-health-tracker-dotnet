@@ -12,10 +12,12 @@ using MentalHealthTracker.Api.Modules.Realtime;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using Npgsql;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,6 +75,39 @@ builder.Services.AddSignalR();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+// El callback de Google OAuth es el único endpoint que acepta tráfico sin sesión y
+// desencadena una redirección externa + upsert de usuario: sin límite sería un vector
+// de abuso (fuerza bruta sobre state/code y trabajo innecesario contra Google/BD).
+// Se particiona por IP de origen porque el stack actual expone Kestrel directamente
+// (docker-compose publica el puerto 3000 sin proxy), así RemoteIpAddress es el cliente.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        if (context.HttpContext.Response.HasStarted)
+        {
+            return;
+        }
+
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new ErrorResponse(new ErrorBody("RATE_LIMITED", "Too many requests. Please try again later.", [])),
+            cancellationToken);
+    };
+
+    options.AddPolicy(AuthController.AuthRateLimitPolicy, httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(15),
+                AutoReplenishment = true,
+            }));
+});
+
 const string CorsPolicyName = "Frontend";
 var appUrls = builder.Configuration
     .GetSection(AppUrlsOptions.SectionName)
@@ -129,6 +164,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseRouting();
+
+app.UseRateLimiter();
 
 app.UseRequireAuth();
 

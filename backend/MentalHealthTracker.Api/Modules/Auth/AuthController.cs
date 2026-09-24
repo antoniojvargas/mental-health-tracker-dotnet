@@ -5,6 +5,7 @@ using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
@@ -19,11 +20,14 @@ public sealed class AuthController(
     IOptions<AppUrlsOptions> appUrls,
     ILogger<AuthController> logger) : ControllerBase
 {
+    internal const string AuthRateLimitPolicy = "auth";
+
     private const string OAuthStateCookieName = "oauth_state";
 
     private const string LoginErrorRoute = "/login?error=auth_failed";
 
     [HttpGet("google/callback")]
+    [EnableRateLimiting(AuthRateLimitPolicy)]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
