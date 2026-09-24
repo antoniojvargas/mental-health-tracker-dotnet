@@ -3,6 +3,7 @@ using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace MentalHealthTracker.Api.Modules.DailyLog;
 
@@ -11,10 +12,13 @@ namespace MentalHealthTracker.Api.Modules.DailyLog;
 [RequireAuth]
 public sealed class DailyLogController(IDailyLogService dailyLogService) : ControllerBase
 {
+    internal const string WriteRateLimitPolicy = "write";
+
     private Guid UserId =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
     [HttpPost]
+    [EnableRateLimiting(WriteRateLimitPolicy)]
     [ProducesResponseType(typeof(DailyLogResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(DailyLogResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]

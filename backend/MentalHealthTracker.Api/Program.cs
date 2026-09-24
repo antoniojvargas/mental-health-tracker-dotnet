@@ -106,6 +106,34 @@ builder.Services.AddRateLimiter(options =>
                 Window = TimeSpan.FromMinutes(15),
                 AutoReplenishment = true,
             }));
+
+    // POST /api/logs (upsert de registros) se limita por id de usuario y no por IP:
+    // dos pacientes detrás de la misma red (NAT de empresa, campus) no deben consumir
+    // la cuota del otro. La partición sale del JWT firmado en la cookie; si el token
+    // falta o es inválido no se limita (GetNoLimiter) porque RequireAuth los rechaza
+    // igual con 401 y nunca llegan a escribir.
+    options.AddPolicy(DailyLogController.WriteRateLimitPolicy, httpContext =>
+    {
+        var token = httpContext.Request.Cookies[JwtService.SessionCookieName];
+        var userId = httpContext.RequestServices
+            .GetRequiredService<JwtService>()
+            .Verify(token)?
+            .UserId;
+
+        if (userId is null)
+        {
+            return RateLimitPartition.GetNoLimiter((Guid?)null);
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            userId,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(15),
+                AutoReplenishment = true,
+            });
+    });
 });
 
 const string CorsPolicyName = "Frontend";

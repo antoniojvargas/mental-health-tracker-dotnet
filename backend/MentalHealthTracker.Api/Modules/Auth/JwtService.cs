@@ -46,7 +46,7 @@ public sealed class JwtService
         return $"{signingInput}.{signature}";
     }
 
-    public (Guid UserId, string Email)? Verify(string token)
+    public (Guid UserId, string Email)? Verify(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
