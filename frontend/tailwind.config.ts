@@ -64,6 +64,37 @@ export default {
         // — the logbook texture. It is the only family with tabular figures.
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
+      keyframes: {
+        'fade-in': { from: { opacity: '0' }, to: { opacity: '1' } },
+        'slide-up': {
+          from: { opacity: '0', transform: 'translateY(8px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'slide-in-page': {
+          from: { opacity: '0', transform: 'translateX(10px)' },
+          to: { opacity: '1', transform: 'translateX(0)' },
+        },
+        // The ambient pulse of the breathing exercise. Slow and infinite on
+        // purpose — it is the one animation meant to be watched repeatedly.
+        breathe: {
+          '0%, 100%': { opacity: '0.35', transform: 'scale(0.85)' },
+          '50%': { opacity: '1', transform: 'scale(1)' },
+        },
+        // Chart lines, for a stroke drawn from 0 to full length.
+        draw: {
+          from: { strokeDashoffset: '1' },
+          to: { strokeDashoffset: '0' },
+        },
+      },
+      // Durations stay in the 200-250ms band and ease out: motion should
+      // settle the interface, never draw attention to itself.
+      animation: {
+        'fade-in': 'fade-in 200ms ease-out',
+        'slide-up': 'slide-up 250ms ease-out',
+        'slide-in-page': 'slide-in-page 220ms ease-out',
+        breathe: 'breathe 1.4s ease-in-out infinite',
+        draw: 'draw 400ms ease-out forwards',
+      },
     },
   },
 } satisfies Config
