@@ -53,11 +53,15 @@ export default {
         },
       },
       fontFamily: {
-        // Ambient default everywhere: a calm text serif, not a UI grotesque.
+        // Default everywhere (`font-sans`, and the body via preflight). A calm
+        // text serif, not a UI grotesque: reading, not interface chrome. All
+        // body copy, labels, form text and buttons stay here.
         sans: ['"Newsreader"', 'Georgia', 'ui-serif', 'serif'],
-        // Used sparingly, for hero moments and section titles only.
+        // Sparingly, for hero moments and section titles only. It is a display
+        // face, so long runs of it are wrong — never paragraphs or dense UI.
         display: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
-        // Dates, figures, chart data — the logbook texture.
+        // Dates, figures, chart data and any value that must align in a column
+        // — the logbook texture. It is the only family with tabular figures.
         mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
     },
