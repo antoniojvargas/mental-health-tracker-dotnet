@@ -324,3 +324,75 @@ no puede confundirse con el arranque del contenedor. La espera de disponibilidad
 la wait strategy de Testcontainers, que es más fiable que el reintento con backoff que hoy
 ejecuta `DatabaseInitializer.WaitForDatabaseAsync`. El `docker-compose.test.yml` se
 conservaría para el ciclo local, pero la connection string pasaría a ser siempre inyectada.
+### Tipos del contrato: espejo a mano y OpenAPI como detector de deriva, no como fuente
+
+`frontend/src/types/daily-log.ts` es el punto único donde el frontend describe el contrato
+con la API, y hoy está escrito a mano. Existe `npm run generate:types`, que corre
+`openapi-typescript` sobre el snapshot versionado `frontend/openapi.json` y produce
+`frontend/src/types/api.generated.d.ts`. **El archivo generado se versiona pero no se
+importa en la aplicación**: sirve para auditar que el espejo a mano no se desvía, no para
+consumirlo. Es una decisión revisada contra el documento OpenAPI real de la API, no una
+preferencia.
+
+**Por qué el consumo directo del generado no es viable hoy**
+
+1. **Falta un endpoint entero.** `GET /api/auth/me` documenta su `200` como
+   `{ "description": "OK" }`, sin schema: `AuthController` devuelve un objeto anónimo que
+   Swashbuckle no sabe describir. El tipo `User` es **inevitablemente manual**; un contrato
+   "100 % generado" lo rompería en el primer import.
+2. **El tipo generado rechaza un payload que la API sí acepta.** Swashbuckle traduce el
+   `ActivityType?` de C# como `activityType?: ActivityType`, es decir opcional pero *no*
+   nullable, así que envía `activityType: null` —que es como se dice "no hay actividad"— falla
+   con `TS2322: Type 'null' is not assignable to type '"none" | "other" | ...'`. El espejo a
+   mano declara `activityType: ActivityType | null`, que es lo correcto.
+3. **`ApiErrorCode` se degrada a `string`.** El documento declara `ErrorBody.code` como
+   `string` plano, así que se pierde el conjunto cerrado de los 5 códigos y con él la
+   exhaustividad del `switch` y el autocompletado.
+4. **Introduce 21 `| null` donde C# no admite null.** `createdAt: string | null` y
+   `ErrorBody.message: string | null` son ruido defensivo en cada punto de uso, y además
+   enmascaran la nullability que sí importa.
+5. **Los enums dejan de ser iterables.** El generado emite uniones de literales
+   (`"none" | "insomnia" | ...`) sin `as const`, así que la UI no puede recorrerlas para
+   pintar selectores o sliders y necesita la lista a mano de nuevo, que es justo la
+   duplicación que generar los tipos iba a eliminar. Los **valores sí coinciden**: 26 de 26
+   verificados contra el `SnakeCaseEnumJsonConverter` real.
+6. **El documento no contiene el conocimiento de dominio.** Los rangos que impone
+   `CreateDailyLogValidator` (mood 1-5, ansiedad/estrés 1-10, sueño 0-24, actividad 0-600,
+   366 días de rango), la regla de que `sleepDisturbances` y `symptoms` se envían siempre
+   como `[]`, que `createdAt` viene en formato "O" de .NET y `new Date()` no lo parsea de
+   forma fiable entre navegadores, y que `details[].field` es la única propiedad PascalCase
+   del cable. Nada de eso está en el OpenAPI, y es la parte que más errores cuesta.
+7. **La respuesta 429 no documenta cabeceras.** Los `RateLimit-*` que emite la API no están
+   en el documento, así que el contrato generado tampoco los refleja.
+
+**Por qué `openapi-typescript` no es una dependencia del proyecto**
+
+`openapi-typescript@7.13.0` declara `typescript@^5.x` como peer y el proyecto usa
+`typescript@6.0.3`, así que `npm install` falla con `ERESOLVE`. Se podría resolver con
+`--legacy-peer-deps`, pero se comprobó que entonces **`npm ci` pasa a fallar sin ese flag**,
+lo que rompe el `npm ci` del `Dockerfile` y cualquier CI futuro. El peer además es espurio:
+`openapi-typescript` no importa `typescript` en su bundle, solo lo declara para el chequeo
+opcional del `.d.ts` generado. Por eso el script invoca `npx --yes
+openapi-typescript@7.13.0` con la versión pineada: el árbol de dependencias y el `npm ci`
+se quedan intactos, a cambio de necesitar red la primera vez.
+
+**Limitación que sí arrastra la decisión**
+
+El snapshot `frontend/openapi.json` se queda desactualizado por sí solo: regenerarlo exige
+arrancar la API en `Development` (que a su vez necesita Postgres, porque `Program.cs` ejecuta
+las migraciones al inicio) y volver a volcar el documento. Sin CI que lo haga, el detector
+de deriva solo corre cuando alguien se acuerda. Ese coste es aceptable mientras el
+generado no se consuma, pero es la razón por la que esta decisión es revisable y no
+definitiva.
+
+**Cuándo y cómo se adoptaría el consumo directo**
+
+Cuando el documento OpenAPI aprenda a describirse a sí mismo, es decir cuando se cierren
+estos cuatro huecos: que `AuthController` deje de devolver un objeto anónimo y devuelva un
+`UserResponse` documentado; que `ErrorBody.code` se declare como enum en el schema; que los
+enums se emitan con `x-enumNames` o similar para poder recuperar la lista de valores; y que
+las respuestas 429 documenten sus cabeceras. Con eso, el camino sería generar los tipos
+base y mantener encima una capa fina a mano solo para lo que el documento no puede
+expresar —los rangos de validación, la regla de `[]`, el formato de `createdAt`—, que es
+justo la parte que hoy está en `daily-log.ts`. Hasta entonces, regenerar y mirar el diff es
+la forma barata de detectar que un DTO del backend se movió.

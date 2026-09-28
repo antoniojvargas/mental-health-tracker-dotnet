@@ -30,3 +30,25 @@ Dos reglas para no romper la intención del diseño:
 
 Definida en `tailwind.config.ts`. `ember` está reservada para el degradado
 ambiental del login y no debe usarse en el cromo de la interfaz.
+
+## Tipos del contrato
+
+`src/types/daily-log.ts` es el único sitio donde el frontend describe el
+contrato con la API. Si necesitas la forma de un campo que no esté ahí,
+no la redeclares en el componente: añádela al archivo.
+
+`npm run generate:types` regenera `src/types/api.generated.d.ts` a partir
+del snapshot `openapi.json`. **Ese archivo no se importa**: existe para
+auditar que el espejo a mano no se desvía del backend. El motivo está
+detallado en `docs/architecture.md`.
+
+Para refrescar el snapshot hay que volcar el documento de una API en
+Development, y `Program.cs` ejecuta las migraciones al arrancar, así que
+hace falta Postgres:
+
+```bash
+docker compose up -d postgres
+# arrancar la API con ASPNETCORE_ENVIRONMENT=Development
+curl -s http://localhost:3000/swagger/v1/swagger.json > frontend/openapi.json
+cd frontend && npm run generate:types
+```

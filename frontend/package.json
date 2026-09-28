@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:types": "npx --yes openapi-typescript@7.13.0 openapi.json -o src/types/api.generated.d.ts"
   },
   "dependencies": {
     "pinia": "^4.0.3",
