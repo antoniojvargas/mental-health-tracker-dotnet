@@ -260,3 +260,67 @@ inyección manual de dependencias por módulo se vuelva ruido, o si aparecieran
 proyecciones/reads complejos que no son "un caso de uso por endpoint", podría evaluarse
 un bus de comandos (MediatR) o CQRS — manteniendo siempre esta regla: el controller es lo
 único que conoce HTTP y el repositorio lo único que toca la infraestructura de datos.
+
+### Base de datos de pruebas: `docker-compose.test.yml`, sin Testcontainers (decisión de alcance)
+
+Las pruebas de integración arrancan un PostgreSQL real de la misma versión que producción
+(`postgres:16-alpine`) con `docker compose -f docker-compose.test.yml up -d`, y `make test`
+lo levanta y lo baja alrededor de `dotnet test`. **No se usa Testcontainers para gestionar
+ese contenedor desde el propio suite.** Es una decisión revisada con datos medidos en esta
+máquina, no una omisión.
+
+**Qué aporta hoy el compose para test**
+
+| Aspecto                          | Estado actual                                                                                             |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Aislamiento por ejecución        | Total: el compose monta `tmpfs` en `/var/lib/postgresql/data`, así que cada `up` parte de una base vacía |
+| Versión de Postgres              | `16-alpine`, idéntica a `docker-compose.yml`                                                              |
+| Coste de arranque                | `~0,2 s` si el contenedor ya está arriba                                                                  |
+| Coste de un contenedor nuevo     | `~1,2 s` medido: `0,14 s` de `docker run` + `1,03 s` hasta que `pg_isready` responde                     |
+| Ciclo completo de `make test`    | `~6,9 s` medido, de los cuales `~3 s` son las pruebas                                                    |
+| Puerto                           | Fijo, `5433`, separado del `5432` del compose de desarrollo                                              |
+
+**Motivos para no adoptar Testcontainers todavía**
+
+1. **Docker ya es un prerrequisito, así que Testcontainers no elimina ninguno.** Los tests
+   corren en el host y hoy levantan Postgres con compose. Testcontainers automatiza el
+   *orquestador*, no el requisito: sin un demonio Docker, ninguna de las dos opciones
+   funciona. La ventaja que más se le atribuye (un `dotnet test` autocontenido) no aporta
+   aquí lo que aportaría en un proyecto sin orquestación previa.
+2. **El aislamiento por ejecución ya está resuelto.** El `tmpfs` del compose garantiza una
+   base vacía en cada `up`, que es exactamente lo que aportaría un contenedor efímero. Y
+   desde `IntegrationTestBase` las pruebas ya truncan `users` y `daily_logs` entre casos,
+   así que el estado no se hereda ni entre pruebas ni entre ejecuciones.
+3. **Mantener ambas vías cuesta más de lo que ahorra.** Pedir compose como opción local
+   rápida y Testcontainers como vía principal obliga a que la connection string deje de ser
+   una constante en `CustomWebApplicationFactory` (hoy fija `localhost:5433`) y pase a
+   inyectarse, con un valor por defecto para el compose y otro asignado dinámicamente por
+   el puerto mapeado del contenedor. Eso son dos rutas de configuración para la misma base
+   de datos y, por tanto, dos maneras de que los tests apunten a la instancia equivocada.
+4. **El detonante todavía no ha llegado.** El beneficio mayor de Testcontainers es
+   simplificar CI, y **este repositorio no tiene CI** (no existe `.github/workflows`). Se
+   estaría pagando la complejidad de dos modos a cambio de una ventaja hipotética.
+
+**Limitación que sí arrastra la decisión**: el puerto `5433` es fijo. Si otro proceso lo ocupa,
+`make test` falla con un error de binding poco descriptivo en lugar de levantar la base en
+otro puerto. Con un solo desarrollador en su máquina y el compose de desarrollo en `5432`, la
+colisión es improbable.
+
+**Cuándo y cómo se adoptaría**
+
+El momento natural es que aparezca CI, y conviene hacerlo junto con consolidar los fixtures:
+hoy las 5 clases de test usan `IClassFixture<CustomWebApplicationFactory>`, así que cada
+una tiene su instancia y las migraciones de `Program.cs` se ejecutan 5 veces por ejecución.
+Un contenedor a nivel de colección encaja con un `ICollectionFixture` único, que resolvería
+las dos cosas de una vez: un solo arranque de Postgres, un solo `MigrateAsync` y un solo
+`Program` en memoria.
+
+Los cambios concretos serían: añadir `Testcontainers.PostgreSql` (4.15.0, compatible con
+`net9.0`) al proyecto de tests; un `PostgreSqlBuilder` con `.WithImage("postgres:16-alpine")`
+y las mismas credenciales del compose; su `GetConnectionString()` —que ya trae el puerto
+mapeado— inyectado en la factory en vez de la constante; y el `IAsyncLifetime` del
+contenedor conviviendo con el de `IntegrationTestBase`, que debe seguir truncando tablas y
+no puede confundirse con el arranque del contenedor. La espera de disponibilidad la resuelve
+la wait strategy de Testcontainers, que es más fiable que el reintento con backoff que hoy
+ejecuta `DatabaseInitializer.WaitForDatabaseAsync`. El `docker-compose.test.yml` se
+conservaría para el ciclo local, pero la connection string pasaría a ser siempre inyectada.
