@@ -10,11 +10,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class RealtimeLogEventsTests : IClassFixture<ApiWebApplicationFactory>
+public sealed class RealtimeLogEventsTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly ApiWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public RealtimeLogEventsTests(ApiWebApplicationFactory factory)
+    public RealtimeLogEventsTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

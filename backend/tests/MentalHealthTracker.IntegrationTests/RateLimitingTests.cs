@@ -12,18 +12,18 @@ namespace MentalHealthTracker.IntegrationTests;
 // Verifica las políticas de rate limiting definidas en Program.cs: "auth" (20 req/15 min
 // por IP) sobre el callback de Google OAuth, y "write" (30 req/15 min por id de usuario)
 // sobre POST /api/logs. Los límites (20 y 30) son el contrato vigente en Program.cs.
-// Cada clase de test tiene su propia instancia de ApiWebApplicationFactory, por lo que el
+// Cada clase de test tiene su propia instancia de CustomWebApplicationFactory, por lo que el
 // estado del rate limiter (y agotar cuotas) queda aislado a esta clase.
-public sealed class RateLimitingTests : IClassFixture<ApiWebApplicationFactory>
+public sealed class RateLimitingTests : IClassFixture<CustomWebApplicationFactory>
 {
     private const int AuthPermitLimit = 20;
     private const int WritePermitLimit = 30;
 
     private const string AuthCallbackUrl = "/api/auth/google/callback?state=x&code=y";
 
-    private readonly ApiWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public RateLimitingTests(ApiWebApplicationFactory factory)
+    public RateLimitingTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

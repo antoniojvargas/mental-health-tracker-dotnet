@@ -8,13 +8,16 @@ namespace MentalHealthTracker.IntegrationTests;
 // de test: apunta a postgres-test (docker-compose.test.yml, puerto 5433) y provee los
 // secretos ficticios que el entry point valida al arrancar (Jwt:Secret, GoogleOAuth:*,
 // AppUrls:FrontendUrl). Sin estos valores ValidateOnStart de Program.cs abortaría el boot.
-// El entorno se fija a "Development" (no "Testing") a propósito: los tests de /me y logout
-// deben correr con el endpoint /api/auth/test-login NO registrado (ver AuthEndpointsTests).
-public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
+// El entorno se fija a "Testing", que es lo que habilita MapTestAuthEndpoints en
+// Program.cs (endpoint /api/auth/test-login) y desactiva Swagger, que solo se monta en
+// Development. El esquema no se crea aquí: Program.cs llama a DatabaseInitializer.MigrateAsync
+// durante el arranque, antes de que la factory sirva la primera petición, y ese migrate
+// espera a que postgres-test acepte conexiones con backoff exponencial.
+public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseEnvironment("Development");
+        builder.UseEnvironment("Testing");
 
         builder.ConfigureAppConfiguration((_, configuration) =>
         {

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text.Json;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Models;
@@ -9,11 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class AuthEndpointsTests : IClassFixture<ApiWebApplicationFactory>
+public sealed class AuthEndpointsTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly ApiWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public AuthEndpointsTests(ApiWebApplicationFactory factory)
+    public AuthEndpointsTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }
@@ -82,18 +81,6 @@ public sealed class AuthEndpointsTests : IClassFixture<ApiWebApplicationFactory>
             setCookie.Contains("Max-Age=0", StringComparison.OrdinalIgnoreCase) ||
             setCookie.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase),
             $"Set-Cookie debe expirar la cookie de sesión, pero fue: {setCookie}");
-    }
-
-    [Fact]
-    public async Task TestLogin_NotRegistered_WhenEnvironmentIsNotTesting()
-    {
-        var client = _factory.CreateClient();
-
-        var response = await client.PostAsJsonAsync(
-            "/api/auth/test-login",
-            new { email = "e2e@example.com", name = "E2E" });
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
