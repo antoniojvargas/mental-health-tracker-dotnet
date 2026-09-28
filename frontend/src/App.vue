@@ -1,7 +1,7 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { RouterView } from 'vue-router'
+</script>
 
 <template>
-  <main>
-    <h1>Mental Health Tracker</h1>
-  </main>
+  <RouterView />
 </template>
