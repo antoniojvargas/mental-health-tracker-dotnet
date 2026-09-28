@@ -5,8 +5,9 @@
  * la API. Cualquier tipo del dominio que viaje por HTTP se declara aquí y se
  * importa desde aquí; si aparece una forma local en un componente, está mal.
  *
- * Refleja los DTOs de backend/MentalHealthTracker.Api/Modules/DailyLog/Dtos/
- * y los enums de backend/MentalHealthTracker.Domain/Enums/.
+ * Refleja los DTOs de backend/MentalHealthTracker.Api/Modules/DailyLog/Dtos/,
+ * los enums de backend/MentalHealthTracker.Domain/Enums/ y el contrato de
+ * error de Core/Exceptions/GlobalExceptionHandler.cs.
  *
  * Formato del cable (System.Text.Json con `JsonSerializerDefaults.Web`):
  *   - Propiedades en camelCase.
@@ -16,6 +17,9 @@
  *   - `Guid` viaja como string.
  *   - `DateOnly` viaja como "yyyy-MM-dd".
  *   - Los enteros de C# (`short`, `int`) son `number` en JS.
+ *
+ * Excepción a camelCase: `details[].field` de un error de validación llega en
+ * PascalCase. Está anotado donde se declara.
  */
 
 /** "yyyy-MM-dd". El backend lo formatea así y no acepta formato libre. */
@@ -145,6 +149,93 @@ export interface CreateDailyLogInput {
   /** Misma regla que sleepDisturbances: siempre `[]`. */
   symptoms: Symptom[]
   notes: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Listado
+// ---------------------------------------------------------------------------
+
+/** Espejo de `DailyLogListMeta`. */
+export interface DailyLogListMeta {
+  from: IsoDate
+  to: IsoDate
+  limit: number
+  offset: number
+  /**
+   * Total de coincidencias ignorando limit y offset. Se devuelve en todas las
+   * páginas, así que sirve para el paginador sin una llamada extra.
+   */
+  total: number
+}
+
+/** Espejo de `DailyLogListResponse`, el cuerpo de GET /api/logs. */
+export interface DailyLogListResponse {
+  data: DailyLog[]
+  meta: DailyLogListMeta
+}
+
+/**
+ * Parámetros de GET /api/logs. Espejo de `ListDailyLogsQuery`, que se enlaza
+ * desde el query string.
+ *
+ * Si no mandas `from` ni `to`, el backend usa hoy-29 días hasta hoy. Los
+ * topes los impone `ListDailyLogsQueryValidator`: limit como mucho 366, offset
+ * no negativo, from <= to y rango total de 366 días como máximo.
+ */
+export interface ListDailyLogsQuery {
+  from?: IsoDate
+  to?: IsoDate
+  /** Por defecto 100. */
+  limit?: number
+  /** Por defecto 0. */
+  offset?: number
+}
+
+// ---------------------------------------------------------------------------
+// Errores
+//
+// Contrato transversal, no solo de registro diario. Vive aquí porque este es
+// el archivo que declara el contrato, pero no depende de nada de DailyLog, así
+// que si crece conviene moverlo a src/types/api-error.ts.
+// ---------------------------------------------------------------------------
+
+/**
+ * Un fallo de validación por campo.
+ *
+ * Ojo: `field` llega en PascalCase ("MoodRating", "LogDate",
+ * "Symptoms[0].Severity") mientras que todo lo demás en el cable es camelCase.
+ * Es el nombre crudo de la propiedad de .NET que emite FluentValidation, así
+ * que no lo pases por una función camelCase.
+ */
+export interface ApiErrorDetail {
+  field: string
+  message: string
+}
+
+/** Códigos emitidos por `GlobalExceptionHandler`. */
+export type ApiErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'UNAUTHORIZED'
+  | 'NOT_FOUND'
+  | 'RATE_LIMITED'
+  | 'INTERNAL_ERROR'
+
+/** Espejo de `ErrorBody`. */
+export interface ApiErrorBody {
+  code: ApiErrorCode
+  message: string
+  details: ApiErrorDetail[]
+}
+
+/**
+ * Espejo de `ErrorResponse`. Es el cuerpo de cualquier respuesta 4xx y 5xx,
+ * con la carga anidada bajo `error`:
+ *
+ *   { "error": { "code": "VALIDATION_ERROR", "message": "...",
+ *                "details": [ { "field": "MoodRating", "message": "..." } ] } }
+ */
+export interface ApiErrorResponse {
+  error: ApiErrorBody
 }
 
 // ---------------------------------------------------------------------------
