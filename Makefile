@@ -13,7 +13,7 @@ logs: ## Muestra los logs en vivo de todos los servicios
 
 test: ## Ejecuta los tests xUnit del backend contra postgres-test
 	docker compose -f docker-compose.test.yml up -d
-	$(DOTNET) test backend/MentalHealthTracker.slnx
+	DOTNET_ROLL_FORWARD=LatestMajor $(DOTNET) test backend/MentalHealthTracker.slnx
 	docker compose -f docker-compose.test.yml down
 
 test-e2e: ## Ejecuta las pruebas end-to-end con Playwright (requiere stack arriba)
