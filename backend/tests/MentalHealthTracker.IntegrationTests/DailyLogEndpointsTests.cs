@@ -11,15 +11,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationFactory>
+[Collection(IntegrationTestCollection.Name)]
+public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
+    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly CustomWebApplicationFactory _factory;
-
-    public DailyLogEndpointsTests(CustomWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
-
     [Fact]
     public async Task PostLog_WhenNoExistingLog_Returns201()
     {
@@ -74,7 +69,7 @@ public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationF
         var createdCount = results.Count(r => r.StatusCode == HttpStatusCode.Created);
         Assert.Equal(1, createdCount);
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IDailyLogRepository>();
         var log = await repository.FindByUserAndDateAsync(user.Id, logDate);
 
@@ -213,7 +208,7 @@ public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationF
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs/today");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
 
-        return await _factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAsync(request);
     }
 
     private async Task<int> TotalAsync(HttpResponseMessage response)
@@ -230,7 +225,7 @@ public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationF
 
     private async Task SeedLogAsync(Guid userId, DateOnly date, int mood)
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IDailyLogRepository>();
         await repository.UpsertAsync(new DailyLog
         {
@@ -256,7 +251,7 @@ public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationF
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
         request.Content = JsonContent.Create(body);
 
-        return await _factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAsync(request);
     }
 
     private async Task<HttpResponseMessage> GetLogsAsync(string token, string? query = null)
@@ -266,12 +261,12 @@ public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationF
             $"/api/logs{(query is null ? "" : $"?{query}")}");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
 
-        return await _factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAsync(request);
     }
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
 

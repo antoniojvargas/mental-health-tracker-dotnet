@@ -8,19 +8,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class AuthEndpointsTests : IClassFixture<CustomWebApplicationFactory>
+[Collection(IntegrationTestCollection.Name)]
+public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
+    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly CustomWebApplicationFactory _factory;
-
-    public AuthEndpointsTests(CustomWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
-
     [Fact]
     public async Task Me_WithoutCookie_Returns401()
     {
-        var client = _factory.CreateClient();
+        var client = Factory.CreateClient();
 
         var response = await client.GetAsync("/api/auth/me");
 
@@ -35,7 +30,7 @@ public sealed class AuthEndpointsTests : IClassFixture<CustomWebApplicationFacto
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
 
-        var response = await _factory.CreateClient().SendAsync(request);
+        var response = await Factory.CreateClient().SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -58,7 +53,7 @@ public sealed class AuthEndpointsTests : IClassFixture<CustomWebApplicationFacto
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={tampered}");
 
-        var response = await _factory.CreateClient().SendAsync(request);
+        var response = await Factory.CreateClient().SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -71,7 +66,7 @@ public sealed class AuthEndpointsTests : IClassFixture<CustomWebApplicationFacto
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
 
-        var response = await _factory.CreateClient().SendAsync(request);
+        var response = await Factory.CreateClient().SendAsync(request);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
@@ -85,7 +80,7 @@ public sealed class AuthEndpointsTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
 

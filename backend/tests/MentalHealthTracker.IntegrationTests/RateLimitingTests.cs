@@ -14,19 +14,14 @@ namespace MentalHealthTracker.IntegrationTests;
 // sobre POST /api/logs. Los límites (20 y 30) son el contrato vigente en Program.cs.
 // Cada clase de test tiene su propia instancia de CustomWebApplicationFactory, por lo que el
 // estado del rate limiter (y agotar cuotas) queda aislado a esta clase.
-public sealed class RateLimitingTests : IClassFixture<CustomWebApplicationFactory>
+[Collection(IntegrationTestCollection.Name)]
+public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
+    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
     private const int AuthPermitLimit = 20;
     private const int WritePermitLimit = 30;
 
     private const string AuthCallbackUrl = "/api/auth/google/callback?state=x&code=y";
-
-    private readonly CustomWebApplicationFactory _factory;
-
-    public RateLimitingTests(CustomWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
 
     [Fact]
     public async Task AuthPolicy_WhenLimitExceeded_Returns429WithErrorBodyAndRateLimitHeaders()
@@ -34,7 +29,7 @@ public sealed class RateLimitingTests : IClassFixture<CustomWebApplicationFactor
         // El callback responde 302 hacia el frontend externo; el RedirectHandler del
         // WebApplicationFactory lo seguiría dentro del TestServer (404), por eso se
         // desactiva para observar el status real del endpoint.
-        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         for (var i = 0; i < AuthPermitLimit; i++)
         {
@@ -93,12 +88,12 @@ public sealed class RateLimitingTests : IClassFixture<CustomWebApplicationFactor
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
         request.Content = JsonContent.Create(body);
 
-        return await _factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAsync(request);
     }
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
 

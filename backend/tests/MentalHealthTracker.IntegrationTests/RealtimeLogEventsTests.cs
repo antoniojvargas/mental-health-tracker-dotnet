@@ -10,15 +10,10 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class RealtimeLogEventsTests : IClassFixture<CustomWebApplicationFactory>
+[Collection(IntegrationTestCollection.Name)]
+public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
+    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly CustomWebApplicationFactory _factory;
-
-    public RealtimeLogEventsTests(CustomWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
-
     [Fact]
     public async Task PostOwnLog_OwnConnectedClient_ReceivesLogCreated()
     {
@@ -68,10 +63,10 @@ public sealed class RealtimeLogEventsTests : IClassFixture<CustomWebApplicationF
     private HubConnection CreateHubConnection(string token)
     {
         return new HubConnectionBuilder()
-            .WithUrl(new Uri(_factory.Server.BaseAddress, "hub/logs"), options =>
+            .WithUrl(new Uri(Factory.Server.BaseAddress, "hub/logs"), options =>
             {
                 options.Transports = HttpTransportType.LongPolling;
-                options.HttpMessageHandlerFactory = _ => _factory.Server.CreateHandler();
+                options.HttpMessageHandlerFactory = _ => Factory.Server.CreateHandler();
                 options.Headers["Cookie"] = $"{JwtService.SessionCookieName}={token}";
             })
             .Build();
@@ -97,12 +92,12 @@ public sealed class RealtimeLogEventsTests : IClassFixture<CustomWebApplicationF
             notes = "mejor que ayer",
         });
 
-        return await _factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAsync(request);
     }
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
 
