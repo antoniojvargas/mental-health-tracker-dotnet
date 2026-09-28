@@ -7,8 +7,7 @@ export default defineConfig(({ mode }) => {
   // escucha en localhost:3000. Dentro de la red de Compose hay que llegar por
   // nombre de servicio (http://backend:3000), porque allí localhost apunta al
   // propio contenedor del frontend. Por eso VITE_PROXY_TARGET es configurable.
-  const target =
-    loadEnv(mode, process.cwd()).VITE_PROXY_TARGET || 'http://localhost:3000'
+  const target = loadEnv(mode, process.cwd()).VITE_PROXY_TARGET || 'http://localhost:3000'
 
   return {
     plugins: [vue()],

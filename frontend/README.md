@@ -3,17 +3,30 @@
 Vue 3 + TypeScript + Vite. Tailwind CSS 4 se configura con
 `tailwind.config.ts`, cargado desde `src/index.css` vía `@config`.
 
+## Comandos
+
+| Script                   | Qué hace                                       |
+| ------------------------ | ---------------------------------------------- |
+| `npm run lint`           | ESLint sobre el proyecto, sin escribir cambios |
+| `npm run lint:fix`       | ESLint corrigiendo lo que se puede             |
+| `npm run format`         | Comprueba el formato con Prettier              |
+| `npm run format:fix`     | Aplica el formato                              |
+| `npm run generate:types` | Regenera los tipos desde el snapshot OpenAPI   |
+
+`api.generated.d.ts` y `openapi.json` están fuera del lint y del formato:
+los dos los genera una herramienta y no son código nuestro.
+
 ## Tipografía
 
 Tres familias, tres usos y ningún solapamiento. Se cargan como webfonts desde
 Google Fonts en `index.html`; los pesos disponibles son los que pides ahí, así
 que **no inventes un peso que no esté en el `link`**.
 
-| Familia              | Token       | Uso                                                                  | Pesos              |
-| -------------------- | ----------- | -------------------------------------------------------------------- | ------------------ |
-| Newsreader           | `font-sans` | Default. Todo el texto corrido, etiquetas, formularios y botones.     | 400, 500, 600, itálica 400 |
-| Bricolage Grotesque  | `font-display` | Títulos de sección y momentos protagonistas.                        | 500, 600, 700      |
-| IBM Plex Mono        | `font-mono` | Fechas, cifras, datos de gráfica y todo lo que deba alinearse en columna. | 400, 500       |
+| Familia             | Token          | Uso                                                                       | Pesos                      |
+| ------------------- | -------------- | ------------------------------------------------------------------------- | -------------------------- |
+| Newsreader          | `font-sans`    | Default. Todo el texto corrido, etiquetas, formularios y botones.         | 400, 500, 600, itálica 400 |
+| Bricolage Grotesque | `font-display` | Títulos de sección y momentos protagonistas.                              | 500, 600, 700              |
+| IBM Plex Mono       | `font-mono`    | Fechas, cifras, datos de gráfica y todo lo que deba alinearse en columna. | 400, 500                   |
 
 `font-sans` es el default del body por el preflight de Tailwind, así que en texto
 corrido no hace falta escribir la utilidad.

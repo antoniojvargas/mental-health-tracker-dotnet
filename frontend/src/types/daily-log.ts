@@ -54,13 +54,7 @@ export const ACTIVITY_TYPES = [
 ] as const
 export type ActivityType = (typeof ACTIVITY_TYPES)[number]
 
-export const SOCIAL_FREQUENCIES = [
-  'none',
-  'rare',
-  'occasional',
-  'frequent',
-  'daily',
-] as const
+export const SOCIAL_FREQUENCIES = ['none', 'rare', 'occasional', 'frequent', 'daily'] as const
 export type SocialFrequency = (typeof SOCIAL_FREQUENCIES)[number]
 
 export const SYMPTOM_TYPES = [
@@ -214,11 +208,7 @@ export interface ApiErrorDetail {
 
 /** Códigos emitidos por `GlobalExceptionHandler`. */
 export type ApiErrorCode =
-  | 'VALIDATION_ERROR'
-  | 'UNAUTHORIZED'
-  | 'NOT_FOUND'
-  | 'RATE_LIMITED'
-  | 'INTERNAL_ERROR'
+  'VALIDATION_ERROR' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'RATE_LIMITED' | 'INTERNAL_ERROR'
 
 /** Espejo de `ErrorBody`. */
 export interface ApiErrorBody {
