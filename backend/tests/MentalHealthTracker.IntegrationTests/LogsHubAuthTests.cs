@@ -6,11 +6,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class LogsHubAuthTests : IClassFixture<ApiWebApplicationFactory>
+public sealed class LogsHubAuthTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly ApiWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public LogsHubAuthTests(ApiWebApplicationFactory factory)
+    public LogsHubAuthTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }

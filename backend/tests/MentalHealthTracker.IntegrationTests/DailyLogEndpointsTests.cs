@@ -11,11 +11,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class DailyLogEndpointsTests : IClassFixture<ApiWebApplicationFactory>
+public sealed class DailyLogEndpointsTests : IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly ApiWebApplicationFactory _factory;
+    private readonly CustomWebApplicationFactory _factory;
 
-    public DailyLogEndpointsTests(ApiWebApplicationFactory factory)
+    public DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     {
         _factory = factory;
     }
