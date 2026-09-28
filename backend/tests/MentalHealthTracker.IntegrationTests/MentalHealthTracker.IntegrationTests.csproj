@@ -4,8 +4,18 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <CollectCoverage>true</CollectCoverage>
+    <CoverletOutputFormat>cobertura</CoverletOutputFormat>
+    <CoverletInclude>[MentalHealthTracker.Api]*,[MentalHealthTracker.Domain]*,[MentalHealthTracker.Infrastructure]*</CoverletInclude>
+    <CoverletExcludeByFile>**/Migrations/*.cs,**/*.Designer.cs</CoverletExcludeByFile>
+  </PropertyGroup>
+
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="coverlet.msbuild" Version="10.1.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.20" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.20" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

@@ -6,19 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-public sealed class LogsHubAuthTests : IClassFixture<CustomWebApplicationFactory>
+[Collection(IntegrationTestCollection.Name)]
+public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
+    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
-    private readonly CustomWebApplicationFactory _factory;
-
-    public LogsHubAuthTests(CustomWebApplicationFactory factory)
-    {
-        _factory = factory;
-    }
-
     [Fact]
     public async Task Negotiate_WithoutCookie_Returns401()
     {
-        var client = _factory.CreateClient();
+        var client = Factory.CreateClient();
 
         var response = await client.PostAsync(
             "/hub/logs/negotiate?negotiateVersion=1",
@@ -35,7 +30,7 @@ public sealed class LogsHubAuthTests : IClassFixture<CustomWebApplicationFactory
             ? token[..^1] + (token[^1] == 'A' ? 'B' : 'A')
             : token;
 
-        var client = _factory.CreateClient();
+        var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
         request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={tampered}");
@@ -50,7 +45,7 @@ public sealed class LogsHubAuthTests : IClassFixture<CustomWebApplicationFactory
     {
         var (_, token) = await CreateAuthenticatedSessionAsync();
 
-        var client = _factory.CreateClient();
+        var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
         request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
@@ -62,7 +57,7 @@ public sealed class LogsHubAuthTests : IClassFixture<CustomWebApplicationFactory
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
     {
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = Factory.Services.CreateAsyncScope();
         var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
         var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
 
