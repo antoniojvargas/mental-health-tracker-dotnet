@@ -53,6 +53,11 @@ services:
     restart: unless-stopped
     ports:
       - "5173:5173"
+    environment:
+      # El navegador llama a /api y /hub en el mismo origen y el dev server
+      # hace de proxy. Dentro de la red de Compose el backend se alcanza por
+      # nombre de servicio, nunca por localhost.
+      VITE_PROXY_TARGET: http://backend:3000
     depends_on:
       backend:
         condition: service_healthy

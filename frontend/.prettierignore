@@ -1,0 +1,10 @@
+dist
+coverage
+node_modules
+
+# Generado por `npm run generate:types`.
+src/types/api.generated.d.ts
+
+# Snapshot del documento OpenAPI: lo emite Swashbuckle con su propia
+# indentación y no es código nuestro.
+openapi.json
