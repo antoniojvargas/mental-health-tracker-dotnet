@@ -1,59 +1,17 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-import { apiRequest, ApiError } from './api-client'
-
-/**
- * Sustituye `fetch` global por un stub que resuelve la respuesta dada y lo
- * devuelve como spy, para poder inspeccionar cómo se llamó.
- *
- * El `Response` es real, no un doble: la lógica que decide qué hacer con el
- * cuerpo (`.text()`, `status`, `statusText`, `ok`) es parte de lo que se está
- * probando, y un objeto plano fingiendo ser `Response` la dejaría fuera del
- * alcance del test. Node 22 trae `Response` en el global, así que esto no
- * necesita `undici` ni MSW.
- */
-function mockFetch(response: Response) {
-  const fetchSpy = vi.fn().mockResolvedValue(response)
-  vi.stubGlobal('fetch', fetchSpy)
-  return fetchSpy
-}
+import { apiRequest } from './api-client'
+import { captureError, emptyResponse, jsonResponse, mockFetch } from '../test-support/http'
 
 /** Los headers con los que se envió la petición, para poder comprobar el Content-Type. */
 function headersOf(fetchSpy: ReturnType<typeof mockFetch>): HeadersInit {
   return fetchSpy.mock.calls[0][1].headers as HeadersInit
 }
 
-/**
- * Espera el rechazo y devuelve el `ApiError` ya tipado.
- *
- * Mejor que `.catch((thrown) => thrown)`: así el resultado es `ApiError` y no
- * `unknown`, y una promesa que se resuelve en vez de rechazar revienta aquí con
- * un mensaje claro en lugar de colarse en las aserciones siguientes.
- */
-async function captureError(promise: Promise<unknown>): Promise<ApiError> {
-  try {
-    await promise
-  } catch (thrown) {
-    expect(thrown).toBeInstanceOf(ApiError)
-    return thrown as ApiError
-  }
-
-  throw new Error('Se esperaba que la petición fuera rechazada, pero se resolvió')
-}
-
 describe('apiRequest', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
   it('devuelve el cuerpo parseado y envía la cookie de sesión', async () => {
     const user = { id: 'a1', email: 'a@b.c', name: 'Ada', avatarUrl: null }
-    const fetchSpy = mockFetch(
-      new Response(JSON.stringify(user), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
+    const fetchSpy = mockFetch(jsonResponse(user))
 
     const result = await apiRequest<typeof user>('/auth/me')
 
@@ -68,7 +26,7 @@ describe('apiRequest', () => {
   })
 
   it('serializa el body y solo declara Content-Type cuando lo hay', async () => {
-    const withBody = mockFetch(new Response(null, { status: 204 }))
+    const withBody = mockFetch(emptyResponse(204))
 
     await apiRequest('/logs', { method: 'POST', body: { logDate: '2026-09-30' } })
 
@@ -77,8 +35,7 @@ describe('apiRequest', () => {
     expect(init.body).toBe('{"logDate":"2026-09-30"}')
     expect(headersOf(withBody)).toEqual({ 'Content-Type': 'application/json' })
 
-    vi.unstubAllGlobals()
-    const withoutBody = mockFetch(new Response(null, { status: 204 }))
+    const withoutBody = mockFetch(emptyResponse(204))
 
     await apiRequest('/auth/me')
 
@@ -90,7 +47,7 @@ describe('apiRequest', () => {
   it('devuelve undefined en un 204 sin cuerpo en vez de lanzar', async () => {
     // `response.json()` sobre un cuerpo vacío revienta con un SyntaxError, así
     // que este caso es el que cubre POST /api/auth/logout.
-    mockFetch(new Response(null, { status: 204 }))
+    mockFetch(emptyResponse(204))
 
     await expect(apiRequest('/auth/logout', { method: 'POST' })).resolves.toBeUndefined()
   })
@@ -103,12 +60,7 @@ describe('apiRequest', () => {
         details: [{ field: 'MoodRating', message: "'Mood Rating' must be between 1 and 5." }],
       },
     }
-    mockFetch(
-      new Response(JSON.stringify(body), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
+    mockFetch(jsonResponse(body, 400))
 
     const error = await captureError(apiRequest('/logs', { method: 'POST', body: {} }))
 
