@@ -1,8 +1,41 @@
 <script setup lang="ts">
-// La vista no tiene estado todavía: no hay script más allá de este comentario.
-// Cuando el callback de Google vuelva con `?error=auth_failed` —que es lo que
-// hace AuthController cuando rechaza state o code— esta vista aún no lo
-// enseña; es el siguiente trozo de trabajo, no parte de esta tarjeta.
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+import { useAuthStore } from '../stores/useAuthStore'
+
+const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
+
+/**
+ * El backend manda aquí con `?error=auth_failed` cuando rechaza el state o el
+ * code de Google, y también cuando el intercambio con Google falla
+ * (AuthController.RedirectToLogin). Los dos casos comparten el mismo código, así
+ * que el texto no puede distinguirlos y no debe fingir que lo hace.
+ *
+ * Solo se reconoce ese valor exacto: un `error` desconocido se ignora en vez de
+ * caer en el mensaje equivocado.
+ */
+const showAuthError = computed(() => route.query.error === 'auth_failed')
+
+onMounted(async () => {
+  try {
+    const user = await auth.fetchMe()
+    if (user) {
+      // `replace` y no `push`: nobody pidió entrar aquí, así que /login no debe
+      // quedar en el historial. Con `push`, el botón de atrás devolvería al
+      // visitor a /login, el guard lo devolvería a /dashboard, y el usuario
+      // pelearía con su propio historial.
+      await router.replace('/dashboard')
+    }
+  } catch {
+    // La API no está disponible. La tarjeta de login tiene que seguir siendo
+    // usable y no hay a dónde mandar al usuario, así que se queda aquí. El 401
+    // no llega a este catch: el store lo resuelve como "no hay sesión", que es
+    // justo el caso normal de quien está en esta pantalla.
+  }
+})
 </script>
 
 <template>
@@ -60,14 +93,42 @@
       </p>
 
       <!--
+        Aviso de fallo de autenticación. Va antes del botón porque explica por
+        qué el clic anterior no funcionó, que es justo lo que se busca en ese
+        punto de la pantalla.
+
+        `role="alert"` implica `aria-live="assertive"`: un lector de pantalla lo
+        interrumpe para leerlo. Sin él el texto se vería igual pero pasaría
+        desapercibido a quien no ve.
+
+        Los tonos son de `ink` y no un rojo de error porque la paleta no tiene
+        ninguno, y `ember` —el único cálido— está reservado para el degradado
+        ambiente. Un aviso en `ink` se lee como una nota serena, que es el
+        registro del resto de la aplicación.
+      -->
+      <p
+        v-if="showAuthError"
+        role="alert"
+        class="font-sans mt-6 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3 text-sm leading-relaxed text-ink-600"
+      >
+        We couldn't sign you in with Google. Please try again.
+      </p>
+
+      <!--
         Un `<a>` y no un router-link a propósito: el flujo de Google se resuelve
         con cookies httpOnly que fija el backend, así que hace falta una
         navegación de página entera. Un enlace del router intentaría resolverlo
         en el cliente y la cookie no llegaría a fijarse.
+
+        El margen superior baja a `mt-4` cuando hay aviso, para que el botón no
+        se despegue del texto que lo explica.
       -->
       <a
         href="/api/auth/google"
-        class="font-sans mt-8 inline-flex w-full items-center justify-center gap-3 rounded-xl border border-ink-200 bg-paper-50 px-5 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-clearsky-300 hover:bg-clearsky-50 hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+        :class="[
+          'font-sans inline-flex w-full items-center justify-center gap-3 rounded-xl border border-ink-200 bg-paper-50 px-5 py-3 text-sm font-medium text-ink-600 transition-colors hover:border-clearsky-300 hover:bg-clearsky-50 hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500',
+          showAuthError ? 'mt-4' : 'mt-8',
+        ]"
       >
         <svg viewBox="0 0 18 18" class="h-4 w-4 shrink-0" aria-hidden="true">
           <path
