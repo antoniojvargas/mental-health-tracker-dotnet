@@ -1,3 +1,20 @@
+<script lang="ts">
+/**
+ * Pila de modales abiertos, de fuera hacia dentro, y el overflow que había antes
+ * del primero.
+ *
+ * Este bloque es `<script>` normal y no `<script setup>` a propósito: lo que se
+ * declara en `<script setup>` se ejecuta una vez por instancia, así que una
+ * `openStack` de ahí le daría a cada modal su propia pila privada, y cada uno se
+ * vería a sí mismo como el único abierto. Solo sirve si la comparten, y lo
+ * único de verdad común entre dos instancias es el módulo.
+ */
+export const openStack: HTMLElement[] = []
+
+/** Entablón de scroll anterior al primer modal, para restaurarlo tal cual. */
+let previousOverflow = ''
+</script>
+
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 
@@ -43,19 +60,9 @@ const panel = ref<HTMLElement | null>(null)
 /** Foco previo a la apertura: el elemento al que hay que devolverlo al cerrar. */
 let previouslyFocused: HTMLElement | null = null
 
-/**
- * Modales abiertos a la vez, de fuera hacia dentro.
- *
- * Hace falta por dos razones que se rompen juntas. El scroll del `body` solo se
- * restaura cuando se cierra el último: si el interior desbloquea al cerrarse,
- * deja la página con scroll mientras el exterior sigue abierto. Y el foco se
- * devuelve al elemento que tenía cada uno, no al que tenía el exterior, que ya
- * no es el suyo.
- */
-const openStack: HTMLElement[] = []
-
-/** Entablón de scroll que había antes del primer modal, para restaurarlo tal cual. */
-let previousOverflow = ''
+// `openStack` y `previousOverflow` viven en el bloque `<script>` de arriba porque
+// tienen que ser de todos: el scroll del `body` solo se restaura al cerrar el
+// último modal, y el foco vuelve al elemento que tenía cada uno.
 
 /**
  * Elementos en los que el foco puede entrar. Se filtran por atributo y no por
@@ -79,11 +86,20 @@ const focusable = () =>
 /** Diapositiva mientras el foco se devuelve al cerrar, para no pelear con el trap. */
 let returning = false
 
+/** ¿Es este modal el último de la pila, es decir, el que está encima? */
+function encima() {
+  return openStack[openStack.length - 1] === panel.value
+}
+
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
-    // `stopPropagation` para que un Escape aquí no siga cerrando cosas de más
-    // arriba: un modal anidado no debería cerrar a su padre en el mismo tecleo.
-    event.stopPropagation()
+    // Solo reacciona el modal de encima. Con dos abiertos hay dos listeners de
+    // `keydown` en el mismo `document` y los dos ven el tecleo, así que aquí
+    // `stopPropagation` no sirve de nada: frena la subida por el árbol, no a otro
+    // listener del mismo nodo. Sin esta comprobación un Escape cerraba los dos,
+    // y con ellos el formulario que hubiera detrás.
+    if (!encima()) return
+
     event.preventDefault()
     emit('close')
     return
@@ -91,6 +107,10 @@ function onKeydown(event: KeyboardEvent) {
 
   if (event.key !== 'Tab') return
 
+  // Aquí no hace falta la comprobación de `encima()` que sí está en el Escape:
+  // aunque el modal de debajo robe el foco con este `Tab`, su propio `focusin`
+  // se lo devuelve al de encima en el mismo tecleo. Comprobado con un mutante:
+  // quitar la guarda deja los 28 tests en verde.
   const targets = focusable()
   // Sin nada enfocable dentro no hay a dónde ir con el Tab, y el panel con
   // `tabindex="-1"` es el único sitio donde puede quedarse el foco.
@@ -122,6 +142,13 @@ function onKeydown(event: KeyboardEvent) {
  */
 function onFocusin(event: FocusEvent) {
   if (returning || !props.open || !panel.value) return
+
+  // Solo el de encima vigila el foco. Todos se teletransportan al `body`, así que
+  // ninguno cuelga del panel de los demás: si los dos vigilaran, el de abajo le
+  // quitaría el foco al de arriba y el de arriba se lo devolvería, en bucle,
+  // hasta reventar la pila de llamadas.
+  if (!encima()) return
+
   const target = event.target as Node | null
   if (target && !panel.value.contains(target)) {
     ;(focusable()[0] ?? panel.value).focus()
@@ -151,15 +178,22 @@ watch(
       // activo, no el propio modal.
       previouslyFocused = document.activeElement as HTMLElement | null
       lockScroll()
-      openStack.push(panel.value as HTMLElement)
 
       // Espera al render para que el panel ya exista en el DOM. Sin esto,
       // `focusable()` no encuentra nada y el foco se queda donde estaba, detrás del
       // overlay, que es justo el fallo que hace inaccesible a un modal.
       await nextTick()
+      // La pila se rellena aquí y no antes: el watcher corre antes del render, así
+      // que `panel.value` todavía era `null` y la pila guardaba nulos. Con eso
+      // `encima()` no encontraba nunca su propio panel y el Escape no cerraba.
+      openStack.push(panel.value as HTMLElement)
       ;(focusable()[0] ?? panel.value)?.focus()
     } else if (wasOpen) {
-      openStack.pop()
+      // `indexOf` y no `pop`: si el Escape ya lo sacó de la pila, este `pop`
+      // se llevaría la entrada del modal de debajo y dejaría al de encima sin
+      // poder recibir un Escape.
+      const mio = openStack.indexOf(panel.value as HTMLElement)
+      if (mio !== -1) openStack.splice(mio, 1)
       unlockScroll()
       returning = true
       previouslyFocused?.focus()
@@ -184,7 +218,8 @@ onBeforeUnmount(() => {
   // Cerrar el componente sin haberlo cerrado deja el `body` bloqueado para
   // siempre, que es un fallo invisible y muy molesto de depurar.
   if (props.open) {
-    openStack.pop()
+    const mio = openStack.indexOf(panel.value as HTMLElement)
+    if (mio !== -1) openStack.splice(mio, 1)
     unlockScroll()
   }
 })

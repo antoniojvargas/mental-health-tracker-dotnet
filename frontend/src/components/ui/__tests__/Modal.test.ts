@@ -44,6 +44,70 @@ const Harness = defineComponent({
   },
 })
 
+/**
+ * Dos modales a la vez, abiertos en orden: el primero y el segundo.
+ *
+ * Hermanos, y no anidados, a propósito. Anidados, el segundo viviría en el slot
+ * del primero, así que cerrando el de abajo se desmontaría el de encima con él y
+ * no se podría observar nunca el cierre fuera de orden, que es justo lo que rompe
+ * un `pop()` a ciegas. Aquí cada uno es independiente y puede cerrarse cuando
+ * quiera, que es como se abre un modal desde una vista y otro desde un menú.
+ *
+ * Los dos se teletransportan al `body`, así que ninguno cuelga del panel del
+ * otro: cada trap de foco ve el foco del otro como una fuga, y se lo quitan el
+ * uno al otro en bucle.
+ */
+const DosModales = defineComponent({
+  components: { Modal },
+  setup() {
+    return { fuera: ref(false), dentro: ref(false) }
+  },
+  render() {
+    return h('div', [
+      h('button', { id: 'abre-padre', onClick: () => (this.fuera = true) }, 'Abrir padre'),
+      h(Modal, { open: this.fuera, title: 'Padre', onClose: () => (this.fuera = false) }, () => [
+        h('p', { id: 'texto-del-padre' }, 'El padre no tiene nada enfocable'),
+      ]),
+      h('button', { id: 'abre-hijo', onClick: () => (this.dentro = true) }, 'Abrir hijo'),
+      h(Modal, { open: this.dentro, title: 'Hijo', onClose: () => (this.dentro = false) }, () => [
+        h('button', { id: 'hoja' }, 'Hoja'),
+        h('button', { id: 'ultimo-del-hijo' }, 'Último del hijo'),
+      ]),
+    ])
+  },
+})
+
+const dialogos = () => [...document.querySelectorAll('[role="dialog"]')]
+const titulos = () => dialogos().map((d) => d.querySelector('h2')?.textContent)
+
+/** Monta el harness y abre los dos modales, el segundo encima del primero. */
+async function losDos() {
+  const wrapper = mount(DosModales, { attachTo: document.body })
+  montados.push(wrapper)
+  // Clic sobre el nodo del `document`, no `wrapper.get`: los paneles están
+  // teletransportados al `body` y no cuelgan del wrapper.
+  document.getElementById('abre-padre')!.click()
+  await nextTick()
+  await nextTick()
+  document.getElementById('abre-hijo')!.click()
+  await nextTick()
+  await nextTick()
+  return wrapper
+}
+
+/**
+ * Abre los dos y cierra el de abajo desde fuera, con el de encima todavía en
+ * pantalla. Es el orden que rompe un `pop()` a ciegas: la entrada que toca
+ * quitar es la de abajo, que no es la última de la pila.
+ */
+async function abajoCerradoPorFuera() {
+  const wrapper = await losDos()
+  wrapper.vm.fuera = false
+  await nextTick()
+  await nextTick()
+  return wrapper
+}
+
 const montados: VueWrapper[] = []
 
 /**
@@ -129,7 +193,7 @@ describe('Modal', () => {
     })
 
     it('dos modales a la vez no comparten el id del título', async () => {
-      // `aria-labelledby` resuelto por id: si los dos diagonales usaran el mismo,
+      // `aria-labelledby` resuelto por id: si los dos usan el mismo,
       // ambos anunciarían el título del otro.
       const wrapper = mount(Harness, { attachTo: document.body })
       montados.push(wrapper)
@@ -165,19 +229,125 @@ describe('Modal', () => {
       expect(dialogo()).not.toBeNull()
     })
 
-    it('no propaga el Escape a un modal exterior', async () => {
-      // Anidados: un Escape no debería cerrar el padre y el hijo en el mismo
-      // tecleo, que es como se pierde un formulario sin querer.
-      const events: string[] = []
-      const wrapper = mount(Harness, { attachTo: document.body })
-      montados.push(wrapper)
-      wrapper.vm.open = true
-      await nextTick()
-      document.addEventListener('keydown', (e) => events.push(e.key))
+    it('con dos modales abiertos cierra solo el de encima', async () => {
+      await losDos()
+      expect(titulos()).toEqual(['Padre', 'Hijo'])
 
       escape()
+      await nextTick()
 
-      expect(events).toEqual(['Escape'])
+      // El fallo que esto destapa: los dos modales están escuchando en el mismo
+      // `document`, así que los dos ven el tecleo, y un solo Escape se llevaba
+      // los dos a la vez, con ellos el formulario que había detrás.
+      expect(titulos()).toEqual(['Padre'])
+    })
+
+    it('el segundo Escape sí cierra el de debajo', async () => {
+      await losDos()
+
+      escape()
+      await nextTick()
+      escape()
+      await nextTick()
+
+      // Si el cierre del de encima no lo saca de la pila, el de debajo sigue
+      // creyendo que hay un modal encima y este segundo Escape no cerraría nada.
+      expect(titulos()).toEqual([])
+    })
+
+    it('el Tab lo gestiona el modal de encima, no el de debajo', async () => {
+      await losDos()
+      document.getElementById('ultimo-del-hijo')!.focus()
+
+      tab()
+      await nextTick()
+
+      // Con el foco en el último botón del de encima, el `Tab` tiene que dar la
+      // vuelta dentro de ese modal. Aquí el de debajo no tiene nada enfocable,
+      // que es el peor caso para él: su handler cae en la rama de "no hay a
+      // dónde ir" y le focusearía su propio panel, llevándose el foco de un
+      // diálogo que sigue encima. El usuario acabaría escribiendo en el que ya
+      // no ve.
+      expect(document.activeElement?.id).toBe('hoja')
+      expect(dialogos()[1].contains(document.activeElement)).toBe(true)
+    })
+
+    it('el Shift+Tab del de encima tampoco cae en el de debajo', async () => {
+      await losDos()
+      document.getElementById('hoja')!.focus()
+
+      tab(true)
+      await nextTick()
+
+      expect(document.activeElement?.id).toBe('ultimo-del-hijo')
+    })
+
+    it('el de debajo tampoco roba el foco al de encima', async () => {
+      await losDos()
+
+      // Los dos se teletransportan al `body`, así que ninguno está dentro del
+      // panel del otro. Cada trap veía el foco del otro como una fuga y lo
+      // recuperaba, en bucle, hasta reventar la pila de llamadas.
+      expect(document.activeElement?.id).toBe('hoja')
+    })
+
+    it('el de debajo vuelve a atrapar el foco cuando el otro ya no está', async () => {
+      await losDos()
+      escape()
+      await nextTick()
+      await nextTick()
+      document.getElementById('texto-del-padre')!.focus()
+
+      tab()
+      await nextTick()
+
+      // Ya no hay nada encima, así que le toca a él devolver el foco a su panel.
+      // Si no recuperara su turno, el foco escaparía hacia la página de detrás
+      // con el overlay todavía visible.
+      expect(dialogos()).toHaveLength(1)
+      expect(dialogos()[0].contains(document.activeElement)).toBe(true)
+    })
+
+    it('el de encima sigue respondiendo si el de debajo se cierra desde fuera', async () => {
+      await abajoCerradoPorFuera()
+      // Ambos viven en el `body`, así que el de encima sobrevive al cierre del
+      // otro.
+      expect(titulos()).toEqual(['Hijo'])
+
+      escape()
+      await nextTick()
+
+      // Si al cerrar el de abajo se hubiera llevado la entrada del de encima en
+      // vez de la suya, la pila apuntaría a un modal ya desmontado y el otro
+      // dejaría de cerrarse con Escape: un overlay con su disparador muerto.
+      expect(titulos()).toEqual([])
+    })
+
+    it('restaura el scroll original si el de debajo se cierra primero', async () => {
+      document.body.style.overflow = 'scroll'
+      const wrapper = await abajoCerradoPorFuera()
+
+      escape()
+      await nextTick()
+      wrapper.vm.dentro = false
+      await nextTick()
+      await nextTick()
+
+      // Con el de abajo cerrándose primero, un `lockScroll`/`unlockScroll` que no
+      // mire la pila guarda 'hidden' como valor anterior y lo devuelve como si
+      // fuera el scroll real: la página se queda bloqueada para siempre.
+      expect(document.body.style.overflow).toBe('scroll')
+    })
+
+    it('mantiene el scroll bloqueado con un modal cerrado encima', async () => {
+      await losDos()
+
+      escape()
+      await nextTick()
+
+      // Queda uno abierto: devolver el scroll aquí dejaría la página desplazable
+      // por detrás de un overlay que sigue cubriendo la pantalla.
+      expect(document.body.style.overflow).toBe('hidden')
     })
   })
 

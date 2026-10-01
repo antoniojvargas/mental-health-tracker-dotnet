@@ -8,15 +8,30 @@
  * propiedades que se puedan inspeccionar en un objeto.
  */
 
-import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mount, type VueWrapper } from '@vue/test-utils'
 
 import Button from '../Button.vue'
 
-/** Monta el botón con props y texto, y devuelve el `<button>` del DOM. */
+/**
+ * Monta el botón con props y texto, y devuelve el `<button>` del DOM.
+ *
+ * Va al `body` de verdad: VTU crea un div aparte por defecto, y un clic real
+ * necesita un nodo conectado al documento para que el `disabled` nativo se
+ * comporte como en un navegador.
+ */
 function render(props: Record<string, unknown> = {}, text = 'Guardar') {
-  return mount(Button, { props, slots: { default: text } })
+  const wrapper = mount(Button, { attachTo: document.body, props, slots: { default: text } })
+  montados.push(wrapper)
+  return wrapper
 }
+
+const montados: VueWrapper[] = []
+
+afterEach(() => {
+  for (const wrapper of montados.splice(0)) wrapper.unmount()
+  document.body.innerHTML = ''
+})
 
 describe('Button', () => {
   describe('variantes', () => {
@@ -57,15 +72,74 @@ describe('Button', () => {
       expect(render({ disabled: true }).attributes('disabled')).toBeDefined()
     })
 
-    it('no dispara el clic mientras está deshabilitado', async () => {
+    /**
+     * Monta con un listener real en `attrs`, no con `wrapper.emitted()`.
+     *
+     * El clic sale de `element.click()` de verdad, que es lo que respeta el
+     * `disabled` nativo. Y `disabled` va en `props` mientras el clic va en
+     * `attrs`: son sitios distintos, y confundirlos daba un test que pasaba
+     * probando justo lo contrario de lo que decía.
+     */
+    function conClic(props: Record<string, unknown> = {}) {
+      const clic = vi.fn()
       const wrapper = mount(Button, {
-        props: { disabled: true, onClick: () => void 0 },
+        attachTo: document.body,
+        attrs: { onClick: clic },
+        props,
         slots: { default: 'Guardar' },
       })
+      montados.push(wrapper)
+      return { clic, wrapper }
+    }
 
-      await wrapper.trigger('click')
+    it('no llama al manejador del clic mientras está deshabilitado', () => {
+      // Con un listener real en el atributo, no `wrapper.emitted()`. VTU cuenta
+      // como emitido cualquier evento que llega al nodo raíz, así que `emitted`
+      // seguiría registrando el clic aunque el botón no hiciera nada con él: se
+      // comprobó con un mutante que se comía el evento y la suite siguió verde.
+      // Un clic de verdad contra el `disabled` nativo sí lo respeta el navegador,
+      // y es esa propiedad la que se está comprobando.
+      const { clic, wrapper } = conClic({ disabled: true })
 
-      expect(wrapper.emitted('click')).toBeUndefined()
+      wrapper.element.click()
+
+      // Un `disabled` de mentira, con un manejador detrás, deja pulsar un botón
+      // que dice que no se puede pulsar.
+      expect(clic).not.toHaveBeenCalled()
+    })
+
+    it('sí llama al manejador cuando está habilitado, que es el control del anterior', () => {
+      // Sin este counterpart, el test de arriba pasa igual si el componente
+      // nunca emitiera clic: distinguiría entre "no dispara" y "nunca dispara",
+      // que no es lo mismo.
+      const { clic, wrapper } = conClic()
+
+      wrapper.element.click()
+
+      expect(clic).toHaveBeenCalledTimes(1)
+    })
+
+    it('vuelve a llamar al manejador al habilitarlo de nuevo', async () => {
+      // El caso de una validación que falla y luego deja pasar: si el botón se
+      // quedara muerto, el usuario no podría reintentar sin recargar la página.
+      const { clic, wrapper } = conClic({ disabled: true })
+      wrapper.element.click()
+      expect(clic).not.toHaveBeenCalled()
+
+      await wrapper.setProps({ disabled: false })
+      wrapper.element.click()
+
+      expect(clic).toHaveBeenCalledTimes(1)
+    })
+
+    it('no llama al manejador cuando está cargando, para no enviar dos veces', () => {
+      const { clic, wrapper } = conClic({ loading: true })
+
+      wrapper.element.click()
+
+      // Un doble envío al recargar una página es el fallo más caro de un
+      // formulario de guardado, y el `disabled` es lo único que lo evita.
+      expect(clic).not.toHaveBeenCalled()
     })
 
     it('baja la opacidad para que se lea como apagado y no como roto', () => {
