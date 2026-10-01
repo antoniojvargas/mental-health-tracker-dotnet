@@ -8,14 +8,26 @@
 <template>
   <main class="relative grid min-h-svh place-content-center overflow-hidden bg-paper-100 px-6">
     <!--
-      La única vez que se usa `ember`: el commit de la paleta lo reservó para el
-      gradiente ambiente del login y lo descartó para cromo de interfaz. Va detrás
-      de todo y desenfocado, así que se lee como luz y no como un elemento.
+      Capa ambiente. Los dos adornos viven en un envoltorio que lleva el
+      `aria-hidden` y el `pointer-events-none` una sola vez: ambos son adorno,
+      y repetirlo en cada hijo es una forma de que se le olvide a uno.
+
+      `ember` es el único color que aparece aquí, y es su único uso en toda la
+      app: la paleta lo reservó para el degradado ambiente del login y lo
+      descartó para cromo de interfaz. Al ir detrás de todo y desenfocado se lee
+      como luz, no como un elemento.
     -->
-    <div
-      aria-hidden="true"
-      class="pointer-events-none absolute inset-x-0 top-0 h-96 bg-ember-300/35 blur-3xl"
-    ></div>
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0">
+      <!-- Banda superior: el lavado ancho que baja desde el borde. -->
+      <div class="absolute inset-x-0 top-0 h-96 bg-ember-300/35 blur-3xl"></div>
+      <!--
+        Círculo cálido arriba a la derecha. Un tono más fuerte que la banda para
+        que se lea como una capa por delante de ella y no como una mancha más
+        grande; sangra fuera del encuadre a propósito, que es lo que lo hace
+        parecer luz que viene de fuera y no un círculo pegado a la esquina.
+      -->
+      <div class="absolute -top-28 -right-28 h-96 w-96 rounded-full bg-ember-400/40 blur-3xl"></div>
+    </div>
 
     <section
       class="animate-slide-up relative w-full max-w-sm rounded-2xl border border-ink-100 bg-paper-50 px-8 py-10 shadow-sm"
