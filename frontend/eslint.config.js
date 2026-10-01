@@ -37,4 +37,15 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // El UI kit se llama por lo que hace, no por un prefijo: `Button`, no
+    // `UiButton`. Un `Button` dentro de `components/ui/` no colisiona con nada,
+    // mientras que el prefijo redundaría con la carpeta. La regla se relaja solo
+    // aquí, para que siga marcando error en el resto de la app, donde un nombre
+    // corto sí puede perderse en un `import`.
+    files: ['src/components/ui/**/*.vue'],
+    rules: {
+      'vue/multi-word-component-names': 'off',
+    },
+  },
 )
