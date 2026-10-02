@@ -33,6 +33,8 @@ const currentStep = ref<StepIndex>(0)
 
 const form = reactive<DailyLogForm>({
   mood: null,
+  anxiety: 5,
+  stress: 5,
   sleepQuality: 5,
   sleepHours: 7,
   activity: 5,
@@ -51,6 +53,8 @@ const form = reactive<DailyLogForm>({
 
 export interface DailyLogForm {
   mood: number | null
+  anxiety: number
+  stress: number
   sleepQuality: number
   sleepHours: number
   activity: number
@@ -124,11 +128,27 @@ function close() {
           class="flex flex-col gap-6"
           @submit.prevent="submit"
         >
-          <section v-if="currentStep === 0" class="flex flex-col gap-4">
-            <h2 class="text-base font-medium text-ink-900">How are you feeling today?</h2>
+          <section v-if="currentStep === 0" class="flex flex-col gap-6">
+            <h2 class="text-base font-medium text-ink-900">Mood</h2>
             <MoodScale
               v-model="form.mood"
               aria-label="Mood"
+            />
+            <SliderField
+              v-model="form.anxiety"
+              label="Anxiety"
+              :min="1"
+              :max="10"
+              :step="1"
+              helper-text="1 = very low, 10 = very high"
+            />
+            <SliderField
+              v-model="form.stress"
+              label="Stress"
+              :min="1"
+              :max="10"
+              :step="1"
+              helper-text="1 = very low, 10 = very high"
             />
           </section>
 
