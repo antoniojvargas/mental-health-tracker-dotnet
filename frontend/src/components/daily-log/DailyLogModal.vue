@@ -31,12 +31,24 @@ const steps = ['Mood', 'Sleep', 'Activity and social life', 'Symptoms'] as const
 type StepIndex = 0 | 1 | 2 | 3
 const currentStep = ref<StepIndex>(0)
 
+const sleepDisturbanceOptions = [
+  { key: 'trouble-falling-asleep', label: 'Trouble falling asleep' },
+  { key: 'waking-during-night', label: 'Waking up during the night' },
+  { key: 'waking-too-early', label: 'Waking up too early' },
+  { key: 'nightmares', label: 'Nightmares' },
+  { key: 'restless-legs', label: 'Restless legs' },
+  { key: 'interrupted-sleep', label: 'Interrupted sleep' },
+  { key: 'snoring', label: 'Snoring' },
+  { key: 'other', label: 'Other' },
+] as const
+
 const form = reactive<DailyLogForm>({
   mood: null,
   anxiety: 5,
   stress: 5,
-  sleepQuality: 5,
+  sleepQuality: 3,
   sleepHours: 7,
+  sleepDisturbances: [],
   activity: 5,
   social: 5,
   symptoms: [
@@ -57,6 +69,7 @@ export interface DailyLogForm {
   stress: number
   sleepQuality: number
   sleepHours: number
+  sleepDisturbances: string[]
   activity: number
   social: number
   symptoms: SymptomEntry[]
@@ -155,21 +168,39 @@ function close() {
           <section v-if="currentStep === 1" class="flex flex-col gap-6">
             <h2 class="text-base font-medium text-ink-900">Sleep</h2>
             <SliderField
-              v-model="form.sleepQuality"
-              label="Sleep quality"
-              :min="0"
-              :max="10"
-              :step="1"
-              helper-text="0 = very poor, 10 = very good"
-            />
-            <SliderField
               v-model="form.sleepHours"
               label="Sleep hours"
               :min="0"
-              :max="12"
+              :max="24"
               :step="0.5"
-              helper-text="Approximate hours of sleep"
+              helper-text="Approximate hours of sleep (0–24)"
             />
+            <SliderField
+              v-model="form.sleepQuality"
+              label="Sleep quality"
+              :min="1"
+              :max="5"
+              :step="1"
+              helper-text="1 = very poor, 5 = very good"
+            />
+            <fieldset class="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-paper-50 p-4">
+              <legend class="px-1 text-sm font-medium text-ink-900">Sleep disturbances (select all that apply)</legend>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <label
+                  v-for="opt in sleepDisturbanceOptions"
+                  :key="opt.key"
+                  class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-2 hover:bg-ink-50"
+                >
+                  <input
+                    type="checkbox"
+                    :value="opt.key"
+                    v-model="form.sleepDisturbances"
+                    class="h-4 w-4 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+                  />
+                  <span class="text-sm text-ink-900">{{ opt.label }}</span>
+                </label>
+              </div>
+            </fieldset>
           </section>
 
           <section v-if="currentStep === 2" class="flex flex-col gap-6">
