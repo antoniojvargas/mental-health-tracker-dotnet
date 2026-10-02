@@ -5,6 +5,10 @@ import Button from '../ui/Button.vue'
 import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
 import SymptomPicker, { type SymptomEntry } from './SymptomPicker.vue'
+import { create as createLog } from '../../services/logs.api'
+import { useToast } from '../../composables/useToast'
+import { ApiError } from '../../services/api-client'
+import type { CreateDailyLogInput, ActivityType, SocialFrequency, SymptomType, SleepDisturbance } from '../../types/daily-log'
 
 /**
  * Modal multipaso para registrar un Daily Log.
@@ -25,11 +29,14 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: DailyLogForm): void
+  (e: 'saved'): void
 }>()
 
 const steps = ['Mood', 'Sleep', 'Activity and social life', 'Symptoms'] as const
 type StepIndex = 0 | 1 | 2 | 3
 const currentStep = ref<StepIndex>(0)
+const isSubmitting = ref(false)
+const { success, error: toastError } = useToast()
 
 const sleepDisturbanceOptions = [
   { key: 'trouble-falling-asleep', label: 'Trouble falling asleep' },
@@ -141,6 +148,176 @@ function back() {
 function submit() {
   if (!isLastStep.value) return
   emit('submit', { ...form, symptoms: form.symptoms.map((s) => ({ ...s })) })
+}
+
+function resetForm() {
+  form.mood = null
+  form.anxiety = 5
+  form.stress = 5
+  form.sleepQuality = 3
+  form.sleepHours = 7
+  form.sleepDisturbances = []
+  form.activityType = 'none'
+  form.activityMinutes = 0
+  form.activity = 5
+  form.socialFrequency = 'none'
+  form.social = 5
+  form.symptoms = [
+    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
+    { key: 'depression', label: 'Depression', active: false, severity: 1 },
+    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
+    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
+    { key: 'energy', label: 'Energy', active: false, severity: 1 },
+    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
+    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
+    { key: 'pain', label: 'Pain', active: false, severity: 1 },
+  ]
+  form.notes = ''
+  currentStep.value = 0
+}
+
+function mapSleepDisturbances(dist: string[]): SleepDisturbance[] {
+  const allowed = new Set(['none', 'insomnia', 'nightmares', 'frequent_waking', 'early_waking'])
+  return dist
+    .map((d) => {
+      if (d === 'trouble-falling-asleep') return 'insomnia' as SleepDisturbance
+      if (d === 'waking-during-night' || d === 'waking-too-early' || d === 'interrupted-sleep') return 'frequent_waking' as SleepDisturbance
+      if (d === 'nightmares') return 'nightmares' as SleepDisturbance
+      if (d === 'restless-legs') return 'frequent_waking' as SleepDisturbance
+      if (d === 'snoring') return 'none' as SleepDisturbance
+      if (d === 'other') return 'none' as SleepDisturbance
+      if (allowed.has(d)) return d as SleepDisturbance
+      return 'none' as SleepDisturbance
+    })
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+}
+
+function mapActivityType(t: string): ActivityType | null {
+  switch (t) {
+    case 'none':
+      return null
+    case 'walk':
+      return 'walking' as ActivityType
+    case 'run':
+      return 'running' as ActivityType
+    case 'gym':
+      return 'gym' as ActivityType
+    case 'yoga':
+      return 'yoga' as ActivityType
+    case 'cycling':
+      return 'cycling' as ActivityType
+    case 'sports':
+      return 'sports' as ActivityType
+    case 'housework':
+      return 'other' as ActivityType
+    case 'other':
+      return 'other' as ActivityType
+    default:
+      return null
+  }
+}
+
+function mapSocialFrequency(f: string): SocialFrequency {
+  switch (f) {
+    case 'none':
+      return 'none' as SocialFrequency
+    case 'once':
+    case 'rare':
+      return 'rare' as SocialFrequency
+    case 'few':
+    case 'occasional':
+      return 'occasional' as SocialFrequency
+    case 'several':
+    case 'frequent':
+      return 'frequent' as SocialFrequency
+    case 'daily':
+      return 'daily' as SocialFrequency
+    default:
+      return 'none' as SocialFrequency
+  }
+}
+
+function mapSymptomType(key: string): SymptomType | null {
+  switch (key) {
+    case 'anxiety':
+    case 'panic':
+      return 'panic' as SymptomType
+    case 'depression':
+    case 'low_mood':
+      return 'low_mood' as SymptomType
+    case 'sleep':
+      return 'fatigue' as SymptomType
+    case 'appetite':
+      return 'appetite_change' as SymptomType
+    case 'energy':
+    case 'fatigue':
+      return 'fatigue' as SymptomType
+    case 'concentration':
+      return 'concentration' as SymptomType
+    case 'irritability':
+      return 'irritability' as SymptomType
+    case 'pain':
+      return 'restlessness' as SymptomType
+    default:
+      return null
+  }
+}
+
+function buildPayload(): CreateDailyLogInput {
+  const activeSymptoms = form.symptoms
+    .filter((s) => s.active)
+    .map((s) => {
+      const t = mapSymptomType(s.key)
+      return t ? { type: t, severity: Math.min(5, Math.max(1, s.severity)) } : null
+    })
+    .filter((x): x is { type: SymptomType; severity: number } => x !== null)
+
+  const today = new Date()
+  const logDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  return {
+    logDate,
+    moodRating: form.mood ?? 3,
+    anxietyLevel: Math.min(10, Math.max(1, form.anxiety)),
+    stressLevel: Math.min(10, Math.max(1, form.stress)),
+    sleepHours: Math.min(24, Math.max(0, form.sleepHours)),
+    sleepQuality: Math.min(5, Math.max(1, form.sleepQuality)),
+    sleepDisturbances: mapSleepDisturbances(form.sleepDisturbances),
+    activityType: mapActivityType(form.activityType),
+    activityMinutes:
+      form.activityType === 'none' || form.activityMinutes <= 0
+        ? null
+        : Math.min(600, Math.max(0, Math.round(form.activityMinutes))),
+    socialFrequency: mapSocialFrequency(form.socialFrequency),
+    symptoms: activeSymptoms,
+    notes: form.notes.trim().length > 0 ? form.notes.trim().slice(0, 1000) : null,
+  }
+}
+
+async function handleSubmit() {
+  if (isSubmitting.value) return
+  isSubmitting.value = true
+  try {
+    await createLog(buildPayload())
+    success('Thanks for logging today!')
+    emit('submit', { ...form, symptoms: form.symptoms.map((s) => ({ ...s })) })
+    emit('saved')
+    resetForm()
+    emit('close')
+  } catch (err) {
+    if (err instanceof ApiError) {
+      toastError(err.message || 'Failed to save log')
+    } else {
+      toastError('Failed to save log')
+    }
+    // No cerramos el modal ante error
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function submit() {
+  handleSubmit()
 }
 
 function close() {
@@ -322,8 +499,8 @@ function close() {
         <div class="flex items-center gap-2">
           <Button variant="subtle" @click="close">Cancel</Button>
           <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>
-          <Button v-if="!isLastStep" variant="subtle" type="submit" @click="submit">Save now</Button>
-          <Button v-else type="submit" @click="submit">Save</Button>
+          <Button v-if="!isLastStep" variant="subtle" type="submit" :loading="isSubmitting" @click="submit">Save now</Button>
+          <Button v-else type="submit" :loading="isSubmitting" @click="submit">Save</Button>
         </div>
       </div>
     </template>
