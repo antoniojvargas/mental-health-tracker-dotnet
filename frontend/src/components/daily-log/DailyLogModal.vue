@@ -322,6 +322,7 @@ function close() {
         <div class="flex items-center gap-2">
           <Button variant="subtle" @click="close">Cancel</Button>
           <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>
+          <Button v-if="!isLastStep" variant="subtle" type="submit" @click="submit">Save now</Button>
           <Button v-else type="submit" @click="submit">Save</Button>
         </div>
       </div>
