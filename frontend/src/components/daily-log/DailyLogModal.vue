@@ -42,6 +42,26 @@ const sleepDisturbanceOptions = [
   { key: 'other', label: 'Other' },
 ] as const
 
+const activityTypeOptions = [
+  { key: 'none', label: 'None' },
+  { key: 'walk', label: 'Walk' },
+  { key: 'run', label: 'Run' },
+  { key: 'gym', label: 'Gym' },
+  { key: 'yoga', label: 'Yoga/Stretching' },
+  { key: 'cycling', label: 'Cycling' },
+  { key: 'sports', label: 'Sports' },
+  { key: 'housework', label: 'Housework' },
+  { key: 'other', label: 'Other' },
+] as const
+
+const socialFrequencyOptions = [
+  { key: 'none', label: 'None' },
+  { key: 'once', label: 'Once' },
+  { key: 'few', label: 'A few times' },
+  { key: 'several', label: 'Several times' },
+  { key: 'daily', label: 'Daily' },
+] as const
+
 const form = reactive<DailyLogForm>({
   mood: null,
   anxiety: 5,
@@ -49,7 +69,10 @@ const form = reactive<DailyLogForm>({
   sleepQuality: 3,
   sleepHours: 7,
   sleepDisturbances: [],
+  activityType: 'none',
+  activityMinutes: 0,
   activity: 5,
+  socialFrequency: 'none',
   social: 5,
   symptoms: [
     { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
@@ -70,7 +93,10 @@ export interface DailyLogForm {
   sleepQuality: number
   sleepHours: number
   sleepDisturbances: string[]
+  activityType: string
+  activityMinutes: number
   activity: number
+  socialFrequency: string
   social: number
   symptoms: SymptomEntry[]
 }
@@ -205,6 +231,30 @@ function close() {
 
           <section v-if="currentStep === 2" class="flex flex-col gap-6">
             <h2 class="text-base font-medium text-ink-900">Activity and social life</h2>
+
+            <div class="flex flex-col gap-2">
+              <label for="activityType" class="text-sm font-medium text-ink-900">Activity type</label>
+              <select
+                id="activityType"
+                v-model="form.activityType"
+                class="rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+              >
+                <option v-for="opt in activityTypeOptions" :key="opt.key" :value="opt.key">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+
+            <SliderField
+              v-model="form.activityMinutes"
+              label="Activity minutes"
+              :min="0"
+              :max="600"
+              :step="5"
+              :disabled="form.activityType === 'none'"
+              helper-text="0–600 minutes (disabled if no activity)"
+            />
+
             <SliderField
               v-model="form.activity"
               label="Activity level"
@@ -213,6 +263,20 @@ function close() {
               :step="1"
               helper-text="0 = very low, 10 = very high"
             />
+
+            <div class="flex flex-col gap-2">
+              <label for="socialFrequency" class="text-sm font-medium text-ink-900">Social contact frequency</label>
+              <select
+                id="socialFrequency"
+                v-model="form.socialFrequency"
+                class="rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+              >
+                <option v-for="opt in socialFrequencyOptions" :key="opt.key" :value="opt.key">
+                  {{ opt.label }}
+                </option>
+              </select>
+            </div>
+
             <SliderField
               v-model="form.social"
               label="Social connection"
