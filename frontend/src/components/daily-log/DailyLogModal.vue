@@ -5,10 +5,17 @@ import Button from '../ui/Button.vue'
 import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
 import SymptomPicker, { type SymptomEntry } from './SymptomPicker.vue'
-import { create as createLog } from '../../services/logs.api'
+import { create as createLog, today as getToday } from '../../services/logs.api'
 import { useToast } from '../../composables/useToast'
 import { ApiError } from '../../services/api-client'
-import type { CreateDailyLogInput, ActivityType, SocialFrequency, SymptomType, SleepDisturbance } from '../../types/daily-log'
+import type {
+  CreateDailyLogInput,
+  ActivityType,
+  SocialFrequency,
+  SymptomType,
+  SleepDisturbance,
+  DailyLog,
+} from '../../types/daily-log'
 
 /**
  * Modal multipaso para registrar un Daily Log.
@@ -36,6 +43,7 @@ const steps = ['Mood', 'Sleep', 'Activity and social life', 'Symptoms'] as const
 type StepIndex = 0 | 1 | 2 | 3
 const currentStep = ref<StepIndex>(0)
 const isSubmitting = ref(false)
+const isLoading = ref(false)
 const { success, error: toastError } = useToast()
 
 const sleepDisturbanceOptions = [
@@ -123,11 +131,150 @@ const canGoNext = computed(() => {
 
 const isLastStep = computed(() => currentStep.value === steps.length - 1)
 
+function inverseMapActivityType(t: ActivityType | null): string {
+  switch (t) {
+    case 'walking':
+      return 'walk'
+    case 'running':
+      return 'run'
+    case 'gym':
+      return 'gym'
+    case 'yoga':
+      return 'yoga'
+    case 'cycling':
+      return 'cycling'
+    case 'sports':
+      return 'sports'
+    case 'other':
+      return 'other'
+    case 'none':
+    case null:
+    default:
+      return 'none'
+  }
+}
+
+function inverseMapSocialFrequency(f: SocialFrequency): string {
+  switch (f) {
+    case 'rare':
+      return 'rare'
+    case 'occasional':
+      return 'occasional'
+    case 'frequent':
+      return 'frequent'
+    case 'daily':
+      return 'daily'
+    case 'none':
+    default:
+      return 'none'
+  }
+}
+
+function inverseMapSleepDisturbance(d: SleepDisturbance): string | null {
+  switch (d) {
+    case 'insomnia':
+      return 'trouble-falling-asleep'
+    case 'frequent_waking':
+      return 'waking-during-night'
+    case 'early_waking':
+      return 'waking-too-early'
+    case 'nightmares':
+      return 'nightmares'
+    case 'none':
+    default:
+      return null
+  }
+}
+
+function inverseMapSymptomType(t: SymptomType): string | null {
+  switch (t) {
+    case 'panic':
+      return 'anxiety'
+    case 'low_mood':
+      return 'depression'
+    case 'fatigue':
+      return 'energy'
+    case 'irritability':
+      return 'irritability'
+    case 'concentration':
+      return 'concentration'
+    case 'appetite_change':
+      return 'appetite'
+    case 'restlessness':
+      return 'pain'
+    case 'hopelessness':
+      return 'depression'
+    default:
+      return null
+  }
+}
+
+function loadToday() {
+  isLoading.value = true
+  getToday()
+    .then((log: DailyLog | null) => {
+      if (log) {
+        fillFromLog(log)
+      } else {
+        resetForm()
+      }
+    })
+    .catch(() => {
+      resetForm()
+    })
+    .finally(() => {
+      isLoading.value = false
+    })
+}
+
+function fillFromLog(log: DailyLog) {
+  form.mood = log.moodRating
+  form.anxiety = log.anxietyLevel
+  form.stress = log.stressLevel
+  form.sleepQuality = log.sleepQuality
+  form.sleepHours = log.sleepHours
+  form.sleepDisturbances = (log.sleepDisturbances || [])
+    .map((d) => inverseMapSleepDisturbance(d))
+    .filter((x): x is string => x !== null)
+  form.activityType = inverseMapActivityType(log.activityType)
+  form.activityMinutes = log.activityMinutes ?? 0
+  form.activity = 5
+  form.socialFrequency = inverseMapSocialFrequency(log.socialFrequency)
+  form.social = 5
+  const mappedSymptoms = (log.symptoms || []).map((s) => {
+    const key = inverseMapSymptomType(s.type)
+    return {
+      key: key ?? s.type,
+      label: key ? key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') : s.type,
+      active: true,
+      severity: Math.min(5, Math.max(1, s.severity)),
+    }
+  })
+  const existingKeys = new Set(mappedSymptoms.map((m) => m.key))
+  const defaults = [
+    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
+    { key: 'depression', label: 'Depression', active: false, severity: 1 },
+    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
+    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
+    { key: 'energy', label: 'Energy', active: false, severity: 1 },
+    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
+    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
+    { key: 'pain', label: 'Pain', active: false, severity: 1 },
+  ]
+  form.symptoms = defaults.map((d) => {
+    const found = mappedSymptoms.find((m) => m.key === d.key)
+    return found ? { ...found } : { ...d }
+  })
+  form.notes = log.notes ?? ''
+  currentStep.value = 0
+}
+
 watch(
   () => props.open,
   (open) => {
     if (open) {
       currentStep.value = 0
+      loadToday()
     }
   },
 )
