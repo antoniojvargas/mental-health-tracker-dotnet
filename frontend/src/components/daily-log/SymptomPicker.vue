@@ -29,17 +29,6 @@ export type SymptomKey =
   | 'irritability'
   | 'pain'
 
-const defaultSymptoms: SymptomEntry[] = [
-  { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-  { key: 'depression', label: 'Depression', active: false, severity: 1 },
-  { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-  { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-  { key: 'energy', label: 'Energy', active: false, severity: 1 },
-  { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-  { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-  { key: 'pain', label: 'Pain', active: false, severity: 1 },
-]
-
 const props = withDefaults(
   defineProps<{
     /** Lista de síntomas; si no se pasa, usa defaults del dominio */
@@ -50,7 +39,16 @@ const props = withDefaults(
     ariaLabel?: string
   }>(),
   {
-    modelValue: () => defaultSymptoms.map((s) => ({ ...s })),
+    modelValue: () => [
+      { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
+      { key: 'depression', label: 'Depression', active: false, severity: 1 },
+      { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
+      { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
+      { key: 'energy', label: 'Energy', active: false, severity: 1 },
+      { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
+      { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
+      { key: 'pain', label: 'Pain', active: false, severity: 1 },
+    ],
     disabled: false,
     ariaLabel: 'Symptom picker',
   },

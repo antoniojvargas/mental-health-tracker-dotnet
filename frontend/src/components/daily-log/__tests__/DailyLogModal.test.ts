@@ -11,8 +11,8 @@ const toastSuccess = vi.fn()
 const toastError = vi.fn()
 
 vi.mock('../../../services/logs.api', () => ({
-  create: createLog,
-  today: getToday,
+  create: vi.fn(),
+  today: vi.fn(),
 }))
 
 vi.mock('../../../composables/useToast', () => ({
@@ -26,6 +26,8 @@ vi.mock('../../../composables/useToast', () => ({
 }))
 
 import { ApiError } from '../../../services/api-client'
+import * as logsApi from '../../../services/logs.api'
+import * as toastModule from '../../../composables/useToast'
 
 const Harness = defineComponent({
   components: { DailyLogModal, Toast },
@@ -66,15 +68,15 @@ function clickSaveNow() {
 }
 
 function selectMood(value: number) {
-  const moods = Array.from(document.querySelectorAll('[role="radio"][aria-label="Mood"]'))
+  const moods = Array.from(document.querySelectorAll('[role="radio"]'))
   const mood = moods.find((r) => r.textContent?.trim() === String(value))
   mood?.click()
 }
 
 describe('DailyLogModal', () => {
   beforeEach(() => {
-    createLog.mockReset()
-    getToday.mockReset()
+    ;(logsApi.create as any).mockReset()
+    ;(logsApi.today as any).mockReset()
     toastSuccess.mockReset()
     toastError.mockReset()
     document.body.innerHTML = ''
@@ -86,65 +88,76 @@ describe('DailyLogModal', () => {
   })
 
   it('navigates between steps', async () => {
-    getToday.mockResolvedValue(null)
+    ;(logsApi.today as any).mockResolvedValue(null)
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     expect(document.body.textContent).toContain('Step 1 of 4')
     expect(document.body.textContent).toContain('Mood')
 
     selectMood(4)
     await nextTick()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
     clickNext()
     await nextTick()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
     expect(document.body.textContent).toContain('Step 2 of 4')
     expect(document.body.textContent).toContain('Sleep')
 
     clickNext()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
     expect(document.body.textContent).toContain('Step 3 of 4')
     expect(document.body.textContent).toContain('Activity and social life')
 
     clickNext()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
     expect(document.body.textContent).toContain('Step 4 of 4')
     expect(document.body.textContent).toContain('Symptoms')
   })
 
   it('can save from first step', async () => {
-    getToday.mockResolvedValue(null)
-    createLog.mockResolvedValue({ id: '1' })
+    ;(logsApi.today as any).mockResolvedValue(null)
+    ;(logsApi.create as any).mockResolvedValue({ id: '1' })
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     selectMood(5)
     await nextTick()
     clickSaveNow()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
-    expect(createLog).toHaveBeenCalled()
+    expect(logsApi.create).toHaveBeenCalled()
     expect(toastSuccess).toHaveBeenCalled()
   })
 
   it('sends expected payload on save', async () => {
-    getToday.mockResolvedValue(null)
-    createLog.mockResolvedValue({ id: '1' })
+    ;(logsApi.today as any).mockResolvedValue(null)
+    ;(logsApi.create as any).mockResolvedValue({ id: '1' })
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     selectMood(3)
     clickSaveNow()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
-    expect(createLog).toHaveBeenCalledWith(
+    expect(logsApi.create).toHaveBeenCalledWith(
       expect.objectContaining({
         moodRating: 3,
         anxietyLevel: expect.any(Number),
@@ -159,36 +172,42 @@ describe('DailyLogModal', () => {
   })
 
   it('shows toast on success and closes modal', async () => {
-    getToday.mockResolvedValue(null)
-    createLog.mockResolvedValue({ id: '1' })
+    ;(logsApi.today as any).mockResolvedValue(null)
+    ;(logsApi.create as any).mockResolvedValue({ id: '1' })
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     selectMood(4)
     clickSaveNow()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     expect(toastSuccess).toHaveBeenCalledWith(expect.stringContaining('Thanks'))
     expect(document.body.textContent).not.toContain('Step 1')
   })
 
   it('shows error without closing modal when API fails', async () => {
-    getToday.mockResolvedValue(null)
-    createLog.mockRejectedValue(new ApiError(400, 'VALIDATION_ERROR', 'Invalid'))
+    ;(logsApi.today as any).mockResolvedValue(null)
+    ;(logsApi.create as any).mockRejectedValue(new ApiError(400, 'VALIDATION_ERROR', 'Invalid'))
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     selectMood(2)
     clickSaveNow()
     await nextTick()
     await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
 
     expect(toastError).toHaveBeenCalled()
     expect(document.body.textContent).toContain('Step 1 of 4')
   })
 })
+
+

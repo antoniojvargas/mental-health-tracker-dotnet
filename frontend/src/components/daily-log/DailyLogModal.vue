@@ -293,8 +293,8 @@ function back() {
 }
 
 function submit() {
-  if (!isLastStep.value) return
-  emit('submit', { ...form, symptoms: form.symptoms.map((s) => ({ ...s })) })
+  // El submit global maneja el envío; este legacy no debe interferir
+  handleSubmit()
 }
 
 function resetForm() {
@@ -463,7 +463,7 @@ async function handleSubmit() {
   }
 }
 
-function submit() {
+function onSubmit() {
   handleSubmit()
 }
 
@@ -491,7 +491,7 @@ function close() {
 
         <form
           class="flex flex-col gap-6"
-          @submit.prevent="submit"
+          @submit.prevent="onSubmit"
         >
           <section v-if="currentStep === 0" class="flex flex-col gap-6">
             <h2 class="text-base font-medium text-ink-900">Mood</h2>
@@ -646,8 +646,8 @@ function close() {
         <div class="flex items-center gap-2">
           <Button variant="subtle" @click="close">Cancel</Button>
           <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>
-          <Button v-if="!isLastStep" variant="subtle" type="submit" :loading="isSubmitting" @click="submit">Save now</Button>
-          <Button v-else type="submit" :loading="isSubmitting" @click="submit">Save</Button>
+          <Button v-if="!isLastStep" variant="subtle" type="submit" :loading="isSubmitting" @click="onSubmit">Save now</Button>
+          <Button v-else type="submit" :loading="isSubmitting" @click="onSubmit">Save</Button>
         </div>
       </div>
     </template>
