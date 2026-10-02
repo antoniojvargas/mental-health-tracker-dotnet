@@ -84,6 +84,7 @@ const form = reactive<DailyLogForm>({
     { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
     { key: 'pain', label: 'Pain', active: false, severity: 1 },
   ],
+  notes: '',
 })
 
 export interface DailyLogForm {
@@ -99,6 +100,7 @@ export interface DailyLogForm {
   socialFrequency: string
   social: number
   symptoms: SymptomEntry[]
+  notes: string
 }
 
 const progress = computed(() => ((currentStep.value + 1) / steps.length) * 100)
@@ -293,6 +295,20 @@ function close() {
               v-model="form.symptoms"
               aria-label="Symptoms"
             />
+            <div class="flex flex-col gap-2">
+              <label for="notes" class="text-sm font-medium text-ink-900">Notes</label>
+              <textarea
+                id="notes"
+                v-model="form.notes"
+                maxlength="1000"
+                rows="4"
+                placeholder="Additional notes..."
+                class="rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+              />
+              <div class="flex justify-end text-xs text-ink-500">
+                {{ form.notes.length }}/1000
+              </div>
+            </div>
           </section>
         </form>
       </div>
