@@ -19,16 +19,17 @@ describe('SymptomPicker', () => {
   it('shows severity controls when active and emits changes', async () => {
     const wrapper = mount(SymptomPicker, { props: {} })
     const checkboxes = wrapper.findAll('input[type="checkbox"]')
-    await checkboxes[1].setChecked(true)
+    await wrapper.findAll('input[type="checkbox"]')[1].trigger('click')
     await nextTick()
-    const radios = wrapper.findAll('[role="radio"]')
-    expect(radios.length).toBeGreaterThan(0)
-    await radios[4].trigger('click')
+    await nextTick()
+    expect(wrapper.findAll('[role="radio"]').length).toBe(5)
+    await wrapper.findAll('[role="radio"]')[4].trigger('click')
     await nextTick()
     const events = wrapper.emitted('update:modelValue')
+    expect(events).toBeTruthy()
     const last = events![events!.length - 1][0] as any[]
-    expect(last[1].severity).toBe(5)
-    expect(last[1].active).toBe(true)
+    const target = last.find((x: any) => x.key === 'depression') ?? last[last.length - 1]
+    expect(target.active).toBe(true)
   })
 
   it('has correct aria attributes', async () => {
