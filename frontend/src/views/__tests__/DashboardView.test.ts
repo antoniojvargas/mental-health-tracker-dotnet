@@ -13,6 +13,11 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }))
 
+// La vista solo cablea el composable; su comportamiento se prueba aparte.
+vi.mock('../../composables/useLogSocket', () => ({
+  useLogSocket: vi.fn(),
+}))
+
 function makeLog(logDate: IsoDate): DailyLog {
   return {
     id: `id-${logDate}`,
