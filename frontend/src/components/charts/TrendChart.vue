@@ -35,6 +35,20 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
 const GRID_COLOR = '#EAE0CB'
 const TICK_COLOR = '#8A9B97'
 const TICK_FONT = { family: '"IBM Plex Mono", monospace', size: 12 }
+const TOOLTIP_BG = '#2B3A3A'
+const TOOLTIP_TEXT = '#FBF8F2'
+
+const LONG_DATE = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' })
+
+/**
+ * "yyyy-MM-dd" a fecha larga en inglés ("October 3"), sin el desfase de huso de
+ * `new Date(iso)`: el string ya viene como fecha local del servidor y parsearlo
+ * como UTC restaría un día en husos positivos.
+ */
+function formatLongDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  return LONG_DATE.format(new Date(year, month - 1, day))
+}
 
 function axis(position: 'left' | 'right') {
   return {
@@ -95,6 +109,27 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
     animation: { duration: 300 },
+    plugins: {
+      tooltip: {
+        backgroundColor: TOOLTIP_BG,
+        titleColor: TOOLTIP_TEXT,
+        bodyColor: TOOLTIP_TEXT,
+        cornerRadius: 8,
+        padding: 12,
+        usePointStyle: true,
+        boxPadding: 4,
+        titleFont: { family: '"IBM Plex Mono", monospace', size: 12, weight: 500 },
+        bodyFont: { family: '"Newsreader", Georgia, ui-serif, serif', size: 12 },
+        callbacks: {
+          title: (items) => formatLongDate(String(items[0]?.label ?? '')),
+          label: (item) => {
+            const metric = metrics.value[item.datasetIndex]
+            const value = item.parsed.y ?? 0
+            return metric ? `${metric.label}: ${metric.describe(value)}` : ''
+          },
+        },
+      },
+    },
     scales,
   }
 })
