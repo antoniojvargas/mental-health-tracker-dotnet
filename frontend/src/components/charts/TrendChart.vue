@@ -136,7 +136,28 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 </script>
 
 <template>
-  <div class="h-72">
+  <div
+    v-if="logs.length === 0"
+    class="flex h-72 flex-col items-center justify-center rounded-2xl border border-ink-100 bg-paper-50 text-center"
+  >
+    <svg
+      class="h-8 w-8 text-ink-300"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      stroke-linecap="round"
+      aria-hidden="true"
+    >
+      <path d="M5 16a7 7 0 0 1 14 0" />
+      <path d="M3 16h18M12 3v3M5.6 8.6l1.4 1.4M18.4 8.6 17 10" />
+      <path d="M8 20h8" />
+    </svg>
+    <p class="mt-2 font-display font-medium text-ink-600">No data yet</p>
+    <p class="text-sm text-ink-400">Your first entry starts the story.</p>
+  </div>
+
+  <div v-else class="h-72">
     <Line :data="chartData" :options="chartOptions" />
   </div>
 </template>
