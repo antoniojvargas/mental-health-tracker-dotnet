@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
+import MetricSelector from '../components/charts/MetricSelector.vue'
+import RangeToggle from '../components/charts/RangeToggle.vue'
+import TrendChart from '../components/charts/TrendChart.vue'
 import DailyLogModal from '../components/daily-log/DailyLogModal.vue'
 import Button from '../components/ui/Button.vue'
 import Logo from '../components/ui/Logo.vue'
+import Skeleton from '../components/ui/Skeleton.vue'
 import { useAuthStore } from '../stores/useAuthStore'
 import { useLogsStore, type LogRange } from '../stores/useLogsStore'
 import type { IsoDate } from '../types/daily-log'
@@ -13,16 +17,18 @@ const auth = useAuthStore()
 const logsStore = useLogsStore()
 const router = useRouter()
 
-/**
- * Ventana de tendencias. Por ahora solo decide la carga inicial; `RangeToggle`
- * la moverá desde la sección de tendencias.
- */
+/** Ventana de tendencias: la fija `RangeToggle` y dispara la recarga. */
 const range = ref<LogRange>('week')
+
+/** Métricas dibujadas; `MetricSelector` deja activar hasta tres. */
+const metrics = ref<string[]>(['mood', 'anxiety', 'sleepHours'])
 const modalOpen = ref(false)
 
-onMounted(() => {
-  void logsStore.fetch(range.value)
-})
+/**
+ * Una sola carga, la inicial incluida: `immediate` cubre el montaje y el mismo
+ * manejador cubre cada cambio de ventana, sin duplicar la petición.
+ */
+watch(range, (value) => void logsStore.fetch(value), { immediate: true })
 
 /**
  * El avatar es opcional: Google no siempre entrega una foto, así que la
@@ -136,7 +142,18 @@ async function handleLogout(): Promise<void> {
         aria-labelledby="trends-heading"
         class="animate-fade-in rounded-2xl border border-ink-100 bg-paper-50 p-6"
       >
-        <h2 id="trends-heading" class="font-display font-semibold text-ink-700">Your trends</h2>
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 id="trends-heading" class="font-display font-semibold text-ink-700">Your trends</h2>
+          <RangeToggle v-model="range" />
+        </div>
+        <MetricSelector v-model="metrics" />
+        <div class="mt-4">
+          <Skeleton v-if="logsStore.loading" class="h-72 w-full" />
+          <p v-else-if="logsStore.error" class="py-8 text-center text-sm text-ink-400">
+            {{ logsStore.error }}
+          </p>
+          <TrendChart v-else :logs="logsStore.logs" :metric-keys="metrics" />
+        </div>
       </section>
     </main>
 
