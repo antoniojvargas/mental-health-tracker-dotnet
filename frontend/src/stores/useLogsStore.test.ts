@@ -64,16 +64,21 @@ describe('useLogsStore', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('pide los últimos 30 días cuando el rango es "month"', async () => {
-    const fetchSpy = mockFetch(listResponse([]))
+  it('al cambiar de rango vuelve a pedir la ventana y reemplaza la lista', async () => {
+    mockFetch(listResponse([makeLog('2026-10-01')]))
     const store = useLogsStore()
+    await store.fetch('week')
+    expect(store.logs.map((log) => log.logDate)).toEqual(['2026-10-01'])
 
+    const fetchSpy = mockFetch(listResponse([makeLog('2026-09-05'), makeLog('2026-10-01')]))
     await store.fetch('month')
 
     const url = new URL(fetchSpy.mock.calls[0][0] as string, 'http://localhost')
     const from = url.searchParams.get('from') as IsoDate
     const to = url.searchParams.get('to') as IsoDate
     expect(daysBetween(from, to)).toBe(29)
+    // Reemplaza, no acumula: la lista es la ventana nueva.
+    expect(store.logs.map((log) => log.logDate)).toEqual(['2026-09-05', '2026-10-01'])
   })
 
   it('guarda el mensaje de error y no relanza, sin vaciar los logs ya cargados', async () => {
