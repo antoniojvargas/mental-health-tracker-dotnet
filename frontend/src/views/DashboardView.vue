@@ -9,6 +9,7 @@ import DailyLogModal from '../components/daily-log/DailyLogModal.vue'
 import Button from '../components/ui/Button.vue'
 import Logo from '../components/ui/Logo.vue'
 import Skeleton from '../components/ui/Skeleton.vue'
+import { useLogSocket } from '../composables/useLogSocket'
 import { useAuthStore } from '../stores/useAuthStore'
 import { useLogsStore, type LogRange } from '../stores/useLogsStore'
 import type { IsoDate } from '../types/daily-log'
@@ -29,6 +30,13 @@ const modalOpen = ref(false)
  * manejador cubre cada cambio de ventana, sin duplicar la petición.
  */
 watch(range, (value) => void logsStore.fetch(value), { immediate: true })
+
+/**
+ * Los registros que llegan por el hub (guardados en otra pestaña) entran por
+ * `mergeLog`: si el día ya estaba en la lista se reemplaza, y si no se inserta
+ * en orden. Así el panel se actualiza sin recargar.
+ */
+useLogSocket((log) => logsStore.mergeLog(log))
 
 /**
  * El avatar es opcional: Google no siempre entrega una foto, así que la
