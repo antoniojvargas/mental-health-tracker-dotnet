@@ -41,6 +41,65 @@ El stack levanta tres servicios con hot-reload (los cambios en el código se apl
 
 Disponible en desarrollo en `http://localhost:3000/openapi/v1.json` (OpenAPI generado por ASP.NET Core).
 
+## Producción con Docker
+
+El archivo `docker-compose.prod.yml` levanta la pila de producción (Postgres + backend + frontend sobre nginx) usando las imágenes multi-stage de `backend/Dockerfile.prod` y `frontend/Dockerfile.prod`. Corre bajo su propio proyecto de Compose (`name: mht-prod`), de modo que contenedores, red, volúmenes e imágenes quedan aislados del stack de desarrollo: sin ese `name` ambos compartirían el volumen `postgres-data` y las etiquetas de las imágenes.
+
+### Secretos
+
+Los valores sensibles **nunca** van en el compose ni en un `.env`: se inyectan como Docker secrets montados en `/run/secrets/*` y el backend los lee con la variante `*_FILE`. Crea los cuatro archivos (están en `.gitignore`, no se versionan). El detalle de qué contiene cada uno y cómo generarlos está en [`secrets/README.md`](secrets/README.md):
+
+```bash
+umask 077
+openssl rand -base64 32 | tr -d '\n' > secrets/postgres_password.txt
+DB_PASS="$(cat secrets/postgres_password.txt)"
+printf 'Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=%s' "$DB_PASS" | tr -d '\n' > secrets/database_url.txt
+openssl rand -base64 48 | tr -d '\n' > secrets/jwt_secret.txt
+printf '%s' 'el-client-secret-de-google' > secrets/google_client_secret.txt
+```
+
+### Variables no sensibles
+
+Copia la plantilla y ajusta los valores (usuario/nombre de base, `GOOGLE_CLIENT_ID`, URLs, nivel de log y puerto):
+
+```bash
+cp .env.production.example .env.production
+```
+
+### Levantar la pila
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+El frontend queda disponible en `http://localhost:8080` (o el `HTTP_PORT` configurado). Al arrancar, el backend aplica las migraciones de EF Core y expone el healthcheck real (`SELECT 1` contra Postgres) en `/api/health`.
+
+### Verificar que está sana
+
+```bash
+# Los tres servicios deben aparecer como "healthy".
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+
+# Healthcheck del backend a través del proxy del frontend.
+curl http://localhost:8080/api/health   # -> {"status":"ok","uptime":...}
+```
+
+Ante un fallo, `docker compose --env-file .env.production -f docker-compose.prod.yml logs <servicio>` muestra la causa (p. ej. un secreto ausente hace que el backend falle la validación de configuración antes del healthcheck).
+
+### Apagado ordenado
+
+El backend maneja `SIGTERM`: deja de aceptar conexiones nuevas, cierra las conexiones de SignalR y el pool de Postgres, y fuerza la salida tras 10 segundos si algo se queda colgado. Por eso `docker compose ... stop` (o `down`) termina en pocos segundos.
+
+### Bajar la pila
+
+```bash
+# Conserva el volumen de datos.
+docker compose --env-file .env.production -f docker-compose.prod.yml down
+
+# Elimina también el volumen de Postgres.
+docker compose --env-file .env.production -f docker-compose.prod.yml down -v
+```
+
 ## Testing
 
 ### Capas de pruebas

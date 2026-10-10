@@ -22,7 +22,7 @@ public static class SecretFileConfigurationExtensions
         [
             ("JWT_SECRET", "JWT_SECRET_FILE", "Jwt:Secret"),
             ("GOOGLE_CLIENT_SECRET", "GOOGLE_CLIENT_SECRET_FILE", "GoogleOAuth:ClientSecret"),
-            ("ConnectionStrings__Default", "ConnectionStrings__Default_FILE", "ConnectionStrings:Default"),
+            ("Database__ConnectionString", "Database__ConnectionString_FILE", "Database:ConnectionString"),
         ];
 
         public override void Load()

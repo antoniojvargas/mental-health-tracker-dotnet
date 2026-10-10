@@ -1,6 +1,7 @@
 using FluentValidation;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
+using MentalHealthTracker.Api.Core.Hosting;
 using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Core.OpenApi;
 using MentalHealthTracker.Api.Core.Validation;
@@ -25,6 +26,15 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddSecretFileConfiguration();
 
 builder.Host.UseSerilogLogging();
+
+// Apagado ordenado: SIGTERM para de aceptar conexiones nuevas y da margen a
+// cerrar las conexiones SignalR y el pool de Postgres, pero si algo se queda
+// colgado el host forza la salida al cumplirse los 10 segundos (Kestrel aborta
+// entonces cualquier request/WebSocket pendiente).
+builder.Host.ConfigureHostOptions(options =>
+{
+    options.ShutdownTimeout = TimeSpan.FromSeconds(10);
+});
 
 // Add services to the container.
 
@@ -73,6 +83,8 @@ builder.Services.AddControllers(options =>
     options.Filters.Add<FluentValidationActionFilter>();
 });
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<SignalRConnectionTracker>();
+builder.Services.AddHostedService<GracefulShutdownService>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 

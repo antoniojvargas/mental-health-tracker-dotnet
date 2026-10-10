@@ -1,0 +1,134 @@
+# Pila de PRODUCCION, aislada de la de desarrollo por `name: mht-prod`.
+#
+# Sin `name:`, Docker Compose deriva el nombre de proyecto de la carpeta, igual
+# que el compose de desarrollo, y ambas pilas comparten el mismo espacio:
+#   * El volumen `postgres-data` se resuelve como <proyecto>_postgres-data, asi
+#     que desarrollo y produccion montarian la MISMA base de datos: escribir
+#     desde una pila corrompe los datos de la otra.
+#   * La red por defecto y el prefijo de las etiquetas de servicio son el
+#     mismo, de modo que `docker compose up/down` de una pila alcanza los
+#     contenedores de la otra.
+#   * Las imagenes construidas se etiquetan con el nombre de proyecto, asi que
+#     la imagen de produccion sobreescribe a la de desarrollo bajo la misma
+#     etiqueta (y viceversa al reconstruir).
+#
+# Con `name: mht-prod` el prefijo es propio: contenedores, red, volumenes e
+# imagenes quedan bajo `mht-prod_*`, aislados de la pila de desarrollo.
+#
+# La pila es inmutable: no hay bind mounts (el codigo va dentro de la imagen),
+# y cada servicio define restart, healthcheck y un limite de memoria propio para
+# que una fuga de memoria no tumbe al resto de contenedores del host.
+#
+# Uso:
+#   1) Crear los archivos de secretos (gitignored por secrets/*.txt):
+#        secrets/postgres_password.txt    — password del usuario postgres
+#        secrets/database_url.txt         — connection string completo a la BD
+#        secrets/jwt_secret.txt           — clave de firma de JWT (>= 16 caracteres)
+#        secrets/google_client_secret.txt — client secret de Google OAuth
+#      El password dentro de database_url debe coincidir con postgres_password;
+#      dentro de la red el host de la BD es `postgres`, nunca localhost.
+#   2) Copiar y ajustar las variables no sensibles:
+#        cp .env.production.example .env.production
+#   3) Levantar la pila:
+#        docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+#
+# Ningun valor sensible vive en el compose ni en un .env: los cuatro secretos se
+# inyectan como Docker secrets en /run/secrets/* y el backend los consume con la
+# variante *_FILE (SecretFileConfigurationProvider). Solo la configuracion no
+# sensible (URLs, ClientId de Google) va en `environment` o en .env.production.
+name: mht-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      # El password se inyecta por Docker secret, nunca por env ni compose.
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: ${POSTGRES_DB:-mentalhealthtracker}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
+    # Sin puerto publicado: solo el backend lo alcanza por nombre de servicio.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mentalhealthtracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  backend:
+    image: mht-backend:prod
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    # Tres de los cuatro secretos los consume el backend via *_FILE.
+    environment:
+      GoogleOAuth__ClientId: ${GOOGLE_CLIENT_ID:?export GOOGLE_CLIENT_ID}
+      GoogleOAuth__RedirectUri: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/auth/callback}
+      AppUrls__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-Information}
+      Database__ConnectionString_FILE: /run/secrets/database_url
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+    secrets:
+      - database_url
+      - jwt_secret
+      - google_client_secret
+    # Sin puerto publicado: el frontend proxifica /api y /hub por la red interna.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # La imagen aspnet:alpine no trae curl; usa wget (busybox).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  frontend:
+    image: mht-frontend:prod
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      # nginx escucha solo en IPv4 (0.0.0.0:8080); con "localhost" el wget de
+      # busybox resuelve ::1 y da connection refused. Se usa 127.0.0.1 explicito.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  postgres-data:
+
+secrets:
+  postgres_password:
+    file: secrets/postgres_password.txt
+  database_url:
+    file: secrets/database_url.txt
+  jwt_secret:
+    file: secrets/jwt_secret.txt
+  google_client_secret:
+    file: secrets/google_client_secret.txt
