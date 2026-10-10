@@ -76,7 +76,9 @@ function toggle(key: string) {
 function setSeverity(key: string, severity: number) {
   if (props.disabled) return
   const clamped = Math.min(5, Math.max(1, severity))
-  const next = entries.value.map((s) => (s.key === key ? { ...s, severity: clamped, active: true } : s))
+  const next = entries.value.map((s) =>
+    s.key === key ? { ...s, severity: clamped, active: true } : s,
+  )
   emit('update:modelValue', next)
 }
 </script>
@@ -90,7 +92,11 @@ function setSeverity(key: string, severity: number) {
     <legend class="px-1 text-sm font-medium text-ink-900">{{ ariaLabel }}</legend>
 
     <div class="flex flex-col gap-3">
-      <div v-for="sym in entries" :key="sym.key" class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        v-for="sym in entries"
+        :key="sym.key"
+        class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+      >
         <label class="flex cursor-pointer items-center gap-3" :for="`sym-check-${sym.key}`">
           <input
             :id="`sym-check-${sym.key}`"

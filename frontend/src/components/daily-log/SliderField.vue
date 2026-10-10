@@ -46,7 +46,9 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: number): void
 }>()
 
-const inputId = computed(() => props.id ?? `slider-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`)
+const inputId = computed(
+  () => props.id ?? `slider-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
+)
 
 function onInput(e: Event) {
   const target = e.target as HTMLInputElement | null
