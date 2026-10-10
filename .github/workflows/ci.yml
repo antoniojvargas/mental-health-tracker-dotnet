@@ -191,3 +191,57 @@ jobs:
         # el advisory, el motivo y la fecha de revision; de lo contrario este
         # paso quedara en rojo.
         run: npm audit --audit-level=high
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # .env desechable con valores ficticios: sin secretos reales. OAuth esta
+      # puenteado en E2E, asi que GoogleOAuth__* solo cumplen la validacion de
+      # config del backend y nunca se usan contra Google (las pruebas entran por
+      # POST /api/auth/test-login). El override docker-compose.e2e.yml inyecta
+      # este archivo al contenedor backend via env_file. Las claves con "__" son
+      # el formato de separador que el configuration provider de .NET espera
+      # (GoogleOAuth__ClientId -> GoogleOAuth:ClientId). Database__ConnectionString
+      # apunta al servicio `postgres` de la red de Compose, no a localhost.
+      - name: Crear .env desechable
+        run: |
+          cat > .env <<'EOF'
+          ConnectionStrings__Default=Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres
+          Database__ConnectionString=Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres
+          JWT_SECRET=e2e-only-disposable-secret-0123456789abcdef
+          GoogleOAuth__ClientId=e2e-test-client.apps.googleusercontent.com
+          GoogleOAuth__ClientSecret=e2e-disposable-client-secret
+          GoogleOAuth__RedirectUri=http://localhost:5173/auth/callback
+          AppUrls__FrontendUrl=http://localhost:5173
+          LOG_LEVEL=Information
+          EOF
+
+      - name: Levantar la pila E2E
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 600
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Instalar Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Suite E2E completa
+        working-directory: e2e
+        run: npm test
+
+      - name: Subir reporte E2E
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7

@@ -10,5 +10,10 @@
 # aplica explícitamente encadenado al compose de desarrollo durante la suite E2E.
 services:
   backend:
+    # El stack E2E lee el .env del proyecto (con valores desechables: JWT_SECRET,
+    # GoogleOAuth__*, Database__ConnectionString contra el servicio `postgres`).
+    # Es el unico punto donde se inyecta .env a un contenedor: el compose de
+    # desarrollo no lo usa, asi que los valores reales nunca entran a Docker.
+    env_file: .env
     environment:
       ASPNETCORE_ENVIRONMENT: Testing

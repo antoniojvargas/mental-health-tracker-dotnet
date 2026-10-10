@@ -63,7 +63,7 @@ Disponible en desarrollo en `http://localhost:3000/openapi/v1.json` (OpenAPI gen
 
 La suite E2E vive en `e2e/` (Playwright + TypeScript, solo Chromium) y recorre flujos completos de usuario contra el stack real: navegador → frontend → API → PostgreSQL. El `baseURL` es `http://localhost:5173`, así que primero hay que tener una pila viva.
 
-1. **Levantar la pila E2E.** Se arranca con el override `docker-compose.e2e.yml`, que fija `ASPNETCORE_ENVIRONMENT=Testing` en el backend y habilita `POST /api/auth/test-login`, el endpoint que las pruebas usan para autenticarse sin pasar por el consentimiento de Google:
+1. **Levantar la pila E2E.** Primero crea un `.env` desde `.env.example` con valores desechables: el override `docker-compose.e2e.yml` lo inyecta al backend dentro de Docker. Se arranca con el override, que fija `ASPNETCORE_ENVIRONMENT=Testing` en el backend y habilita `POST /api/auth/test-login`, el endpoint que las pruebas usan para autenticarse sin pasar por el consentimiento de Google:
 
    ```bash
    docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
