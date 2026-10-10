@@ -27,17 +27,27 @@ test('tiempo real: guardar en una pestaña se refleja en la otra sin recargar ni
     }
   })
 
-  const pageBWebSocket = pageB.waitForEvent('websocket')
+  // Esperar el handshake de SignalR en B. Cuando el servidor lo responde, B ya
+  // está en el grupo del usuario (LogsHub.OnConnectedAsync) y ninguna emisión de
+  // A se pierde. El listener se cuelga en cuanto se crea el socket del hub — vía
+  // el evento 'websocket' de la página, no tras un `await`— porque el frame del
+  // handshake puede emitirse antes de que un listener posterior se adjunte, y
+  // Playwright no reproduce frames ya recibidos. El filtro descarta el socket de
+  // HMR de Vite, que no pasa por /hub.
+  let markReady!: () => void
+  const hubReady = new Promise<void>((resolve) => {
+    markReady = resolve
+  })
+  pageB.on('websocket', (socket) => {
+    if (!socket.url().includes('/hub')) return
+    socket.once('framereceived', () => markReady())
+  })
 
   await pageB.goto('/dashboard')
   await expect(pageB.getByRole('heading', { name: 'Hi, Ana.' })).toBeVisible()
   await expect(pageB.getByText('How are you feeling today? Take a minute to log it.')).toBeVisible()
 
-  // Esperar a que la pestaña B tenga el socket de SignalR montado y en el grupo
-  // del usuario antes de guardar en A, o la emisión se pierde.
-  const websocket = await pageBWebSocket
-  await websocket.waitForEvent('framesent', { timeout: 10_000 })
-  await websocket.waitForEvent('framereceived', { timeout: 10_000 })
+  await hubReady
 
   const baselineFetchCount = getLogsRequests
 
