@@ -270,7 +270,7 @@ jobs:
 
       - name: Verificar usuario no root del backend
         run: |
-          uid=$(docker run --rm --entrypoint id -u mht-backend:ci)
+          uid=$(docker run --rm --entrypoint id mht-backend:ci -u)
           echo "El proceso del backend corre con uid=$uid"
           [ "$uid" != "0" ] || { echo "El backend correria como root"; exit 1; }
 
