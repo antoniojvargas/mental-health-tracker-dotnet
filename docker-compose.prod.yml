@@ -1,0 +1,79 @@
+# Pila de PRODUCCION, aislada de la de desarrollo por `name: mht-prod`.
+#
+# Sin `name:`, Docker Compose deriva el nombre de proyecto de la carpeta, igual
+# que el compose de desarrollo, y ambas pilas comparten el mismo espacio:
+#   * El volumen `postgres-data` se resuelve como <proyecto>_postgres-data, asi
+#     que desarrollo y produccion montarian la MISMA base de datos: escribir
+#     desde una pila corrompe los datos de la otra.
+#   * La red por defecto y el prefijo de las etiquetas de servicio son el
+#     mismo, de modo que `docker compose up/down` de una pila alcanza los
+#     contenedores de la otra.
+#   * Las imagenes construidas se etiquetan con el nombre de proyecto, asi que
+#     la imagen de produccion sobreescribe a la de desarrollo bajo la misma
+#     etiqueta (y viceversa al reconstruir).
+#
+# Con `name: mht-prod` el prefijo es propio: contenedores, red, volumenes e
+# imagenes quedan bajo `mht-prod_*`, aislados de la pila de desarrollo.
+#
+# Uso:
+#   docker compose -f docker-compose.prod.yml up -d --build
+# Requiere un .env con valores reales de produccion (JWT_SECRET, credenciales de
+# GoogleOAuth y Database__ConnectionString con Host=postgres: el backend solo
+# alcanza la base por nombre de servicio dentro de la red, nunca por localhost).
+name: mht-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mentalhealthtracker}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Sin puerto publicado: solo el backend lo alcanza por nombre de servicio.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mentalhealthtracker}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: mht-backend:prod
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    env_file: .env
+    # Sin puerto publicado: el frontend proxifica /api y /hub por la red interna.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # La imagen aspnet:alpine no trae curl; usa wget (busybox).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    image: mht-frontend:prod
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
