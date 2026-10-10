@@ -1,0 +1,14 @@
+# Override SOLO para las pruebas end-to-end.
+#
+# Uso: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up
+#
+# Fija ASPNETCORE_ENVIRONMENT=Testing en el backend para que se registren los
+# endpoints de prueba (por ejemplo POST /api/auth/test-login), que permiten a
+# Playwright autenticarse sin depender del flujo real de login.
+#
+# NUNCA se usa para desarrollo real ni para producción: este archivo solo se
+# aplica explícitamente encadenado al compose de desarrollo durante la suite E2E.
+services:
+  backend:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
