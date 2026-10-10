@@ -20,10 +20,20 @@
 # que una fuga de memoria no tumbe al resto de contenedores del host.
 #
 # Uso:
-#   docker compose -f docker-compose.prod.yml up -d --build
-# Requiere un .env con valores reales de produccion (JWT_SECRET, credenciales de
-# GoogleOAuth y Database__ConnectionString con Host=postgres: el backend solo
-# alcanza la base por nombre de servicio dentro de la red, nunca por localhost).
+#   1) Crear los archivos de secretos (gitignored por secrets/*.txt):
+#        secrets/postgres_password.txt    — password del usuario postgres
+#        secrets/database_url.txt         — connection string completo a la BD
+#        secrets/jwt_secret.txt           — clave de firma de JWT (>= 16 caracteres)
+#        secrets/google_client_secret.txt — client secret de Google OAuth
+#      El password dentro de database_url debe coincidir con postgres_password;
+#      dentro de la red el host de la BD es `postgres`, nunca localhost.
+#   2) Levantar la pila:
+#        docker compose -f docker-compose.prod.yml up -d --build
+#
+# Ningun valor sensible vive en el compose ni en un .env: los cuatro secretos se
+# inyectan como Docker secrets en /run/secrets/* y el backend los consume con la
+# variante *_FILE (SecretFileConfigurationProvider). Solo la configuracion no
+# sensible (URLs, ClientId de Google) va en `environment`.
 name: mht-prod
 
 services:
@@ -32,10 +42,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      # El password se inyecta por Docker secret, nunca por env ni compose.
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_DB: ${POSTGRES_DB:-mentalhealthtracker}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    secrets:
+      - postgres_password
     # Sin puerto publicado: solo el backend lo alcanza por nombre de servicio.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mentalhealthtracker}"]
@@ -53,7 +66,18 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     restart: unless-stopped
-    env_file: .env
+    # Tres de los cuatro secretos los consume el backend via *_FILE.
+    environment:
+      GoogleOAuth__ClientId: ${GOOGLE_CLIENT_ID:?export GOOGLE_CLIENT_ID}
+      GoogleOAuth__RedirectUri: ${GOOGLE_OAUTH_REDIRECT_URI:-http://localhost:8080/auth/callback}
+      AppUrls__FrontendUrl: ${APP_URLS__FRONTEND_URL:-http://localhost:8080}
+      Database__ConnectionString_FILE: /run/secrets/database_url
+      JWT_SECRET_FILE: /run/secrets/jwt_secret
+      GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+    secrets:
+      - database_url
+      - jwt_secret
+      - google_client_secret
     # Sin puerto publicado: el frontend proxifica /api y /hub por la red interna.
     depends_on:
       postgres:
@@ -93,3 +117,13 @@ services:
 
 volumes:
   postgres-data:
+
+secrets:
+  postgres_password:
+    file: secrets/postgres_password.txt
+  database_url:
+    file: secrets/database_url.txt
+  jwt_secret:
+    file: secrets/jwt_secret.txt
+  google_client_secret:
+    file: secrets/google_client_secret.txt
