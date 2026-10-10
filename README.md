@@ -50,11 +50,43 @@ Disponible en desarrollo en `http://localhost:3000/openapi/v1.json` (OpenAPI gen
 | Unitarias (backend)   | Lógica de dominio, validación y casos límite de la API, aislada de la base de datos y de HTTP.                  | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj`                                                | Configurado (52)    |
 | Integración (backend) | Endpoints HTTP, autenticación OAuth, repositorios y SignalR contra una PostgreSQL 16 real (Docker, puerto `5433`). | `make test` — levanta `postgres-test`, ejecuta las dos capas del backend y verifica el umbral de cobertura                                 | Configurado (19)    |
 | Unitarias (frontend)  | Lógica de componentes y *composables* de Vue, sin navegador.                                                    | `cd frontend && npm run test:unit`                                                                                                            | Runner listo (22)  |
-| E2E (Playwright)      | Flujos completos de usuario navegador → frontend → API → PostgreSQL.                                            | `make test-e2e` *(pendiente de configurar; requiere el stack levantado con `make up`)*                                                         | Pendiente           |
+| E2E (Playwright)      | Flujos completos de usuario navegador → frontend → API → PostgreSQL.                                            | Requiere la pila E2E arriba; ver [Pruebas E2E](#pruebas-e2e-playwright)                                                                       | Configurado (5)     |
 
 **Notas**
 
 - `make test` fusiona la cobertura de las dos capas del backend (Coverlet + ReportGenerator) y **falla si la cobertura de líneas baja del 70 %**; la medición actual es de 75 %.
 - `npm run test:unit` del frontend usa Vitest y corre sin navegador. El entorno global es `node`, porque el cliente de la API y el store no tocan el DOM; los tests de componente que sí lo necesitan montan la vista con Vue Test Utils sobre `jsdom` mediante un docblock `@vitest-environment`, de modo que solo ese fichero paga el coste de levantar un DOM.
 - La suite de frontend cubre hoy el cliente de la API, el store de autenticación y la vista de login. Los tests de componente montan la vista real con un router de memoria y un Pinia reales, y solo sustituyen `fetch`: la lógica que interesa es la que une el `query` de la ruta, el store y el router, así que falsificar cualquiera de los dos dejaría el cableado real fuera del alcance del test.
-- La capa E2E aún no tiene runner configurado: `e2e/` solo declara la estructura planificada. Cuando se configure, `make test-e2e` será el comando de entrada.
+- La suite E2E vive en `e2e/`; `make test-e2e` ejecuta la suite completa y requiere la pila E2E levantada. Ver [Pruebas E2E](#pruebas-e2e-playwright) para levantar la pila, instalar los navegadores de Playwright y volver al entorno normal.
+
+### Pruebas E2E (Playwright)
+
+La suite E2E vive en `e2e/` (Playwright + TypeScript, solo Chromium) y recorre flujos completos de usuario contra el stack real: navegador → frontend → API → PostgreSQL. El `baseURL` es `http://localhost:5173`, así que primero hay que tener una pila viva.
+
+1. **Levantar la pila E2E.** Se arranca con el override `docker-compose.e2e.yml`, que fija `ASPNETCORE_ENVIRONMENT=Testing` en el backend y habilita `POST /api/auth/test-login`, el endpoint que las pruebas usan para autenticarse sin pasar por el consentimiento de Google:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build
+   ```
+
+2. **Instalar los navegadores de Playwright** (solo la primera vez):
+
+   ```bash
+   cd e2e && npm install && npx playwright install chromium
+   ```
+
+3. **Ejecutar la suite**, ya sea completa o solo los tests etiquetados `@smoke`:
+
+   ```bash
+   cd e2e && npm test            # suite completa (smoke + flujos críticos)
+   cd e2e && npm run test:smoke  # solo los tests con la etiqueta @smoke
+   ```
+
+   Tras la ejecución, el reporte HTML queda en `e2e/playwright-report/`; se abre con `npm run report`.
+
+4. **Volver a la pila normal.** El override solo aplica al entorno de pruebas, así que hay que bajar la pila E2E y levantarla sin él (equivalente a `make up`) para que el backend deje de correr con `ASPNETCORE_ENVIRONMENT=Testing` y `POST /api/auth/test-login` deje de existir:
+
+   ```bash
+   docker compose down
+   docker compose up -d --build
+   ```
