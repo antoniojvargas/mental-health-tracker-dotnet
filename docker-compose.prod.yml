@@ -15,6 +15,10 @@
 # Con `name: mht-prod` el prefijo es propio: contenedores, red, volumenes e
 # imagenes quedan bajo `mht-prod_*`, aislados de la pila de desarrollo.
 #
+# La pila es inmutable: no hay bind mounts (el codigo va dentro de la imagen),
+# y cada servicio define restart, healthcheck y un limite de memoria propio para
+# que una fuga de memoria no tumbe al resto de contenedores del host.
+#
 # Uso:
 #   docker compose -f docker-compose.prod.yml up -d --build
 # Requiere un .env con valores reales de produccion (JWT_SECRET, credenciales de
@@ -38,6 +42,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   backend:
     image: mht-backend:prod
@@ -57,6 +65,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   frontend:
     image: mht-frontend:prod
@@ -74,6 +86,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 volumes:
   postgres-data:
