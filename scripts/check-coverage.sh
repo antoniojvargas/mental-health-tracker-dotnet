@@ -9,7 +9,7 @@ REPORT_DIR="${COVERAGE_DIR:-coverage}/gate"
 "$DOTNET" tool run reportgenerator "-reports:coverage/**/coverage.cobertura.xml" \
   "-targetdir:$REPORT_DIR" "-reporttypes:Xml" >/dev/null
 
-python3 - "$REPORT_DIR/summary.xml" "$THRESHOLD" <<'PY'
+python3 - "$REPORT_DIR/Summary.xml" "$THRESHOLD" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
 
