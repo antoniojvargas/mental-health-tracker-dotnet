@@ -27,13 +27,15 @@
 #        secrets/google_client_secret.txt — client secret de Google OAuth
 #      El password dentro de database_url debe coincidir con postgres_password;
 #      dentro de la red el host de la BD es `postgres`, nunca localhost.
-#   2) Levantar la pila:
-#        docker compose -f docker-compose.prod.yml up -d --build
+#   2) Copiar y ajustar las variables no sensibles:
+#        cp .env.production.example .env.production
+#   3) Levantar la pila:
+#        docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 #
 # Ningun valor sensible vive en el compose ni en un .env: los cuatro secretos se
 # inyectan como Docker secrets en /run/secrets/* y el backend los consume con la
 # variante *_FILE (SecretFileConfigurationProvider). Solo la configuracion no
-# sensible (URLs, ClientId de Google) va en `environment`.
+# sensible (URLs, ClientId de Google) va en `environment` o en .env.production.
 name: mht-prod
 
 services:
@@ -69,8 +71,9 @@ services:
     # Tres de los cuatro secretos los consume el backend via *_FILE.
     environment:
       GoogleOAuth__ClientId: ${GOOGLE_CLIENT_ID:?export GOOGLE_CLIENT_ID}
-      GoogleOAuth__RedirectUri: ${GOOGLE_OAUTH_REDIRECT_URI:-http://localhost:8080/auth/callback}
-      AppUrls__FrontendUrl: ${APP_URLS__FRONTEND_URL:-http://localhost:8080}
+      GoogleOAuth__RedirectUri: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/auth/callback}
+      AppUrls__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-Information}
       Database__ConnectionString_FILE: /run/secrets/database_url
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
@@ -101,7 +104,7 @@ services:
       dockerfile: Dockerfile.prod
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "${HTTP_PORT:-8080}:8080"
     depends_on:
       backend:
         condition: service_healthy
