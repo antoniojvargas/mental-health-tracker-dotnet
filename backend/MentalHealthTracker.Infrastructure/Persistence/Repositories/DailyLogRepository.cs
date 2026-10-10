@@ -57,7 +57,7 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
             """;
 
         command.Parameters.Add(new NpgsqlParameter("@id", NpgsqlDbType.Uuid)
-            { Value = log.Id == Guid.Empty ? Guid.NewGuid() : log.Id });
+        { Value = log.Id == Guid.Empty ? Guid.NewGuid() : log.Id });
         command.Parameters.Add(new NpgsqlParameter("@user_id", NpgsqlDbType.Uuid) { Value = log.UserId });
         command.Parameters.Add(new NpgsqlParameter("@log_date", NpgsqlDbType.Date) { Value = log.LogDate });
         command.Parameters.Add(new NpgsqlParameter("@mood_rating", NpgsqlDbType.Smallint) { Value = log.MoodRating });
@@ -69,20 +69,20 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
         var sleepDisturbances = new Converters.EnumListToStringArrayConverter<SleepDisturbance>()
             .ConvertToProvider(log.SleepDisturbances) as List<string>;
         command.Parameters.Add(new NpgsqlParameter("@sleep_disturbances", NpgsqlDbType.Array | NpgsqlDbType.Text)
-            { Value = (object?)sleepDisturbances?.ToArray() ?? DBNull.Value });
+        { Value = (object?)sleepDisturbances?.ToArray() ?? DBNull.Value });
 
         var activityType = new Converters.EnumSnakeCaseConverter<ActivityType>()
             .ConvertToProvider(log.ActivityType);
         command.Parameters.Add(new NpgsqlParameter("@activity_type", NpgsqlDbType.Text)
-            { Value = (object?)activityType ?? DBNull.Value });
+        { Value = (object?)activityType ?? DBNull.Value });
 
         command.Parameters.Add(new NpgsqlParameter("@activity_minutes", NpgsqlDbType.Smallint)
-            { Value = (object?)log.ActivityMinutes ?? DBNull.Value });
+        { Value = (object?)log.ActivityMinutes ?? DBNull.Value });
 
         var socialFrequency = new Converters.EnumSnakeCaseConverter<SocialFrequency>()
             .ConvertToProvider(log.SocialFrequency);
         command.Parameters.Add(new NpgsqlParameter("@social_frequency", NpgsqlDbType.Text)
-            { Value = socialFrequency });
+        { Value = socialFrequency });
 
         var symptoms = new Converters.JsonListConverter<Symptom>().ConvertToProvider(log.Symptoms);
         command.Parameters.Add(new NpgsqlParameter("@symptoms", NpgsqlDbType.Jsonb) { Value = symptoms });
@@ -134,4 +134,4 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
         return new PagedResult<DailyLog>(items, total);
     }
 
-    }
+}
