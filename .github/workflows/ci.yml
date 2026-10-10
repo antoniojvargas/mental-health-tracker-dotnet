@@ -255,3 +255,50 @@ jobs:
       - name: Bajar la pila E2E
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
+
+  build-prod-images:
+    name: Build prod images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend prod image
+        run: docker build -f backend/Dockerfile.prod -t mht-backend:ci backend
+
+      - name: Build frontend prod image
+        run: docker build -f frontend/Dockerfile.prod -t mht-frontend:ci frontend
+
+      - name: Verificar usuario no root del backend
+        run: |
+          uid=$(docker run --rm --entrypoint id -u mht-backend:ci)
+          echo "El proceso del backend corre con uid=$uid"
+          [ "$uid" != "0" ] || { echo "El backend correria como root"; exit 1; }
+
+      - name: Verificar retry de BD en vez de crash por dependencia
+        run: |
+          # Sin postgres a mano (Host=postgres no resuelve): el arranque debe
+          # quedarse reintentando la conexion con backoff (DatabaseInitializer),
+          # no morir por una dependencia faltante. Todas las opciones requeridas
+          # se pasan para pasar la validacion de config y llegar al bucle de retry.
+          docker run -d --name mht-be-retry \
+            -e Database__ConnectionString="Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres" \
+            -e JWT_SECRET="ci-only-disposable-secret-0123456789" \
+            -e GoogleOAuth__ClientId="ci-test.apps.googleusercontent.com" \
+            -e GoogleOAuth__ClientSecret="ci-disposable-secret" \
+            -e GoogleOAuth__RedirectUri="http://localhost:5173/auth/callback" \
+            -e AppUrls__FrontendUrl="http://localhost:5173" \
+            mht-backend:ci
+          sleep 15
+          logs=$(docker logs mht-be-retry 2>&1)
+          printf '%s\n' "$logs"
+          echo "$logs" | grep -q "Database not ready (attempt" || {
+            echo "No se ve el reintento de conexion a la BD"; exit 1
+          }
+          state=$(docker inspect -f '{{.State.Running}}' mht-be-retry)
+          [ "$state" = "true" ] || {
+            echo "El contenedor murio en lugar de reintentar la conexion"; exit 1
+          }
+
+      - name: Limpiar contenedor de verificacion
+        if: always()
+        run: docker rm -f mht-be-retry || true
