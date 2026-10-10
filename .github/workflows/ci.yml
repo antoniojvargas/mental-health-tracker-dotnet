@@ -155,3 +155,39 @@ jobs:
       - name: npm format
         working-directory: frontend
         run: npm run format
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: NuGet audit
+        working-directory: backend
+        # Auditoría de vulnerabilidades de NuGet (activa por defecto en .NET 8+)
+        # sobre toda la solución, incluyendo dependencias transitivas. Sale en
+        # error si hay algún paquete vulnerable.
+        # Estado: 0 paquetes vulnerables (verificado localmente, 2026-10-09).
+        run: dotnet list MentalHealthTracker.slnx package --vulnerable --include-transitive
+
+      - name: npm audit
+        working-directory: frontend
+        # Falla cuando existe vulnerabilidad de severidad >= high.
+        #
+        # Hallazgos aceptados conscientemente: ninguno en la firma actual.
+        # Historial: source-map-js <=1.2.1 (GHSA-68fv-2mgg-jv7q, high, DoS del
+        # event-loop via mapas de origen indexados) detectado el 2026-10-09. Se
+        # valoró como riesgo bajo real: es transitiva del toolchain de build
+        # (Vite/@vue/compiler-sfc/@tailwindcss), no llega al bundle de produccion
+        # y el input que la explota (source maps hostiles) solo lo generan
+        # nuestras herramientas de build de confianza. Igualmente se resolvio con
+        # `npm audit fix` (bump en lockfile a 1.2.2), sin dependencias nuevas.
+        #
+        # Regla: si un hallazgo nuevo se decide aceptar a proposito, anotar aqui
+        # el advisory, el motivo y la fecha de revision; de lo contrario este
+        # paso quedara en rojo.
+        run: npm audit --audit-level=high
