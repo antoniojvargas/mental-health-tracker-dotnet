@@ -23,6 +23,7 @@ test('recorrido crítico: test-login, dashboard, registrar ánimo y confirmar si
 
   await expect(page.getByRole('heading', { name: 'Hi, Ana.' })).toBeVisible()
   await expect(page.getByText('How are you feeling today? Take a minute to log it.')).toBeVisible()
+  await expect(page.getByText('No data yet')).toBeVisible()
 
   await page.getByRole('button', { name: 'Log my day' }).click()
 
@@ -36,6 +37,13 @@ test('recorrido crítico: test-login, dashboard, registrar ánimo y confirmar si
   await expect(
     page.getByText("You already logged how you're feeling today. You can adjust it if something changed."),
   ).toBeVisible()
+
+  await expect(page.getByText('No data yet')).toBeHidden()
+  await expect(page.locator('canvas')).toBeVisible()
+
+  const monthButton = page.getByRole('button', { name: 'Month' })
+  await monthButton.click()
+  await expect(monthButton).toHaveAttribute('aria-pressed', 'true')
 
   expect(await page.evaluate(() => (window as unknown as { __mhtLoads: number }).__mhtLoads)).toBe(1)
 })
