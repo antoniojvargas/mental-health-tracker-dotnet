@@ -57,6 +57,49 @@ jobs:
       - name: Build
         run: npm run build
 
+  backend-test:
+    name: Backend tests (.NET + Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mht_test
+          POSTGRES_PASSWORD: mht_test
+          POSTGRES_DB: mht_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U mht_test -d mht_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore MentalHealthTracker.slnx
+
+      - name: Build
+        run: dotnet build MentalHealthTracker.slnx --no-restore --configuration Release
+
+      - name: Tests unitarios con cobertura
+        run: dotnet test tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj --configuration Release -p:CoverletOutput=${{ github.workspace }}/coverage/unit/
+
+      - name: Tests de integración con cobertura
+        run: dotnet test tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj --configuration Release -p:CoverletOutput=${{ github.workspace }}/coverage/int/
+
+      - name: Umbral de cobertura
+        working-directory: ${{ github.workspace }}
+        run: ./scripts/check-coverage.sh 70
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
