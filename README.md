@@ -90,3 +90,20 @@ La suite E2E vive en `e2e/` (Playwright + TypeScript, solo Chromium) y recorre f
    docker compose down
    docker compose up -d --build
    ```
+
+## CI (GitHub Actions) y protección de ramas
+
+El workflow `.github/workflows/ci.yml` corre en cada `pull_request` y en `push` a `main`, y ejecuta estos jobs:
+
+| Job                    | Qué hace                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Backend (.NET)         | Restaura, compila y ejecuta los tests unitarios del backend.                                                 |
+| Frontend (Node)        | Instala dependencias, ejecuta los tests unitarios (Vitest) y compila el bundle.                              |
+| Backend tests          | Compila la solución y corre unitarias + integración (Postgres 16 como servicio) con cobertura ≥ 70 %.        |
+| Frontend tests         | Ejecuta los tests unitarios de Vitest con cobertura.                                                         |
+| Lint                   | `dotnet format --verify-no-changes`, ESLint y Prettier.                                                      |
+| Security audit         | `dotnet list package --vulnerable --include-transitive` y `npm audit --audit-level=high`.                    |
+| E2E (Playwright)       | Levanta la pila E2E (override con `ASPNETCORE_ENVIRONMENT=Testing`) y ejecuta la suite completa.             |
+| Build prod images      | Construye las imágenes de producción y verifica que el backend corre como no-root y reintenta la conexión a la BD en vez de crashear. |
+
+**Protección de `main`:** la rama exige que **todos** los checks del CI pasen antes de permitir el merge, y la regla aplica también a los administradores del repositorio. Están bloqueados además los force-pushes y la eliminación de la rama: los cambios entran únicamente vía `pull_request`.
