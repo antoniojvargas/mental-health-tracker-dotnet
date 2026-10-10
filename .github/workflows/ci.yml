@@ -56,3 +56,35 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: dotnet format
+        working-directory: backend
+        run: dotnet format MentalHealthTracker.slnx --verify-no-changes
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm install
+        working-directory: frontend
+        run: npm ci
+
+      - name: npm lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: npm format
+        working-directory: frontend
+        run: npm run format
