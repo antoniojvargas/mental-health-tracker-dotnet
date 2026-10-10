@@ -1,0 +1,304 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  NODE_VERSION: '22'
+
+jobs:
+  backend:
+    name: Backend (.NET)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore MentalHealthTracker.slnx
+
+      - name: Build
+        run: dotnet build MentalHealthTracker.slnx --no-restore --configuration Release
+
+      - name: Tests unitarios
+        run: dotnet test tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj --no-build --configuration Release
+
+  frontend:
+    name: Frontend (Node)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Tests unitarios
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
+
+  backend-test:
+    name: Backend tests (.NET + Postgres)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mht_test
+          POSTGRES_PASSWORD: mht_test
+          POSTGRES_DB: mht_test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U mht_test -d mht_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore MentalHealthTracker.slnx
+
+      - name: Build
+        run: dotnet build MentalHealthTracker.slnx --no-restore --configuration Release
+
+      - name: Tests unitarios con cobertura
+        run: dotnet test tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj --configuration Release -p:CoverletOutput=${{ github.workspace }}/coverage/unit/
+
+      - name: Tests de integración con cobertura
+        run: dotnet test tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj --configuration Release -p:CoverletOutput=${{ github.workspace }}/coverage/int/
+
+      - name: Umbral de cobertura
+        working-directory: ${{ github.workspace }}
+        run: ./scripts/check-coverage.sh 70
+
+  frontend-test:
+    name: Frontend tests (Node)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests con cobertura
+        run: npm run test:unit:coverage
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: dotnet format
+        working-directory: backend
+        run: dotnet format MentalHealthTracker.slnx --verify-no-changes
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: npm install
+        working-directory: frontend
+        run: npm ci
+
+      - name: npm lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: npm format
+        working-directory: frontend
+        run: npm run format
+
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: NuGet audit
+        working-directory: backend
+        # Auditoría de vulnerabilidades de NuGet (activa por defecto en .NET 8+)
+        # sobre toda la solución, incluyendo dependencias transitivas. Sale en
+        # error si hay algún paquete vulnerable.
+        # Estado: 0 paquetes vulnerables (verificado localmente, 2026-10-09).
+        run: dotnet list MentalHealthTracker.slnx package --vulnerable --include-transitive
+
+      - name: npm audit
+        working-directory: frontend
+        # Falla cuando existe vulnerabilidad de severidad >= high.
+        #
+        # Hallazgos aceptados conscientemente: ninguno en la firma actual.
+        # Historial: source-map-js <=1.2.1 (GHSA-68fv-2mgg-jv7q, high, DoS del
+        # event-loop via mapas de origen indexados) detectado el 2026-10-09. Se
+        # valoró como riesgo bajo real: es transitiva del toolchain de build
+        # (Vite/@vue/compiler-sfc/@tailwindcss), no llega al bundle de produccion
+        # y el input que la explota (source maps hostiles) solo lo generan
+        # nuestras herramientas de build de confianza. Igualmente se resolvio con
+        # `npm audit fix` (bump en lockfile a 1.2.2), sin dependencias nuevas.
+        #
+        # Regla: si un hallazgo nuevo se decide aceptar a proposito, anotar aqui
+        # el advisory, el motivo y la fecha de revision; de lo contrario este
+        # paso quedara en rojo.
+        run: npm audit --audit-level=high
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # .env desechable con valores ficticios: sin secretos reales. OAuth esta
+      # puenteado en E2E, asi que GoogleOAuth__* solo cumplen la validacion de
+      # config del backend y nunca se usan contra Google (las pruebas entran por
+      # POST /api/auth/test-login). El override docker-compose.e2e.yml inyecta
+      # este archivo al contenedor backend via env_file. Las claves con "__" son
+      # el formato de separador que el configuration provider de .NET espera
+      # (GoogleOAuth__ClientId -> GoogleOAuth:ClientId). Database__ConnectionString
+      # apunta al servicio `postgres` de la red de Compose, no a localhost.
+      - name: Crear .env desechable
+        run: |
+          cat > .env <<'EOF'
+          ConnectionStrings__Default=Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres
+          Database__ConnectionString=Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres
+          JWT_SECRET=e2e-only-disposable-secret-0123456789abcdef
+          GoogleOAuth__ClientId=e2e-test-client.apps.googleusercontent.com
+          GoogleOAuth__ClientSecret=e2e-disposable-client-secret
+          GoogleOAuth__RedirectUri=http://localhost:5173/auth/callback
+          AppUrls__FrontendUrl=http://localhost:5173
+          LOG_LEVEL=Information
+          EOF
+
+      - name: Levantar la pila E2E
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 600
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Instalar Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Suite E2E completa
+        working-directory: e2e
+        run: npm test
+
+      - name: Guardar logs del backend
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml logs backend > e2e-backend.logs.txt
+
+      - name: Subir reporte E2E y logs del backend
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts
+          path: |
+            e2e/playwright-report/
+            e2e-backend.logs.txt
+          retention-days: 7
+
+      - name: Bajar la pila E2E
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
+
+  build-prod-images:
+    name: Build prod images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend prod image
+        run: docker build -f backend/Dockerfile.prod -t mht-backend:ci backend
+
+      - name: Build frontend prod image
+        run: docker build -f frontend/Dockerfile.prod -t mht-frontend:ci frontend
+
+      - name: Verificar usuario no root del backend
+        run: |
+          uid=$(docker run --rm --entrypoint id mht-backend:ci -u)
+          echo "El proceso del backend corre con uid=$uid"
+          [ "$uid" != "0" ] || { echo "El backend correria como root"; exit 1; }
+
+      - name: Verificar retry de BD en vez de crash por dependencia
+        run: |
+          # Sin postgres a mano (Host=postgres no resuelve): el arranque debe
+          # quedarse reintentando la conexion con backoff (DatabaseInitializer),
+          # no morir por una dependencia faltante. Todas las opciones requeridas
+          # se pasan para pasar la validacion de config y llegar al bucle de retry.
+          docker run -d --name mht-be-retry \
+            -e Database__ConnectionString="Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres" \
+            -e JWT_SECRET="ci-only-disposable-secret-0123456789" \
+            -e GoogleOAuth__ClientId="ci-test.apps.googleusercontent.com" \
+            -e GoogleOAuth__ClientSecret="ci-disposable-secret" \
+            -e GoogleOAuth__RedirectUri="http://localhost:5173/auth/callback" \
+            -e AppUrls__FrontendUrl="http://localhost:5173" \
+            mht-backend:ci
+          sleep 15
+          logs=$(docker logs mht-be-retry 2>&1)
+          printf '%s\n' "$logs"
+          echo "$logs" | grep -q "Database not ready (attempt" || {
+            echo "No se ve el reintento de conexion a la BD"; exit 1
+          }
+          state=$(docker inspect -f '{{.State.Running}}' mht-be-retry)
+          [ "$state" = "true" ] || {
+            echo "El contenedor murio en lugar de reintentar la conexion"; exit 1
+          }
+
+      - name: Limpiar contenedor de verificacion
+        if: always()
+        run: docker rm -f mht-be-retry || true

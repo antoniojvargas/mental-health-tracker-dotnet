@@ -1,0 +1,38 @@
+# Imagen de PRODUCCION del backend. Multi-stage:
+#   1) build: compila y publica la API con el SDK.
+#   2) runtime: imagen aspnet minima, usuario no root, lista para desplegar.
+#
+# Uso: docker build -f backend/Dockerfile.prod -t mht-backend:prod backend
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /source
+
+COPY Directory.Build.props ./
+COPY MentalHealthTracker.slnx ./
+COPY MentalHealthTracker.Api/MentalHealthTracker.Api.csproj MentalHealthTracker.Api/
+COPY MentalHealthTracker.Domain/MentalHealthTracker.Domain.csproj MentalHealthTracker.Domain/
+COPY MentalHealthTracker.Infrastructure/MentalHealthTracker.Infrastructure.csproj MentalHealthTracker.Infrastructure/
+COPY tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj tests/MentalHealthTracker.UnitTests/
+COPY tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj tests/MentalHealthTracker.IntegrationTests/
+
+RUN dotnet restore MentalHealthTracker.Api/MentalHealthTracker.Api.csproj
+
+COPY . .
+RUN dotnet publish MentalHealthTracker.Api/MentalHealthTracker.Api.csproj \
+    --configuration Release \
+    --output /publish \
+    --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+
+COPY --from=build /publish /app
+
+# Las imagenes oficiales de .NET traen el usuario de uid 1654 para ejecutar sin
+# privilegios; se deja como usuario por defecto del contenedor. Nunca root.
+USER 1654
+
+ENV ASPNETCORE_URLS=http://+:3000
+EXPOSE 3000
+
+ENTRYPOINT ["dotnet", "MentalHealthTracker.Api.dll"]

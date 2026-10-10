@@ -46,6 +46,7 @@ export default tseslint.config(
         history: 'readonly',
         localStorage: 'readonly',
         sessionStorage: 'readonly',
+        crypto: 'readonly',
         requestAnimationFrame: 'readonly',
         cancelAnimationFrame: 'readonly',
         setTimeout: 'readonly',

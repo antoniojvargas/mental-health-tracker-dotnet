@@ -5,8 +5,6 @@ import { nextTick, defineComponent, h, ref } from 'vue'
 import DailyLogModal from '../DailyLogModal.vue'
 import Toast from '../../ui/Toast.vue'
 
-const createLog = vi.fn()
-const getToday = vi.fn()
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
 
@@ -27,7 +25,27 @@ vi.mock('../../../composables/useToast', () => ({
 
 import { ApiError } from '../../../services/api-client'
 import * as logsApi from '../../../services/logs.api'
-import * as toastModule from '../../../composables/useToast'
+import type { DailyLog } from '../../../types/daily-log'
+
+function makeLog(): DailyLog {
+  return {
+    id: '1',
+    logDate: '2026-01-01',
+    moodRating: 3,
+    anxietyLevel: 5,
+    stressLevel: 5,
+    sleepHours: 7,
+    sleepQuality: 3,
+    sleepDisturbances: [],
+    activityType: null,
+    activityMinutes: null,
+    socialFrequency: 'none',
+    symptoms: [],
+    notes: null,
+    createdAt: '2026-01-01T00:00:00.0000000+00:00',
+    updatedAt: '2026-01-01T00:00:00.0000000+00:00',
+  }
+}
 
 const Harness = defineComponent({
   components: { DailyLogModal, Toast },
@@ -58,25 +76,29 @@ const Harness = defineComponent({
 let wrapper: VueWrapper | null = null
 
 function clickNext() {
-  const nextBtn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Next')
+  const nextBtn = Array.from(document.querySelectorAll('button')).find(
+    (b) => b.textContent?.trim() === 'Next',
+  )
   nextBtn?.click()
 }
 
 function clickSaveNow() {
-  const saveNow = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Save now')
+  const saveNow = Array.from(document.querySelectorAll('button')).find(
+    (b) => b.textContent?.trim() === 'Save now',
+  )
   saveNow?.click()
 }
 
 function selectMood(value: number) {
-  const moods = Array.from(document.querySelectorAll('[role="radio"]'))
+  const moods = Array.from(document.querySelectorAll<HTMLElement>('[role="radio"]'))
   const mood = moods.find((r) => r.textContent?.trim() === String(value))
   mood?.click()
 }
 
 describe('DailyLogModal', () => {
   beforeEach(() => {
-    ;(logsApi.create as any).mockReset()
-    ;(logsApi.today as any).mockReset()
+    vi.mocked(logsApi.create).mockReset()
+    vi.mocked(logsApi.today).mockReset()
     toastSuccess.mockReset()
     toastError.mockReset()
     document.body.innerHTML = ''
@@ -88,7 +110,7 @@ describe('DailyLogModal', () => {
   })
 
   it('navigates between steps', async () => {
-    ;(logsApi.today as any).mockResolvedValue(null)
+    vi.mocked(logsApi.today).mockResolvedValue(null)
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
@@ -123,8 +145,8 @@ describe('DailyLogModal', () => {
   })
 
   it('can save from first step', async () => {
-    ;(logsApi.today as any).mockResolvedValue(null)
-    ;(logsApi.create as any).mockResolvedValue({ id: '1' })
+    vi.mocked(logsApi.today).mockResolvedValue(null)
+    vi.mocked(logsApi.create).mockResolvedValue(makeLog())
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
@@ -143,8 +165,8 @@ describe('DailyLogModal', () => {
   })
 
   it('sends expected payload on save', async () => {
-    ;(logsApi.today as any).mockResolvedValue(null)
-    ;(logsApi.create as any).mockResolvedValue({ id: '1' })
+    vi.mocked(logsApi.today).mockResolvedValue(null)
+    vi.mocked(logsApi.create).mockResolvedValue(makeLog())
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
@@ -172,8 +194,8 @@ describe('DailyLogModal', () => {
   })
 
   it('shows toast on success and closes modal', async () => {
-    ;(logsApi.today as any).mockResolvedValue(null)
-    ;(logsApi.create as any).mockResolvedValue({ id: '1' })
+    vi.mocked(logsApi.today).mockResolvedValue(null)
+    vi.mocked(logsApi.create).mockResolvedValue(makeLog())
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
@@ -191,8 +213,10 @@ describe('DailyLogModal', () => {
   })
 
   it('shows error without closing modal when API fails', async () => {
-    ;(logsApi.today as any).mockResolvedValue(null)
-    ;(logsApi.create as any).mockRejectedValue(new ApiError(400, 'VALIDATION_ERROR', 'Invalid'))
+    vi.mocked(logsApi.today).mockResolvedValue(null)
+    vi.mocked(logsApi.create).mockRejectedValue(
+      new ApiError(400, { code: 'VALIDATION_ERROR', message: 'Invalid', details: [] }),
+    )
     wrapper = mount(Harness, { attachTo: document.body })
     document.getElementById('open')?.click()
     await nextTick()
@@ -209,5 +233,3 @@ describe('DailyLogModal', () => {
     expect(document.body.textContent).toContain('Step 1 of 4')
   })
 })
-
-

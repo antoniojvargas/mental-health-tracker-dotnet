@@ -18,5 +18,9 @@ export default defineConfig({
     // Restituye los `vi.stubGlobal` solo entre tests, para que ninguno tenga que
     // acordarse de un `afterEach` y el `fetch` de un test no se cuele al siguiente.
     unstubGlobals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text'],
+    },
   },
 })

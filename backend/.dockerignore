@@ -1,6 +1,7 @@
 **/bin/
 **/obj/
 **/coverage/
+*.log
 .git/
 .gitignore
 **/.env

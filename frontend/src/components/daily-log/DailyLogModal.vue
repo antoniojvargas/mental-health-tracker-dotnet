@@ -250,7 +250,6 @@ function fillFromLog(log: DailyLog) {
       severity: Math.min(5, Math.max(1, s.severity)),
     }
   })
-  const existingKeys = new Set(mappedSymptoms.map((m) => m.key))
   const defaults = [
     { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
     { key: 'depression', label: 'Depression', active: false, severity: 1 },
@@ -292,11 +291,6 @@ function back() {
   }
 }
 
-function submit() {
-  // El submit global maneja el envío; este legacy no debe interferir
-  handleSubmit()
-}
-
 function resetForm() {
   form.mood = null
   form.anxiety = 5
@@ -328,7 +322,8 @@ function mapSleepDisturbances(dist: string[]): SleepDisturbance[] {
   return dist
     .map((d) => {
       if (d === 'trouble-falling-asleep') return 'insomnia' as SleepDisturbance
-      if (d === 'waking-during-night' || d === 'waking-too-early' || d === 'interrupted-sleep') return 'frequent_waking' as SleepDisturbance
+      if (d === 'waking-during-night' || d === 'waking-too-early' || d === 'interrupted-sleep')
+        return 'frequent_waking' as SleepDisturbance
       if (d === 'nightmares') return 'nightmares' as SleepDisturbance
       if (d === 'restless-legs') return 'frequent_waking' as SleepDisturbance
       if (d === 'snoring') return 'none' as SleepDisturbance
@@ -482,23 +477,14 @@ function close() {
             <span>{{ steps[currentStep] }}</span>
           </div>
           <div class="h-2 w-full overflow-hidden rounded-full bg-ink-100">
-            <div
-              class="h-full bg-clearsky-600 transition-all"
-              :style="{ width: `${progress}%` }"
-            />
+            <div class="h-full bg-clearsky-600 transition-all" :style="{ width: `${progress}%` }" />
           </div>
         </div>
 
-        <form
-          class="flex flex-col gap-6"
-          @submit.prevent="onSubmit"
-        >
+        <form class="flex flex-col gap-6" @submit.prevent="onSubmit">
           <section v-if="currentStep === 0" class="flex flex-col gap-6">
             <h2 class="text-base font-medium text-ink-900">Mood</h2>
-            <MoodScale
-              v-model="form.mood"
-              aria-label="Mood"
-            />
+            <MoodScale v-model="form.mood" aria-label="Mood" />
             <SliderField
               v-model="form.anxiety"
               label="Anxiety"
@@ -536,7 +522,9 @@ function close() {
               helper-text="1 = very poor, 5 = very good"
             />
             <fieldset class="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-paper-50 p-4">
-              <legend class="px-1 text-sm font-medium text-ink-900">Sleep disturbances (select all that apply)</legend>
+              <legend class="px-1 text-sm font-medium text-ink-900">
+                Sleep disturbances (select all that apply)
+              </legend>
               <div class="grid gap-2 sm:grid-cols-2">
                 <label
                   v-for="opt in sleepDisturbanceOptions"
@@ -544,9 +532,9 @@ function close() {
                   class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-2 hover:bg-ink-50"
                 >
                   <input
+                    v-model="form.sleepDisturbances"
                     type="checkbox"
                     :value="opt.key"
-                    v-model="form.sleepDisturbances"
                     class="h-4 w-4 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
                   />
                   <span class="text-sm text-ink-900">{{ opt.label }}</span>
@@ -559,7 +547,9 @@ function close() {
             <h2 class="text-base font-medium text-ink-900">Activity and social life</h2>
 
             <div class="flex flex-col gap-2">
-              <label for="activityType" class="text-sm font-medium text-ink-900">Activity type</label>
+              <label for="activityType" class="text-sm font-medium text-ink-900"
+                >Activity type</label
+              >
               <select
                 id="activityType"
                 v-model="form.activityType"
@@ -591,7 +581,9 @@ function close() {
             />
 
             <div class="flex flex-col gap-2">
-              <label for="socialFrequency" class="text-sm font-medium text-ink-900">Social contact frequency</label>
+              <label for="socialFrequency" class="text-sm font-medium text-ink-900"
+                >Social contact frequency</label
+              >
               <select
                 id="socialFrequency"
                 v-model="form.socialFrequency"
@@ -615,10 +607,7 @@ function close() {
 
           <section v-if="currentStep === 3" class="flex flex-col gap-4">
             <h2 class="text-base font-medium text-ink-900">Symptoms</h2>
-            <SymptomPicker
-              v-model="form.symptoms"
-              aria-label="Symptoms"
-            />
+            <SymptomPicker v-model="form.symptoms" aria-label="Symptoms" />
             <div class="flex flex-col gap-2">
               <label for="notes" class="text-sm font-medium text-ink-900">Notes</label>
               <textarea
@@ -629,24 +618,27 @@ function close() {
                 placeholder="Additional notes..."
                 class="rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm placeholder:text-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
               />
-              <div class="flex justify-end text-xs text-ink-500">
-                {{ form.notes.length }}/1000
-              </div>
+              <div class="flex justify-end text-xs text-ink-500">{{ form.notes.length }}/1000</div>
             </div>
           </section>
         </form>
       </div>
     </template>
 
-    <template #footer>
+    <template #actions>
       <div class="flex w-full items-center justify-between gap-3">
-        <Button variant="ghost" :disabled="currentStep === 0" @click="back">
-          Back
-        </Button>
+        <Button variant="ghost" :disabled="currentStep === 0" @click="back"> Back </Button>
         <div class="flex items-center gap-2">
           <Button variant="subtle" @click="close">Cancel</Button>
           <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>
-          <Button v-if="!isLastStep" variant="subtle" type="submit" :loading="isSubmitting" @click="onSubmit">Save now</Button>
+          <Button
+            v-if="!isLastStep"
+            variant="subtle"
+            type="submit"
+            :loading="isSubmitting"
+            @click="onSubmit"
+            >Save now</Button
+          >
           <Button v-else type="submit" :loading="isSubmitting" @click="onSubmit">Save</Button>
         </div>
       </div>
