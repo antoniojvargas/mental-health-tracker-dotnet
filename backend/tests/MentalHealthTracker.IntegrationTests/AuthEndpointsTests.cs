@@ -4,6 +4,7 @@ using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
@@ -76,6 +77,31 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
             setCookie.Contains("Max-Age=0", StringComparison.OrdinalIgnoreCase) ||
             setCookie.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase),
             $"Set-Cookie debe expirar la cookie de sesión, pero fue: {setCookie}");
+    }
+
+    [Fact]
+    public async Task GoogleLogin_SetsStateCookieAndRedirectsToGoogle()
+    {
+        var client = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var response = await client.GetAsync("/api/auth/google");
+
+        Assert.Equal(HttpStatusCode.Found, response.StatusCode);
+
+        var setCookie = Assert.Single(response.Headers.GetValues("Set-Cookie"));
+        Assert.StartsWith("oauth_state=", setCookie, StringComparison.Ordinal);
+        Assert.Contains("HttpOnly", setCookie, StringComparison.OrdinalIgnoreCase);
+
+        var stateFromCookie = setCookie.Split(';')[0].Split('=', 2)[1];
+        var query = QueryHelpers.ParseQuery(response.Headers.Location!.Query);
+
+        Assert.Equal(stateFromCookie, query["state"].ToString());
+        Assert.Equal("code", query["response_type"]);
+        Assert.Equal("openid email profile", query["scope"]);
+        Assert.Equal("online", query["access_type"]);
+        Assert.Equal("select_account", query["prompt"]);
+        Assert.Equal("integration-test-client.apps.googleusercontent.com", query["client_id"]);
+        Assert.Equal("http://localhost:5173/auth/callback", query["redirect_uri"]);
     }
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
