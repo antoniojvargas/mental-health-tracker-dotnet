@@ -4,6 +4,12 @@ Mental Health Tracker es una aplicación diseñada para que pacientes registren 
 
 Con base en esos registros, la aplicación genera tendencias semanales y mensuales que permiten al paciente (y a su profesional de la salud) visualizar la evolución de su estado a lo largo del tiempo. Las tendencias se presentan de forma clara e intuitiva, facilitando la detección de patrones y el acompañamiento en el proceso terapéutico.
 
+## Capturas
+
+| Inicio de sesión | Panel con tendencias | Registro diario |
+| --- | --- | --- |
+| ![Pantalla de inicio de sesión con el botón «Continue with Google»](docs/screenshots/login.png) | ![Panel con saludo diario y gráficas de tendencias](docs/screenshots/dashboard.png) | ![Modal de registro diario con escalas de ánimo, ansiedad y sueño](docs/screenshots/daily-log-modal.png) |
+
 ## Stack
 
 | Tecnología   | Versión       | Uso                              |
