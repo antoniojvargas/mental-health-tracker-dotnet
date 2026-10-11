@@ -793,3 +793,114 @@ migración separado** antes de desplegar/escalar (un `docker compose run` o un j
 Kubernetes/CI que termina antes de que el servicio reciba tráfico). La API arrancaría sin migrar
 y el despliegue garantizaría el esquema como paso previo. Es la evolución natural junto con
 Redis: ambos separan el estado operativo (esquema, grupos/contadores) del proceso de la API.
+
+## De Node/React a .NET/Vue
+
+Este proyecto es un cambio deliberado de stack: el mismo dominio (autenticación, registro
+diario, tiempo real) resuelto con el ecosistema .NET/Vue en lugar de Node/React. La tabla mapea
+concepto a concepto; después se detallan los tres cambios que **no** son una traducción literal
+sino un cambio de diseño: la inyección de dependencias del framework, la validación con
+FluentValidation en lugar de zod y los grupos de SignalR en lugar de las *rooms* de Socket.IO.
+
+### Tabla de equivalencias
+
+| Concepto | Node/React | .NET/Vue en este proyecto |
+| -------- | ---------- | ------------------------- |
+| Runtime | Node.js | .NET 9 |
+| Lenguaje | TypeScript | C# 13 (`Nullable` + `TreatWarningsAsErrors`) |
+| Framework HTTP | Fastify | ASP.NET Core (controllers + middleware) |
+| Composición / DI | plugins de Fastify o contenedor manual (tsyringe, awilix) | contenedor integrado, composition root en `Program.cs` |
+| Validación | zod (`.parse` dentro del handler) | FluentValidation + filtro de acción global |
+| Acceso a datos | TypeORM (entidades + repositorios) | EF Core + Npgsql (`IEntityTypeConfiguration` + repositorios) |
+| Base de datos | PostgreSQL | PostgreSQL (igual) |
+| Migraciones | scripts / migraciones de TypeORM | migraciones de EF Core aplicadas al arrancar |
+| Sesión y auth | `jsonwebtoken` + cookies | JWT HS256 propio + cookie `httpOnly` + `RequireAuthMiddleware` |
+| Tiempo real (servidor) | Socket.IO con *rooms* | SignalR con *groups* (+ `IHubContext`) |
+| Tiempo real (cliente) | `socket.io-client` | `@microsoft/signalr` |
+| Estado del front | Redux / Zustand / Context | Pinia |
+| Routing del front | React Router | Vue Router (con guard global) |
+| Cliente HTTP | `fetch` / axios | `fetch` envuelto en `api-client.ts` |
+| Estilos | Tailwind CSS | Tailwind CSS (igual) |
+| Build | Vite | Vite (igual) |
+| Tests backend | Jest + Supertest | xUnit + `WebApplicationFactory` + coverlet |
+| Tests frontend | Jest/Vitest + React Testing Library | Vitest + `@vue/test-utils` + jsdom |
+| Logging | pino / winston | Serilog (con redacción de credenciales) |
+| Documentación de API | swagger-jsdoc / zod-openapi | Swashbuckle (OpenAPI derivado de los controllers) |
+| Config y secretos | `dotenv` | `appsettings` + variables de entorno + `SecretFileConfiguration` |
+
+### Inyección de dependencias del framework
+
+**En Node** la composición suele ser explícita a mano (importar y pasar instancias) o delegada a
+un contenedor opcional (`tsyringe`, `awilix`) o a la encapsulación de plugins de Fastify; las
+dependencias se resuelven donde se declaran. **En .NET** el contenedor viene con el framework:
+todo el grafo se declara de forma centralizada en `Program.cs` con su *lifetime*
+(`AddScoped<IUserRepository, UserRepository>`, `AddSingleton<JwtService>`,
+`AddHttpClient<GoogleOAuthClient>()` como cliente tipado) y las clases reciben lo que necesitan
+por **constructor injection**.
+
+Lo que cambió en el diseño, más allá de la sintaxis:
+
+1. **La composición es un artefacto de primera clase.** El "wiring" no está repartido por los
+   módulos: hay un único lugar donde se ve qué implementa cada interfaz y con qué ciclo de vida.
+   Eso hace explícita la separación controller → service → repository, que se sostiene porque
+   cada capa recibe sus colaboradores inyectados y no los construye.
+2. **El ciclo de vida es parte del contrato.** `Scoped` ata una instancia al request (el
+   `AppDbContext`, los repositorios); `Singleton` guarda lo que no tiene estado por petición
+   (`JwtService`, `AuthCookieOptions`). Es una decisión que en Node normalmente se resuelve a
+   mano o no se explicita.
+3. **La validación de configuración arranca con la app.** `AddOptions<T>().ValidateOnStart()`
+   aborta el proceso si falta un secreto (JWT, Google OAuth, connection string), en vez de
+   fallar en la primera petición que lo use.
+4. **El grafo entero es sustituible en los tests.** `WebApplicationFactory` levanta el mismo
+   `Program` con configuración de test; el resto de los detalles (mirar
+   "Separación de capas") se apoya en esta composición.
+
+### FluentValidation en lugar de zod
+
+Con **zod** el patrón típico es declarar el esquema y llamar a `schema.parse(req.body)` dentro de
+cada handler. Aquí la validación es una **preocupación transversal**: `CreateDailyLogValidator`
+(una clase con reglas tipadas) se resuelve por DI y la ejecuta `FluentValidationActionFilter`
+como filtro global **antes** de que el controller se ejecute.
+
+Lo que cambió:
+
+1. **El controller no valida.** No hay una llamada a `parse` dentro del handler; el filtro corre
+   antes y, si algo falla, lanza `ValidationException` (error de dominio), que
+   `GlobalExceptionHandler` traduce al sobre `{ error: { code: "VALIDATION_ERROR", details } }`
+   con un detalle por campo. La misma forma de error que el frontend ya consume.
+2. **Las reglas son objetos de primera clase, no esquemas sueltos.** Al ser clases con DI, un
+   validador puede depender de otros servicios y reutilizarse; y el rango (mood 1-5, ansiedad
+   1-10, etc.) vive en un único sitio.
+3. **Las mismas reglas alimentan la documentación.** `FluentValidationSchemaFilter` traduce las
+   reglas a `minimum`/`maximum` en el OpenAPI. Con zod el equivalente exige un puente
+   (zod-openapi) que mantenga esquema y documento sincronizados. Detalle en "Tipos del
+   contrato".
+
+### Grupos de SignalR en lugar de rooms de Socket.IO
+
+En **Socket.IO** el servidor conserva la referencia del socket y hace `socket.join('user:'+id)`;
+emitir a la *room* es una llamada sobre una conexión concreta. En **SignalR** la idea es
+parecida (`Groups.AddToGroupAsync(connectionId, "user:{userId}")` en `OnConnectedAsync`), pero el
+emisor **no** necesita conocer el hub: `LogEventEmitter` usa `IHubContext<LogsHub>` para enviar a
+`Clients.Group(...)`.
+
+Lo que cambió:
+
+1. **El emisor está desacoplado del transporte.** El servicio que persiste el log emite a través
+   de la interfaz `ILogEventEmitter`; ni sabe que debajo hay SignalR ni maneja conexiones. Eso es
+   lo que permite tratar el backplane como un detalle de infraestructura (ver "Límites conocidos
+   de alcance").
+2. **La conexión se autentica con la misma sesión.** El hub se marca con `[RequireAuth]` y se
+   apoya en la cookie `httpOnly` que ya usa la API; no hay un segundo token de handshake. En el
+   cliente, `@microsoft/signalr` se construye con `withCredentials` y `withAutomaticReconnect`.
+3. **Los grupos se derivan de la identidad, no del socket.** El nombre `user:{userId}` sale del
+   claim del usuario autenticado, no de un identificador de conexión, así que reconectar
+   reingresa al mismo grupo.
+
+### Lo que no cambió
+
+El stack nuevo no reescribió los límites del dominio: se mantiene el patrón repositorio con
+upsert atómico (`ON CONFLICT`), la sesión en cookie `httpOnly` con la misma lógica de
+`SameSite=Lax` y CSRF, el tipado fuerte del contrato, PostgreSQL como base y Vite + Tailwind en
+el front. El stack es lo que cambió; las decisiones de diseño documentadas arriba son, en buena
+parte, independientes de él.
