@@ -72,6 +72,17 @@ correspondencia con la serie la conserva el punto de color, que no es texto.
 - Los títulos de paso bajaron de `h2` a `h3` para respetar la jerarquía bajo el
   título `h2` del diálogo.
 
+### Movimiento reducido (WCAG 2.3.3, `prefers-reduced-motion`)
+
+- Las animaciones de entrada (`animate-fade-in` y `animate-slide-up`: secciones
+  del dashboard, tarjeta de login, panel del modal y avisos) se apagan con una
+  regla `@media (prefers-reduced-motion: reduce)` en `src/index.css`.
+- La animación del trazado de la gráfica es JS (Chart.js no lee la media query):
+  `TrendChart` consulta `matchMedia('(prefers-reduced-motion: reduce)')` al
+  montar y pone la duración a 0 en ese caso. Cubierto con tests unitarios.
+- Verificado en Chromium real con `reducedMotion: 'reduce'` (las animaciones
+  desaparecen) y sin preferencia (siguen activas).
+
 ## Resultado
 
 axe y Lighthouse con 0 violaciones en las pantallas auditadas. Los tests de

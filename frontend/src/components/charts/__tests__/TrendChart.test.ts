@@ -114,4 +114,36 @@ describe('TrendChart', () => {
       expect(options.scales.hours).toBeUndefined()
     })
   })
+
+  describe('prefers-reduced-motion', () => {
+    const logs = [makeLog('2026-10-01', { moodRating: 4 })]
+
+    it('apaga la animación del trazado cuando el sistema pide menos movimiento', () => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true })),
+      )
+
+      const wrapper = mount(TrendChart, { props: { logs, metricKeys: ['mood'] } })
+      const options = wrapper.findComponent(Line).props('options') as {
+        animation: { duration: number }
+      }
+
+      expect(options.animation.duration).toBe(0)
+    })
+
+    it('conserva la animación (300ms) si el sistema no la pide', () => {
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: false })),
+      )
+
+      const wrapper = mount(TrendChart, { props: { logs, metricKeys: ['mood'] } })
+      const options = wrapper.findComponent(Line).props('options') as {
+        animation: { duration: number }
+      }
+
+      expect(options.animation.duration).toBe(300)
+    })
+  })
 })

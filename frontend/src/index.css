@@ -1,2 +1,15 @@
 @import 'tailwindcss';
 @config '../tailwind.config.ts';
+
+/* Centrado en todo el stock de animaciones de entrada:
+   `fade-in` (secciones del dashboard) y `slide-up` (tarjeta de login, panel del
+   modal y avisos). Por `prefers-reduced-motion` se apagan completas; un usuario
+   que pide menos movimiento no gana nada con que el contenido "entre" animado,
+   solo le añade vértigo. La animación de la gráfica es JS y se gestiona en
+   `TrendChart`, no desde aquí. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-slide-up {
+    animation: none;
+  }
+}

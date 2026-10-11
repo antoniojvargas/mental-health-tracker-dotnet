@@ -38,6 +38,17 @@ const TICK_FONT = { family: '"IBM Plex Mono", monospace', size: 12 }
 const TOOLTIP_BG = '#2B3A3A'
 const TOOLTIP_TEXT = '#FBF8F2'
 
+/**
+ * ¿Pide el usuario reducir el movimiento? Chart.js no lee `prefers-reduced-motion`
+ * por su cuenta, así que hay que decírselo. Se lee una vez al montar con guarda:
+ * `jsdom` (tests) no implementa `matchMedia`, y en un entorno sin ventana no hay
+ * nada que preguntar — en ambos casos el valor honesto es "no reduce".
+ */
+const prefersReducedMotion =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
 const LONG_DATE = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' })
 
 /**
@@ -119,7 +130,9 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    animation: { duration: 300 },
+    // El trazo animado es la parte de la gráfica que más movimiento mete; con
+    // `prefers-reduced-motion` se dibuja de golpe y no de 0 a 1.
+    animation: { duration: prefersReducedMotion ? 0 : 300 },
     plugins: {
       tooltip: {
         backgroundColor: TOOLTIP_BG,
