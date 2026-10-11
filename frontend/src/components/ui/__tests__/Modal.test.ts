@@ -207,6 +207,24 @@ describe('Modal', () => {
     })
   })
 
+  describe('inactividad estando cerrado', () => {
+    it('no intercepta el Tab: deja navegar la página y no roba el foco', async () => {
+      mount(Harness, { attachTo: document.body })
+      const outside = document.getElementById('fuera') as HTMLButtonElement
+      outside.focus()
+
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+      document.dispatchEvent(event)
+      await nextTick()
+
+      // El modal montado pero cerrado no debe comerse el Tab: con `focusable()`
+      // vacío su handler hacía `preventDefault` y apagaba el teclado de toda la
+      // app, y encima robaba el foco hacia su panel fantasma.
+      expect(event.defaultPrevented).toBe(false)
+      expect(document.activeElement).toBe(outside)
+    })
+  })
+
   describe('cierre con Escape', () => {
     it('cierra de verdad, no solo avisa: el diálogo desaparece del DOM', async () => {
       await abierto()

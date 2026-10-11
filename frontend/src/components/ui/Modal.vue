@@ -92,6 +92,13 @@ function encima() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  // Cerrado no intercepta nada. El listener vive en el `document` aunque no haya
+  // diálogo en pantalla, y un Tab con `open=false` caería en la rama de "no hay
+  // a dónde ir": con el panel desmontado `focusable()` está vacío, hace
+  // `preventDefault` y deja toda la página sin tabulación. Sin esta guarda el
+  // teclado muere en cada vista que monta un modal cerrado.
+  if (!props.open) return
+
   if (event.key === 'Escape') {
     // Solo reacciona el modal de encima. Con dos abiertos hay dos listeners de
     // `keydown` en el mismo `document` y los dos ven el tecleo, así que aquí

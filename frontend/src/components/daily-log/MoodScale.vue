@@ -86,10 +86,17 @@ function onKeydown(e: KeyboardEvent) {
     case 'Enter':
       e.preventDefault()
       select(focusedIndex.value)
-      break
+      return
     default:
-      break
+      return
   }
+  // Roving tabindex: la flecha mueve también el foco real, no solo el atributo.
+  // Sin esto el anillo de foco se queda en el radio anterior y el radiogroup se
+  // recorre a ciegas: la selección y el foco son el mismo lugar, siempre.
+  const next = focusedIndex.value
+  ;(e.currentTarget as HTMLElement | null)
+    ?.querySelectorAll<HTMLElement>('[role="radio"]')
+    [next]?.focus()
 }
 </script>
 

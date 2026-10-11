@@ -44,12 +44,28 @@ correspondencia con la serie la conserva el punto de color, que no es texto.
 
 ### Orden de foco y teclado (WCAG 2.1.1, 2.4.3)
 
+- `MoodScale` movía el `tabindex` con las flechas pero no el foco real: el anillo
+  de foco se quedaba en el radio anterior y el grupo se recorría a ciegas. Ahora
+  la flecha mueve también el `focus()` al radio activo.
 - El radiogroup de severidad de síntomas (`SymptomPicker`) declaraba
   `role="radio"` sin navegación por flechas: cada botón era un tab stop aislado
   y el rol prometía un comportamiento que no existía. Se añadieron
   flechas/Home/End con *roving tabindex*, el mismo patrón que ya seguía
   `MoodScale`.
-- El `Modal` ya atrapaba y devolvía el foco; se dejó intacto.
+- El `Modal` atrapaba y devolvía el foco, pero su listener de `keydown` del
+  `document` interceptaba el `Tab` **también con el diálogo cerrado**: el
+  listener se registra en el montaje aunque el panel no esté en pantalla, y con
+  `focusable()` vacío caía en la rama de "no hay a dónde ir" (`preventDefault`),
+  dejando toda la página sin tabulación. Ahora el modal no intercepta nada con
+  `open` en `false`, igual que ya hacía su `focusin`. Era el fallo más grave y el
+  más silencioso: rompía el teclado en toda la app sin violar ninguna regla de
+  axe.
+- El recorrido completo solo con teclado (login, apertura del modal, los cuatro
+  pasos, guardado y cambio de rango y métricas) está cubierto por
+  `e2e/tests/keyboard.spec.ts`: todo se hace con Tab/Shift+Tab, flechas, Espacio
+  y Enter, sin tocar el ratón. Los `<select>` nativos se eligen por su letra
+  inicial (*type-ahead*), que es la vía de teclado portable al CI.
+
 
 ### Textos alternativos (WCAG 1.1.1)
 
@@ -86,9 +102,12 @@ correspondencia con la serie la conserva el punto de color, que no es texto.
 ## Resultado
 
 axe y Lighthouse con 0 violaciones en las pantallas auditadas. Los tests de
-unidad del frontend (179) siguen en verde y el build de producción pasa; el
-único test tocado fue el que fijaba el color del botón `primary`, actualizado
-para reflejar el tono accesible.
+unidad del frontend (182) siguen en verde y el build de producción pasa; se tocó
+el test que fijaba el color del botón `primary` (actualizado al tono accesible),
+el de `MoodScale` (afirma el foco real) y se añadió uno a `Modal` para que un
+diálogo cerrado no intercepte el `Tab`. La auditoría con axe no veía el fallo de
+tabulación del modal: no es una regla de ARIA, es comportamiento de foco, y lo
+destapó el recorrido solo con teclado.
 
 ## Cómo repetir la auditoría
 
