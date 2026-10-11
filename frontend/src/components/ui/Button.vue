@@ -60,7 +60,7 @@ const isInert = computed(() => props.disabled || props.loading)
         // siga siendo legible y se entienda que ahí hay algo, no que no hay nada.
         'border border-ink-200 bg-paper-50 text-ink-600 hover:border-clearsky-300 hover:bg-clearsky-50 hover:text-ink-700':
           variant === 'subtle',
-        'border border-transparent bg-clearsky-600 text-paper-50 hover:bg-clearsky-700':
+        'border border-transparent bg-clearsky-700 text-paper-50 hover:bg-clearsky-800':
           variant === 'primary',
         'border border-transparent bg-transparent text-ink-500 hover:bg-ink-100 hover:text-ink-700':
           variant === 'ghost',

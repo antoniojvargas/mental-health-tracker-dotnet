@@ -33,10 +33,36 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
  */
 
 const GRID_COLOR = '#EAE0CB'
-const TICK_COLOR = '#8A9B97'
+// ink-400 y no ink-300: el gris claro anterior se quedaba en 2.7:1 sobre el papel
+// y las etiquetas de los ejes no llegaban al 3:1 que pide el texto de gráficos.
+const TICK_COLOR = '#5D726D'
 const TICK_FONT = { family: '"IBM Plex Mono", monospace', size: 12 }
 const TOOLTIP_BG = '#2B3A3A'
 const TOOLTIP_TEXT = '#FBF8F2'
+
+/**
+ * Etiquetas del eje X: el ISO crudo ("2026-10-05") ocupa casi todo el ancho de
+ * la gráfica en un móvil y las marcas se pisan. La forma corta ("Oct 5") deja
+ * seis días legibles. Se construye el `Date` por partes para no interpretar la
+ * fecha como UTC y correrla un día.
+ */
+const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
+
+function formatShortDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  return SHORT_DATE.format(new Date(year, month - 1, day))
+}
+
+/**
+ * ¿Pide el usuario reducir el movimiento? Chart.js no lee `prefers-reduced-motion`
+ * por su cuenta, así que hay que decírselo. Se lee una vez al montar con guarda:
+ * `jsdom` (tests) no implementa `matchMedia`, y en un entorno sin ventana no hay
+ * nada que preguntar — en ambos casos el valor honesto es "no reduce".
+ */
+const prefersReducedMotion =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 const LONG_DATE = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric' })
 
@@ -69,6 +95,17 @@ const props = defineProps<{
 
 const metrics = computed(() => props.metricKeys.map(getMetric))
 
+/**
+ * Nombre accesible del gráfico. Un `<canvas>` no tiene texto alternativo propio:
+ * sin esto, un lector de pantalla no anuncia nada o anuncia "canvas". Se nombra
+ * con las series visibles y el número de días para que la imagen tenga un
+ * resumen útil sin volcar toda la tabla de datos.
+ */
+const chartLabel = computed(() => {
+  const names = metrics.value.map((metric) => metric.label).join(', ')
+  return names ? `Trend chart. Series: ${names}. ${props.logs.length} days shown.` : 'Trend chart'
+})
+
 const chartData = computed<ChartData<'line'>>(() => ({
   labels: props.logs.map((log) => log.logDate),
   datasets: metrics.value.map((metric) => ({
@@ -93,7 +130,13 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
       type: 'category',
       border: { display: false, dash: [3, 3] },
       grid: { color: GRID_COLOR, drawTicks: false },
-      ticks: { color: TICK_COLOR, font: TICK_FONT },
+      ticks: {
+        color: TICK_COLOR,
+        font: TICK_FONT,
+        maxRotation: 0,
+        maxTicksLimit: 6,
+        callback: (_value, index) => formatShortDate(props.logs[index]?.logDate ?? ''),
+      },
     },
   }
 
@@ -108,7 +151,9 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    animation: { duration: 300 },
+    // El trazo animado es la parte de la gráfica que más movimiento mete; con
+    // `prefers-reduced-motion` se dibuja de golpe y no de 0 a 1.
+    animation: { duration: prefersReducedMotion ? 0 : 300 },
     plugins: {
       tooltip: {
         backgroundColor: TOOLTIP_BG,
@@ -157,7 +202,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     <p class="text-sm text-ink-400">Your first entry starts the story.</p>
   </div>
 
-  <div v-else class="h-72">
+  <div v-else class="h-72" role="img" :aria-label="chartLabel">
     <Line :data="chartData" :options="chartOptions" />
   </div>
 </template>

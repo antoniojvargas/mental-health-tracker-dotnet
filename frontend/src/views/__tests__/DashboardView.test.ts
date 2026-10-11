@@ -135,12 +135,36 @@ describe('DashboardView', () => {
     mountDashboard({ user: makeUser('Ana Gómez'), loading: true })
 
     expect(wrapper!.findComponent(Skeleton).exists()).toBe(true)
-    expect(wrapper!.text()).toContain('Checking your day…')
+    expect(wrapper!.text()).toContain("We're checking your day…")
   })
 
   it('retira el esqueleto cuando la carga terminó', () => {
     mountDashboard({ user: makeUser('Ana Gómez'), logs: [] })
 
     expect(wrapper!.findComponent(Skeleton).exists()).toBe(false)
+  })
+
+  it('si falla la carga muestra el aviso ya traducido y ofrece reintentar', () => {
+    mountDashboard({
+      user: makeUser('Ana Gómez'),
+      error: "We couldn't reach the server. Please check your connection and try again.",
+    })
+
+    // La vista pinta el mensaje del store sin reescribirlo, y añade la salida.
+    expect(wrapper!.text()).toContain(
+      "We couldn't reach the server. Please check your connection and try again.",
+    )
+    expect(wrapper!.text()).toContain("We couldn't check your day just now.")
+    expect(buttonByText('Try again')).toBeTruthy()
+    expect(wrapper!.findComponent(Skeleton).exists()).toBe(false)
+  })
+
+  it('el reintento vuelve a pedir la ventana activa', async () => {
+    mountDashboard({ user: makeUser('Ana Gómez'), error: 'boom' })
+    const logs = useLogsStore()
+
+    await buttonByText('Try again')!.trigger('click')
+
+    expect(logs.fetch).toHaveBeenCalledWith('week')
   })
 })

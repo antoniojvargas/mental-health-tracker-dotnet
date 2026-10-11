@@ -81,7 +81,7 @@ describe('useLogsStore', () => {
     expect(store.logs.map((log) => log.logDate)).toEqual(['2026-09-05', '2026-10-01'])
   })
 
-  it('guarda el mensaje de error y no relanza, sin vaciar los logs ya cargados', async () => {
+  it('traduce el error a un mensaje de la app y no relanza, sin vaciar los logs ya cargados', async () => {
     mockFetch(listResponse([makeLog('2026-10-03')]))
     const store = useLogsStore()
     await store.fetch('week')
@@ -95,7 +95,9 @@ describe('useLogsStore', () => {
     // No relanza: la vista lee `error` en vez de envolver la llamada.
     await store.fetch('month')
 
-    expect(store.error).toBe('Algo se rompió')
+    // El `message` de la API no se muestra nunca: se elige la frase por código.
+    expect(store.error).toBe('Something went wrong on our end. Please try again.')
+    expect(store.error).not.toContain('Algo')
     expect(store.loading).toBe(false)
     expect(store.logs).toHaveLength(1)
   })

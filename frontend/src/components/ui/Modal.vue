@@ -92,6 +92,13 @@ function encima() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  // Cerrado no intercepta nada. El listener vive en el `document` aunque no haya
+  // diálogo en pantalla, y un Tab con `open=false` caería en la rama de "no hay
+  // a dónde ir": con el panel desmontado `focusable()` está vacío, hace
+  // `preventDefault` y deja toda la página sin tabulación. Sin esta guarda el
+  // teclado muere en cada vista que monta un modal cerrado.
+  if (!props.open) return
+
   if (event.key === 'Escape') {
     // Solo reacciona el modal de encima. Con dos abiertos hay dos listeners de
     // `keydown` en el mismo `document` y los dos ven el tecleo, así que aquí
@@ -239,7 +246,7 @@ onBeforeUnmount(() => {
       -->
       <div
         v-if="open"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-ink-700/40 p-6"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-ink-700/40 p-4 sm:p-6"
         @click="onBackdropClick"
       >
         <!--
@@ -257,7 +264,7 @@ onBeforeUnmount(() => {
           aria-modal="true"
           :aria-labelledby="titleId"
           tabindex="-1"
-          class="animate-slide-up w-full max-w-md rounded-2xl border border-ink-100 bg-paper-50 px-8 py-6 shadow-lg"
+          class="animate-slide-up max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-ink-100 bg-paper-50 px-5 py-6 shadow-lg sm:px-8"
           @click.stop
         >
           <h2 :id="titleId" class="font-display text-lg font-semibold text-ink-700">

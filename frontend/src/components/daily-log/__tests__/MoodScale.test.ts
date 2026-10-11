@@ -16,13 +16,21 @@ describe('MoodScale', () => {
   })
 
   it('supports keyboard navigation with arrows and selection', async () => {
-    const wrapper = mount(MoodScale, { props: { modelValue: null } })
+    // `attachTo` para que el foco real funcione: un elemento suelto no puede
+    // convertirse en `document.activeElement` en jsdom.
+    const wrapper = mount(MoodScale, { props: { modelValue: null }, attachTo: document.body })
     const group = wrapper.find('[role="radiogroup"]')
     await group.trigger('keydown', { key: 'ArrowRight' })
+    await nextTick()
+    // La flecha es roving: además de mover el valor activo, mueve el foco real al
+    // radio que ahora tiene `tabindex=0`. Sin esto, el anillo de foco se queda en
+    // el anterior y el grupo se recorre a ciegas.
+    expect(wrapper.findAll('[role="radio"]')[1].element).toBe(document.activeElement)
     await group.trigger('keydown', { key: 'Enter' })
     await nextTick()
     const values = wrapper.emitted('update:modelValue') as number[][]
     expect(values[0][0]).toBe(2)
+    wrapper.unmount()
   })
 
   it('sets correct aria-checked', async () => {

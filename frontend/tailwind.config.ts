@@ -33,6 +33,11 @@ export default {
           500: '#6F94A6',
           600: '#587989',
           700: '#465F6C',
+          // Un escalón más oscuro que 700, solo para el `hover` del botón
+          // primario: con 700 como relleno base (necesario para que el texto
+          // `paper-50` llegue a 4.5:1) hacía falta un tono de hover más oscuro
+          // que siguiera cumpliendo el contraste, y no existía.
+          800: '#3A4F5A',
         },
         // Soft sage — secondary/confirmation accent, used sparingly.
         meadow: {

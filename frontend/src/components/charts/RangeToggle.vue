@@ -32,11 +32,11 @@ const emit = defineEmits<{
       :key="range.value"
       type="button"
       :aria-pressed="modelValue === range.value"
-      class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+      class="inline-flex min-h-11 items-center justify-center rounded-full px-4 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
       :class="
         modelValue === range.value
           ? 'bg-paper-50 text-ink-700 shadow-sm'
-          : 'text-ink-400 hover:text-ink-600'
+          : 'text-ink-500 hover:text-ink-700'
       "
       @click="emit('update:modelValue', range.value)"
     >

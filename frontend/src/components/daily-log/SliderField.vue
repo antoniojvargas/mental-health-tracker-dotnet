@@ -60,7 +60,7 @@ function onInput(e: Event) {
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label :for="inputId" class="text-sm font-medium text-ink-900">
+      <label :for="inputId" class="text-sm font-medium text-ink-700">
         {{ label }}
       </label>
       <output
@@ -83,7 +83,7 @@ function onInput(e: Event) {
       :value="modelValue"
       :disabled="disabled"
       :aria-valuetext="valueText ?? undefined"
-      class="h-2 w-full cursor-pointer appearance-none rounded-full bg-ink-200 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
+      class="w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
       @input="onInput"
     />
 

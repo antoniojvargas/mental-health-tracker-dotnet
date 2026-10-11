@@ -151,7 +151,7 @@ onMounted(async () => {
         Continue with Google
       </a>
 
-      <p class="font-sans mt-8 text-xs leading-relaxed text-ink-300">
+      <p class="font-sans mt-8 text-xs leading-relaxed text-ink-400">
         We use your Google account to sign in and nothing more. Your entries stay in this app's own
         database and are never sold or shared.
       </p>

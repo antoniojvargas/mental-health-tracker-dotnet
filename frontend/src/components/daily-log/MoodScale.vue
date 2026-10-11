@@ -86,10 +86,17 @@ function onKeydown(e: KeyboardEvent) {
     case 'Enter':
       e.preventDefault()
       select(focusedIndex.value)
-      break
+      return
     default:
-      break
+      return
   }
+  // Roving tabindex: la flecha mueve también el foco real, no solo el atributo.
+  // Sin esto el anillo de foco se queda en el radio anterior y el radiogroup se
+  // recorre a ciegas: la selección y el foco son el mismo lugar, siempre.
+  const next = focusedIndex.value
+  ;(e.currentTarget as HTMLElement | null)
+    ?.querySelectorAll<HTMLElement>('[role="radio"]')
+    [next]?.focus()
 }
 </script>
 
@@ -110,7 +117,7 @@ function onKeydown(e: KeyboardEvent) {
         :aria-label="opt.label"
         :tabindex="focusedIndex === i ? 0 : -1"
         :class="[
-          'group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border text-sm font-medium transition-colors sm:h-11 sm:w-11',
+          'group relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border text-sm font-medium transition-colors',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500',
           {
             'border-clearsky-600 bg-clearsky-600 text-paper-50 shadow-sm':

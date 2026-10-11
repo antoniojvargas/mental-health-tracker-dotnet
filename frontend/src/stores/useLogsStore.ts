@@ -10,7 +10,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { ApiError } from '../services/api-client'
+import { describeError } from '../services/error-messages'
 import { list } from '../services/logs.api'
 import type { DailyLog, IsoDate } from '../types/daily-log'
 
@@ -38,7 +38,12 @@ export const useLogsStore = defineStore('logs', () => {
   const logs = ref<DailyLog[]>([])
   /** `true` mientras `fetch` está en vuelo, para que la vista no parpadee. */
   const loading = ref(false)
-  /** Mensaje del último fallo de `fetch`, o `null` si la última carga fue bien. */
+  /**
+   * Mensaje del último fallo de `fetch`, o `null` si la última carga fue bien.
+   *
+   * Es texto para pantalla, ya traducido por `describeError`: nunca el `message`
+   * crudo de la API, que puede traer nombres de campos o detalles del servidor.
+   */
   const error = ref<string | null>(null)
 
   /**
@@ -62,8 +67,10 @@ export const useLogsStore = defineStore('logs', () => {
       const { data } = await list(toIsoDate(from), toIsoDate(to))
       logs.value = [...data].sort((a, b) => a.logDate.localeCompare(b.logDate))
     } catch (thrown) {
-      error.value =
-        thrown instanceof ApiError ? thrown.message : 'No se pudieron cargar los registros'
+      // Se guarda un mensaje ya traducido, nunca `thrown.message`: el `message`
+      // de la API puede traer nombres de campo o detalles internos, y este string
+      // termina tal cual en la pantalla.
+      error.value = describeError(thrown)
     } finally {
       loading.value = false
     }
