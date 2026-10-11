@@ -78,7 +78,7 @@ public class ListDailyLogsQueryValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
             error.PropertyName == nameof(ListDailyLogsQuery.From) &&
-            error.ErrorMessage == "from debe ser menor o igual que to.");
+            error.ErrorMessage == "from must be less than or equal to to.");
     }
 
     private static ListDailyLogsQuery ValidQuery()

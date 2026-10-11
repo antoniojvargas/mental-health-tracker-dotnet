@@ -148,7 +148,7 @@ public class CreateDailyLogValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, error =>
             error.PropertyName == nameof(CreateDailyLogRequest.LogDate) &&
-            error.ErrorMessage == "logDate no puede estar en el futuro.");
+            error.ErrorMessage == "logDate cannot be in the future.");
     }
 
     private static CreateDailyLogRequest ValidRequest(DateOnly? logDate = null) => new(

@@ -189,7 +189,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Mental Health Tracker API",
         Version = "v1",
-        Description = "API del Mental Health Tracker: autenticación y registro diario del bienestar.",
+        Description = "Mental Health Tracker API: authentication and daily wellbeing logging.",
     });
 
     options.AddSecurityDefinition(
@@ -199,7 +199,7 @@ builder.Services.AddSwaggerGen(options =>
             Type = SecuritySchemeType.ApiKey,
             Name = JwtService.SessionCookieName,
             In = ParameterLocation.Cookie,
-            Description = "Cookie de sesión emitida tras iniciar sesión con Google.",
+            Description = "Session cookie issued after signing in with Google.",
         });
 
     options.OperationFilter<RequireAuthSecurityOperationFilter>();
