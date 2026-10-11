@@ -83,7 +83,7 @@ function onInput(e: Event) {
       :value="modelValue"
       :disabled="disabled"
       :aria-valuetext="valueText ?? undefined"
-      class="h-2 w-full cursor-pointer appearance-none rounded-full bg-ink-200 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
+      class="w-full cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
       @input="onInput"
     />
 

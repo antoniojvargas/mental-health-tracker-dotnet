@@ -60,7 +60,7 @@ function toggle(key: string): void {
       type="button"
       :disabled="!selected.has(metric.key) && modelValue.length >= MAX_METRICS"
       :aria-pressed="selected.has(metric.key)"
-      class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-40"
+      class="flex min-h-11 items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-40"
       :class="
         selected.has(metric.key)
           ? 'border-transparent bg-ink-700 text-paper-50'

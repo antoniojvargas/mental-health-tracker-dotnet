@@ -568,13 +568,13 @@ function close() {
                 <label
                   v-for="opt in sleepDisturbanceOptions"
                   :key="opt.key"
-                  class="flex cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-2 hover:bg-ink-50"
+                  class="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-2 hover:bg-ink-50"
                 >
                   <input
                     v-model="form.sleepDisturbances"
                     type="checkbox"
                     :value="opt.key"
-                    class="h-4 w-4 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+                    class="h-5 w-5 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
                   />
                   <span class="text-sm text-ink-700">{{ opt.label }}</span>
                 </label>
@@ -592,7 +592,7 @@ function close() {
               <select
                 id="activityType"
                 v-model="form.activityType"
-                class="rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+                class="min-h-11 rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
               >
                 <option v-for="opt in activityTypeOptions" :key="opt.key" :value="opt.key">
                   {{ opt.label }}
@@ -626,7 +626,7 @@ function close() {
               <select
                 id="socialFrequency"
                 v-model="form.socialFrequency"
-                class="rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+                class="min-h-11 rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
               >
                 <option v-for="opt in socialFrequencyOptions" :key="opt.key" :value="opt.key">
                   {{ opt.label }}
@@ -665,11 +665,11 @@ function close() {
     </template>
 
     <template #actions>
-      <div class="flex w-full items-center justify-between gap-3">
+      <div class="flex w-full flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" :disabled="currentStep === 0 || !isReady" @click="back">
           Back
         </Button>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <Button variant="subtle" @click="close">Cancel</Button>
           <template v-if="isReady">
             <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>

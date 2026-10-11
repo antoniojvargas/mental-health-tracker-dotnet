@@ -33,10 +33,25 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
  */
 
 const GRID_COLOR = '#EAE0CB'
-const TICK_COLOR = '#8A9B97'
+// ink-400 y no ink-300: el gris claro anterior se quedaba en 2.7:1 sobre el papel
+// y las etiquetas de los ejes no llegaban al 3:1 que pide el texto de gráficos.
+const TICK_COLOR = '#5D726D'
 const TICK_FONT = { family: '"IBM Plex Mono", monospace', size: 12 }
 const TOOLTIP_BG = '#2B3A3A'
 const TOOLTIP_TEXT = '#FBF8F2'
+
+/**
+ * Etiquetas del eje X: el ISO crudo ("2026-10-05") ocupa casi todo el ancho de
+ * la gráfica en un móvil y las marcas se pisan. La forma corta ("Oct 5") deja
+ * seis días legibles. Se construye el `Date` por partes para no interpretar la
+ * fecha como UTC y correrla un día.
+ */
+const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
+
+function formatShortDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number)
+  return SHORT_DATE.format(new Date(year, month - 1, day))
+}
 
 /**
  * ¿Pide el usuario reducir el movimiento? Chart.js no lee `prefers-reduced-motion`
@@ -115,7 +130,13 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
       type: 'category',
       border: { display: false, dash: [3, 3] },
       grid: { color: GRID_COLOR, drawTicks: false },
-      ticks: { color: TICK_COLOR, font: TICK_FONT },
+      ticks: {
+        color: TICK_COLOR,
+        font: TICK_FONT,
+        maxRotation: 0,
+        maxTicksLimit: 6,
+        callback: (_value, index) => formatShortDate(props.logs[index]?.logDate ?? ''),
+      },
     },
   }
 

@@ -117,7 +117,7 @@ function onKeydown(e: KeyboardEvent) {
         :aria-label="opt.label"
         :tabindex="focusedIndex === i ? 0 : -1"
         :class="[
-          'group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border text-sm font-medium transition-colors sm:h-11 sm:w-11',
+          'group relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border text-sm font-medium transition-colors',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500',
           {
             'border-clearsky-600 bg-clearsky-600 text-paper-50 shadow-sm':

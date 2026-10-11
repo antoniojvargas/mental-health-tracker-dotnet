@@ -62,7 +62,7 @@ const { toasts, dismiss } = useToast()
       -->
       <button
         type="button"
-        class="font-sans -mt-0.5 -mr-1 shrink-0 rounded p-1 text-ink-400 transition-colors hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
+        class="font-sans -mt-1.5 -mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded text-ink-400 transition-colors hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
         :aria-label="`Descartar: ${toast.message}`"
         @click="dismiss(toast.id)"
       >

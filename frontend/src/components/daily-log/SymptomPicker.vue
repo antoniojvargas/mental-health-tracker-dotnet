@@ -118,34 +118,37 @@ function onSeverityKeydown(sym: SymptomEntry, event: KeyboardEvent) {
 
 <template>
   <fieldset
-    class="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-paper-50 p-4"
+    class="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-paper-50 p-3 sm:gap-4 sm:p-4"
     :aria-label="ariaLabel"
     :disabled="disabled"
   >
     <legend class="px-1 text-sm font-medium text-ink-700">{{ ariaLabel }}</legend>
 
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-1">
       <div
         v-for="sym in entries"
         :key="sym.key"
         class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
       >
-        <label class="flex cursor-pointer items-center gap-3" :for="`sym-check-${sym.key}`">
+        <label
+          class="flex min-h-11 cursor-pointer items-center gap-3"
+          :for="`sym-check-${sym.key}`"
+        >
           <input
             :id="`sym-check-${sym.key}`"
             type="checkbox"
             :checked="sym.active"
             :disabled="disabled"
-            class="h-4 w-4 cursor-pointer accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
+            class="h-5 w-5 cursor-pointer accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
             @change="toggle(sym.key)"
           />
           <span class="text-sm text-ink-700">{{ sym.label }}</span>
         </label>
 
-        <div v-if="sym.active" class="flex items-center gap-3 pl-7 sm:pl-0">
+        <div v-if="sym.active" class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
           <span class="text-xs text-ink-500">Severity</span>
           <div
-            class="flex items-center gap-1"
+            class="flex items-center justify-between gap-1 sm:justify-start"
             role="radiogroup"
             :aria-label="`${sym.label} severity`"
             @keydown="onSeverityKeydown(sym, $event)"
@@ -158,7 +161,7 @@ function onSeverityKeydown(sym: SymptomEntry, event: KeyboardEvent) {
               :aria-checked="sym.severity === n"
               :tabindex="sym.severity === n ? 0 : -1"
               :disabled="disabled"
-              class="flex h-8 w-8 items-center justify-center rounded-full border text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
+              class="flex h-11 w-11 items-center justify-center rounded-full border text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
               :class="[
                 sym.severity === n
                   ? 'border-clearsky-600 bg-clearsky-600 text-paper-50'

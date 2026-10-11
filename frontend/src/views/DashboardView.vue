@@ -145,7 +145,9 @@ async function handleLogout(): Promise<void> {
             class="h-8 w-8 rounded-full"
             referrerpolicy="no-referrer"
           />
-          <Button variant="ghost" class="px-3! py-1.5!" @click="handleLogout">Log out</Button>
+          <Button variant="ghost" class="min-h-11 px-3! py-1.5!" @click="handleLogout">
+            Log out
+          </Button>
         </div>
       </div>
     </header>
