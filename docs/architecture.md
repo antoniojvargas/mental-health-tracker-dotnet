@@ -635,3 +635,105 @@ estado en el servidor.
 - **Modo demo/e2e**: en el entorno `Testing` se registra `POST /api/auth/test-login`, que
   replica el tramo final del flujo (mismo upsert por `sub` derivado del email y misma cookie de
   sesión) para que los e2e entren autenticados sin pasar por Google.
+
+## Observabilidad
+
+El backend no tiene un stack de métricas/tracing distribuido: se observa con **logs
+estructurados de Serilog** y una **correlación por request**. Esta sección cubre las dos piezas
+que hacen esos logs útiles y seguros (el identificador de correlación y la redacción de
+credenciales) y la decisión de salud: por qué `/api/health` prueba la base de verdad.
+
+### Correlación por `X-Request-Id`
+
+`RequestIdMiddleware` (`RequestIdMiddleware.cs`) corre muy temprano en el pipeline, justo
+después del manejador global de excepciones y antes de seguridad, CORS, rate limiting y
+autenticación (`app.UseRequestId()` en `Program.cs`). Por cada petición:
+
+1. Lee la cabecera entrante `X-Request-Id`; si falta o viene vacía, genera una nueva con
+   `Guid.NewGuid().ToString("N")`.
+2. Escribe ese mismo valor en la cabecera de respuesta `X-Request-Id`.
+3. Empuja `RequestId` a `LogContext` de Serilog dentro de un `using`, de modo que quede
+   enriquecido en **todos** los eventos emitidos durante la petición y se limpie al terminar,
+   sin filtrarse a la siguiente.
+
+**Motivos**
+
+1. **Un identificador cose el rastro de una petición.** El cliente recibe en la respuesta el
+   mismo id que aparece en cada línea de log del backend, así que un reporte de error se puede
+   reducir a filtrar por `RequestId` en los logs.
+2. **El `RequestId` va en el output, no en el mensaje.** En Development el template de consola
+   incluye `[{RequestId}]`; en producción el `CompactJsonFormatter` lo emite como propiedad
+   estructurada (ver `SerilogConfigurationExtensions`), de modo que es consultable sin parsear
+   texto.
+3. **Aceptar el id del cliente es deliberado.** Permite que un proxy o el frontend propaguen su
+   propia correlación en lugar de que el backend imponga una. No se valida su formato ni se usa
+   para nada más que correlación: no es un secreto ni un dato de autorización.
+
+**Implicaciones técnicas**
+
+- La cabecera de respuesta se fija antes de invocar el resto del pipeline, así que acompaña
+  también a las respuestas de error (401, 429, 4xx/5xx) generadas más abajo.
+- No hay propagación saliente: el único llamado a un tercero es el intercambio OAuth con
+  Google, que no reenvía el `X-Request-Id`. Si se añadieran llamadas entre servicios, habría
+  que propagar la cabecera explícitamente para no cortar la traza.
+
+### Redacción de cookies y cabeceras de autorización
+
+`RedactSensitiveHeadersPolicy` (`Core/Configuration`) es un `IDestructuringPolicy` de Serilog
+registrado de forma global (`Destructure.With(...)` en `SerilogConfigurationExtensions`). Cuando
+un evento destructure un diccionario de cabeceras —`IDictionary<string, StringValues>`, que es
+exactamente el tipo de `HttpContext.Request.Headers` y `Response.Headers`— la política lo
+reconstruye con un `StructureValue` donde `Cookie`, `Set-Cookie` y `Authorization` se sustituyen
+por `[REDACTED]`; el resto de cabeceras viaja tal cual. La comparación de nombres es
+*case-insensitive*, así que `cookie` y `Cookie` se tratan igual.
+
+**Motivos**
+
+1. **Esas tres cabeceras son credenciales.** La cookie `access_token` es la sesión entera y
+   `Authorization` puede llevar un bearer token; registrarlos en claro deja un secreto
+   persistido en los logs, que suelen ser el artefacto más copiado, agregado y compartido del
+   sistema.
+2. **La redacción vive en la frontera de logging, no en cada llamada.** Al aplicarse como
+   política de Serilog, cualquier `logger.Information("... {@Headers}", headers)` queda
+   redactado sin que el sitio de llamada tenga que acordarse. Es una garantía por defecto, no
+   una convención.
+3. **El test lo fija como contrato.** `SensitiveHeadersTests` afirma que incluso a nivel
+   `Debug` los valores de `Cookie` y `Authorization` nunca aparecen en la salida y que sí
+   aparece `[REDACTED]`.
+
+**Limitación**: la redacción depende de que el valor se destructure como ese diccionario. Un
+sitio que ya haya formateado las cabeceras a string (p. ej. `headers.ToString()`) y lo registre
+como texto plano no pasa por la política; por eso la convención es registrar el diccionario con
+`{@Headers}`, nunca su representación textual.
+
+### `GET /api/health` consulta la base (`SELECT 1`), no devuelve un literal
+
+El endpoint de salud (`Program.cs`) abre una conexión real con `NpgsqlConnection`, ejecuta
+`SELECT 1` y responde `200 {"status":"ok","uptime":…}` solo si la consulta tiene éxito. Si falla,
+registra la excepción y responde `503 {"status":"error","db":"unreachable"}`. No está decorado
+con `[RequireAuth]`: los orquestadores lo consultan sin sesión.
+
+**Motivos**
+
+1. **Un `200` constante enmascara caídas de la base.** El healthcheck no es para el usuario sino
+   para el orquestador (el `healthcheck` de Docker Compose, `curl`/`wget` contra `/api/health`
+   en desarrollo y producción): si siempre devolviera `ok`, un contenedor con la base caída
+   seguiría marcado como *healthy*, no se reiniciaría, no habría alerta y los clientes fallarían
+   más tarde con errores confusos. Solo una consulta real refleja la disponibilidad real.
+2. **La disponibilidad que importa es la del sistema completo, no la del proceso.** La API no
+   sirve para nada sin Postgres; llamar sano a un proceso que no puede leer ni escribir datos
+   sería una definición falsa de salud.
+3. **`uptime` es informativo, no la señal.** Se incluye para diagnóstico humano; la señal
+   automática es el código de estado.
+
+**Implicaciones técnicas**
+
+- El endpoint hereda la dependencia del pool de Postgres: una base lenta lo hace lento. No hay
+  timeout propio más allá de los defaults de Npgsql.
+- No filtra detalle de infraestructura al cliente: la excepción va al log y la respuesta es un
+  literal genérico.
+
+**Cuándo reconsiderar**: si se necesitara separar *liveness* de *readiness* (un reinicio del
+proceso no debería dispararse por una base momentáneamente caída), lo correcto es dividir en
+`/live` —el proceso responde— y `/ready` —la base responde—, y apuntar cada sonda al endpoint
+que le corresponde.
