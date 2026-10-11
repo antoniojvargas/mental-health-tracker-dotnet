@@ -737,3 +737,59 @@ con `[RequireAuth]`: los orquestadores lo consultan sin sesión.
 proceso no debería dispararse por una base momentáneamente caída), lo correcto es dividir en
 `/live` —el proceso responde— y `/ready` —la base responde—, y apuntar cada sonda al endpoint
 que le corresponde.
+
+## Límites conocidos de alcance
+
+Tres límites del sistema son **decisiones conscientes de alcance**, no deuda accidental: se
+aceptan hoy porque el despliegue es de **una sola instancia** y cada uno tiene ya identificada
+su mitigación. Se listan juntos para que quede claro que comparten la misma causa y que se
+revocan con dos piezas de infraestructura (Redis y un job de migración), no con cambios de
+diseño de la aplicación.
+
+| Límite | Qué pasa hoy | Cuándo se rompe | Mitigación identificada |
+| ------ | ------------ | --------------- | ----------------------- |
+| SignalR sin backplane | El estado de grupos (`user:{userId}`) y conexiones vive en la memoria de cada instancia | Varias réplicas: el evento de una escritura procesada por la instancia B no llega a un usuario conectado a la A | Backplane de SignalR (Redis o Azure SignalR Service), registrado en `AddSignalR()` |
+| Rate limiting en memoria | Los contadores de `FixedWindowRateLimiter` viven en la memoria de la instancia | Varias réplicas: cada una cuenta por separado y el límite deja de ser una garantía global | Contadores distribuidos en Redis (`INCR`/`EXPIRE`), la misma pieza que el backplane de SignalR |
+| Migraciones al arrancar | La API aplica las migraciones con `DatabaseInitializer.MigrateAsync` antes de empezar a escuchar | Varias réplicas: varias instancias compiten por migrar el esquema a la vez | Job de migración separado, previo a escalar la API |
+
+### SignalR sin backplane
+
+Detalle completo en "Escalado horizontal del canal en tiempo real: señalada limitación, sin
+backplane (decisión de alcance)". En una sola réplica los grupos y el broadcast por conexión
+funcionan porque todo vive en la misma memoria; el estado real nunca se pierde, porque la falla
+es solo de *entrega inmediata* del evento y un refresco HTTP devuelve el dato persistido. El
+emisor (`ILogEventEmitter`) no conoce el transporte, así que introducir el backplane es un
+detalle de infraestructura que no toca el dominio.
+
+### Rate limiting en memoria
+
+Detalle completo en "Rate limiting en memoria: mismo backplane pendiente que SignalR (decisión
+de alcance)". Con una sola réplica el contador es local y exacto; con varias, el límite pasa de
+ser una garantía global a ser probabilístico. Es best-effort *por diseño*: mitiga abuso, no
+garantiza un SLA de consumo. Se trata como **la misma decisión** que el backplane de SignalR
+porque ambas se resuelven con la misma dependencia operativa: **Redis**. Se introducen juntas o
+no se introducen.
+
+### Migraciones aplicadas al arrancar
+
+`Program.cs` llama a `DatabaseInitializer.MigrateAsync` durante el arranque, antes de exponer
+tráfico, y **falla en firme** si no puede migrar; así la API nunca sirve peticiones contra un
+esquema desactualizado. Antes de migrar espera a que la base acepte conexiones con reintentos y
+backoff exponencial (`WaitForDatabaseAsync`: hasta 10 intentos, de 1 s a 10 s), para tolerar que
+el contenedor de la base esté reiniciándose cuando arranca la API.
+
+**Por qué se acepta hoy**: con una única instancia no hay competencia por el esquema, y migrar
+en el arranque es la forma más simple de garantizar "esquema al día antes de servir". También es
+lo que hace que el entorno de test sea autocontenido: `Program.cs` aplica las migraciones al
+iniciar, así que las pruebas de integración no las ejecutan por su cuenta.
+
+**Qué se rompe con varias réplicas**: cada instancia intentaría migrar el mismo esquema a la
+vez; EF Core usa bloqueos para serializar, pero se producen esperas, contención y, ante un fallo
+parcial, riesgo de quedar en un estado intermedio con varias instancias reintentando. El arranque
+de la aplicación queda además acoplado a la disponibilidad de la base.
+
+**Mitigación identificada**: sacar las migraciones de la API y correrlas como un **job de
+migración separado** antes de desplegar/escalar (un `docker compose run` o un job de
+Kubernetes/CI que termina antes de que el servicio reciba tráfico). La API arrancaría sin migrar
+y el despliegue garantizaría el esquema como paso previo. Es la evolución natural junto con
+Redis: ambos separan el estado operativo (esquema, grupos/contadores) del proceso de la API.
