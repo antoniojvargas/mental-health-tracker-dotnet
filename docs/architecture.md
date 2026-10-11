@@ -396,3 +396,131 @@ base y mantener encima una capa fina a mano solo para lo que el documento no pue
 expresar —los rangos de validación, la regla de `[]`, el formato de `createdAt`—, que es
 justo la parte que hoy está en `daily-log.ts`. Hasta entonces, regenerar y mirar el diff es
 la forma barata de detectar que un DTO del backend se movió.
+
+## Decisiones de datos
+
+La tabla `daily_logs` usa tipos relacionales para lo que tiene estructura (FK a `users`,
+`date`, `timestamp with time zone`) y tres decisiones de almacenamiento deliberadas para el
+resto: `symptoms` como `jsonb`, las escalas numéricas como `smallint` con el rango validado
+en la aplicación, y los campos categóricos como `text` / `text[]` con el conjunto cerrado en
+el modelo de la aplicación. No son los tipos que EF Core elegiría por defecto; son elecciones
+de alcance que se justifican abajo.
+
+### `symptoms` como `jsonb` y no una tabla hija normalizada
+
+`symptoms` guarda una lista de `Symptom(Type, Severity)` serializada como JSON en una columna
+`jsonb` del propio log. La alternativa relacional sería una tabla hija
+`daily_log_symptoms(log_id, type, severity)` con FK a `daily_logs`.
+
+**Motivos**
+
+1. **Se lee y se escribe siempre completo, junto al log.** Tanto el `POST /api/logs` (que
+   envía el registro entero) como el `GET /api/logs` (que lo devuelve entero) tratan los
+   síntomas como parte indivisible del log. Nunca hay un caso de uso que actualice un síntoma
+   aislado.
+2. **Nunca se consulta por un síntoma suelto.** No existe una consulta del tipo "logs de
+   usuarios con el síntoma X" ni un filtro por síntoma. Las tendencias y agregados iteran la
+   lista en memoria una vez traído el rango de logs, no agregan por síntoma en la base. Sin
+   esa consulta, la tabla hija no aporta nada.
+3. **La tabla hija costaría más de lo que ahorra.** Añadiría un `join`, una segunda entidad
+   con su configuración EF, reglas de cascada y un orden que hoy no existe, y obligaría a
+   partir el `ON CONFLICT ... DO UPDATE` de una sola fila (`DailyLogRepository.UpsertAsync`)
+   en varias sentencias dentro de una transacción.
+4. **El formato queda flexible sin migración de esquema.** Agregar un miembro a `SymptomType`
+   es un cambio de enum en C#, no una migración: el conjunto de valores válidos vive en el
+   código, no en el esquema.
+
+**Implicaciones técnicas**
+
+- La columna es opaca para SQL: no se puede indexar ni filtrar por síntoma sin índices de
+  expresión. Es aceptable porque no existe tal consulta.
+- La serialización usa `JsonListConverter` con política `snake_case`, la misma del contrato
+  HTTP; lo almacenado y lo que viaja por el cable coinciden.
+- Se registra un `ValueComparer` (`ListComparer<T>`) para que EF Core detecte cambios en la
+  lista y no considere que es la misma referencia.
+- No hay validación de forma a nivel de esquema: el rango de `Severity` (1-5) lo valida
+  `CreateDailyLogValidator` y los `SymptomType` fuera del conjunto cerrado los rechaza el
+  `SnakeCaseEnumJsonConverter` al deserializar.
+
+**Cuándo reconsiderar**: si apareciera una consulta real de "logs con el síntoma X" o un
+agregado de "síntoma más frecuente" que deba ejecutarse en la base (sobre todo con un corpus
+grande), una tabla hija con índice sobre `type` sería lo correcto.
+
+### Escalas numéricas como `smallint` con el rango validado en la aplicación
+
+Las escalas (`mood_rating`, `anxiety_level`, `stress_level`, `sleep_quality`) se almacenan
+como `smallint`, `activity_minutes` como `smallint` nullable, y `sleep_hours` como
+`numeric(3,1)`. Los rangos viven en `CreateDailyLogValidator` (mood 1-5, ansiedad/estrés 1-10,
+calidad de sueño 1-5, minutos de actividad 0-600, horas de sueño 0-24), **no** en
+restricciones `CHECK` del esquema.
+
+**Motivos**
+
+1. **Son un continuo, no un conjunto cerrado de etiquetas.** Estos valores se promedian y se
+   grafican en tendencias; `smallint` es el entero más angosto que cubre el dominio
+   (hasta 600) y evita la falsa precisión de `numeric` en un dato que es ordinal.
+2. **El rango vive en un solo lugar.** Una restricción `CHECK` obligaría a duplicar la regla
+   (validador + esquema) y a una migración cada vez que una escala cambie de rango. Con la
+   validación en la aplicación, la única fuente de verdad es el validador.
+3. **El error encaja con el contrato existente.** Validar en la aplicación produce el cuerpo
+   estructurado `VALIDATION_ERROR` con el detalle por campo que el frontend ya consume
+   (`details[].field`). Una `CHECK` fallida llegaría como `SQLSTATE 23514`, que el manejador
+   global tendría que traducir a mano.
+4. **`smallint` en lugar de `int`** es fiel al dominio (2 bytes frente a 4) y documenta que
+   el valor es de rango pequeño; no implican una ganancia de espacio relevante, pero evitan
+   un `int` que sugeriría un rango que no existe.
+
+**Implicaciones técnicas**
+
+- La base aceptará cualquier `smallint`; el único guardia es la aplicación. Quien escriba
+  directo (psql, una migración, o un bug que salte el validador) puede dejar valores fuera de
+  rango. Se acepta porque el repositorio es el único escritor y siempre pasa por la API.
+- La regla queda verificada por pruebas de validación, no por el motor de base de datos. El
+  contrato observable es el mismo: la API nunca persiste ni devuelve un valor fuera de rango
+  por la vía normal.
+
+**Cuándo reconsiderar**: si la integridad debe garantizarse con independencia de la
+aplicación (varios escritores, ETL, o un almacén de datos que consuma la tabla), añadir
+restricciones `CHECK` en el esquema.
+
+### Campos categóricos como `text` / `text[]` con el conjunto cerrado en la aplicación, no `ENUM` de Postgres
+
+`activity_type` y `social_frequency` son columnas `text`; `sleep_disturbances` es `text[]`.
+Los valores son cadenas `snake_case` (`walking`, `frequent`, `insomnia`, …) que produce y
+consume el enum de C# correspondiente (`ActivityType`, `SocialFrequency`, `SleepDisturbance`)
+a través de `EnumSnakeCaseConverter` / `EnumListToStringArrayConverter`. El conjunto cerrado
+de valores válidos **no** está en el esquema, sino en el modelo de la aplicación: el DTO
+tipa el campo con el enum, y el `SnakeCaseEnumJsonConverter` rechaza cualquier cadena fuera
+del conjunto al deserializar (400), antes de llegar al repositorio.
+
+**Motivos**
+
+1. **Agregar un valor es un cambio de código, no una migración.** Hoy sumar un miembro a
+   `ActivityType` es una línea en el enum. Con un `ENUM` de Postgres sería un
+   `ALTER TYPE ... ADD VALUE`, es decir una migración de esquema para un concepto de producto
+   que cambia al ritmo de la app, no al de la base.
+2. **`ENUM` de Postgres es costoso de evolucionar.** Añadir un valor tiene restricciones
+   transaccionales y de bloqueo (históricamente no podía ejecutarse dentro de un bloque de
+   transacción) y quitar o renombrar un valor obliga a recrear el tipo. El vocabulario de
+   síntomas y actividades es justamente el que más se va a mover.
+3. **Una sola fuente de verdad para el conjunto cerrado.** El valor persistido debe coincidir
+   con el que viaja por el cable (`snake_case`). Con `text` + enum en código, la lista vive en
+   el enum de C# y su converter; con un `ENUM` de Postgres, la lista la posee la base y el
+   código pasa a reflejarla. Se prefiere que el contrato lo dicte el dominio.
+4. **Sin acoplamiento ni orden innecesario.** Una columna `text` mapea limpio con Npgsql sin
+   configuración de tipos; un `ENUM` de Postgres impone además un orden de comparación que
+   nadie necesita, porque estos campos no se filtran ni se ordenan por valor.
+
+**Implicaciones técnicas**
+
+- La columna admite cualquier cadena a nivel de motor; el guardia es el enum tipado en el
+  modelo. Se acepta por la misma razón que en las escalas: el repositorio es el único escritor.
+- Renombrar un miembro del enum en código **sí** requiere tratar las cadenas `snake_case`
+  persistidas como vocabulario apéndice: son la clave almacenada, así que un rename sin
+  migración de datos deja huérfanas las filas antiguas.
+- No hay integridad referencial ni validación de esquema para estos valores; tampoco índices,
+  porque no se consultan.
+
+**Cuándo reconsiderar**: si alguno de estos campos dejara de ser un vocabulario fijo y pasara
+a ser una entidad de primera clase (por ejemplo, actividades definidas por el usuario), lo
+correcto sería una tabla propia con FK, no un `ENUM` de Postgres.
