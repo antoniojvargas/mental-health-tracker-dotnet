@@ -524,3 +524,114 @@ del conjunto al deserializar (400), antes de llegar al repositorio.
 **Cuándo reconsiderar**: si alguno de estos campos dejara de ser un vocabulario fijo y pasara
 a ser una entidad de primera clase (por ejemplo, actividades definidas por el usuario), lo
 correcto sería una tabla propia con FK, no un `ENUM` de Postgres.
+
+## Flujo de autenticación con Google (OAuth 2.0 + OpenID Connect)
+
+El login se resuelve con el flujo *authorization code* de OAuth 2.0, con `openid` en el scope
+para obtener un `id_token` conforme a OpenID Connect. La lógica vive en
+`Modules/Auth/AuthController` (inicio y callback), `GoogleOAuthClient` (intercambio y lectura
+del `id_token`) y `UserRepository` (identidad del usuario). Esta sección describe el recorrido
+paso a paso; el *por qué* de la cookie de sesión y de la ausencia de CSRF explícito está en
+"Sesión: JWT en cookie `httpOnly`" y "CSRF y SameSite=Lax", arriba.
+
+### Recorrido paso a paso
+
+| Paso | Quién actúa | Qué ocurre |
+| ---- | ----------- | ---------- |
+| 1 | Navegador | El usuario pulsa "Continue with Google", un `<a href="/api/auth/google">` (navegación de página entera, no `fetch`, para que el backend pueda fijar cookies). |
+| 2 | Frontend → Backend | `GET /api/auth/google` (`AuthController.GoogleLogin`). |
+| 3 | Backend | Genera un `state` aleatorio y fija la cookie `oauth_state`; responde `302` al endpoint de autorización de Google con ese `state`. |
+| 4 | Google | Muestra la pantalla de consentimiento y redirige al `redirect_uri` con `code` y `state`. |
+| 5 | Google → Backend | `GET /api/auth/google/callback?code=…&state=…` (`AuthController.GoogleCallback`). |
+| 6 | Backend | Borra la cookie `oauth_state` y valida `state` contra ella. Si no cuadra, redirige a `/login?error=auth_failed` (login CSRF). |
+| 7 | Backend → Google | Intercambio **servidor-a-servidor** del `code` por tokens en el endpoint de token. |
+| 8 | Backend | Valida el `id_token` recibido (firma, expiración y audiencia). |
+| 9 | Backend | Upsert del usuario por `sub` (`UserRepository.UpsertByGoogleIdAsync`). |
+| 10 | Backend | Firma el JWT y lo envía en la cookie de sesión `access_token`; responde `302` a `${FrontendUrl}/dashboard`. |
+
+Cualquier excepción entre el paso 6 y el 10 se registra y se traduce en el mismo redirect a
+`/login?error=auth_failed`: al navegador nunca le llega el detalle interno (mensajes de Google,
+excepciones de validación) ni un `500` en el cuerpo.
+
+### Paso 2–3: inicio del flujo y cookie `state`
+
+`GoogleLogin` no confía en ningún dato del navegador: **inventa** el `state` con
+`RandomNumberGenerator.Fill` sobre 32 bytes codificados con `WebEncoders.Base64UrlEncode` (no
+`Random`, que no es apto para secretos). Después:
+
+- Fija la cookie `oauth_state` con las mismas opciones centralizadas (`HttpOnly`,
+  `SameSite=Lax`, `Path=/`, `Secure` solo en `Production`) más `Max-Age=10 min`: el `state` no
+  es una credencial de sesión, así que caduca rápido y no se espera que sobreviva a la visita.
+- Redirige a `GoogleOAuthClient.BuildAuthUrl(state)`, que arma la URL de autorización
+  (`accounts.google.com/o/oauth2/v2/auth`) con `response_type=code`, `scope=openid email profile`,
+  `access_type=online` y `prompt=select_account`.
+
+El `state` viaja por dos canales: en la query hacia Google y en la cookie `httpOnly`. Solo el
+segundo lo controla el servidor; el primero pasa por el navegador de terceros.
+
+### Paso 6: consumo de la cookie y anti-CSRF
+
+El callback borra `oauth_state` **antes** de validar (`Response.Cookies.Delete`): la cookie es
+de un solo uso, así que un `state` filtrado no puede reutilizarse. La comparación
+(`StateMatches`) exige que exista la cookie y que `state` tenga la misma longitud, y luego usa
+`CryptographicOperations.FixedTimeEquals` para no filtrar por *timing* cuántos caracteres
+coinciden. Si algo falla se redirige a `/login?error=auth_failed`. Esto es lo que neutraliza
+el *login CSRF* (que un atacante inserte su propio `code` en la sesión de la víctima), ya que
+Google no envía la cookie `oauth_state`: sin la cookie que fijó el propio backend, no hay
+forma de que el `state` de vuelta coincida.
+
+### Paso 7: intercambio servidor-a-servidor del `code`
+
+`GoogleOAuthClient.ExchangeCodeAsync` hace un `POST` a
+`https://oauth2.googleapis.com/token` (`application/x-www-form-urlencoded`) con:
+
+| Parámetro       | Origen              |
+| --------------- | ------------------- |
+| `code`          | query del callback  |
+| `client_id`     | `GoogleOAuth:ClientId` |
+| `client_secret` | `GoogleOAuth:ClientSecret` |
+| `redirect_uri`  | `GoogleOAuth:RedirectUri` |
+| `grant_type`    | literal `authorization_code` |
+
+Dos propiedades son importantes: el **`client_secret` no abandona el backend** (solo aparece
+en esta llamada saliente), y el **`code` se vuelve a pasar tal cual**; su validez la determina
+Google, no el backend. Un fallo de la llamada (`EnsureSuccessStatusCode`) o una respuesta sin
+`id_token` lanzan y terminan en el redirect de error.
+
+### Paso 8: validación del `id_token`
+
+El token endpoint devuelve un `id_token` (JWT firmado por Google). El backend lo valida con
+`GoogleJsonWebSignature.ValidateAsync` y `ValidationSettings` con **`Audience = [ClientId]`**:
+eso comprueba la firma contra las claves públicas de Google, la expiración y que el token
+estuviera dirigido a *esta* aplicación (si no, un `id_token` emitido para otra app serviría para
+suplantar). Tras validar, exige un `sub` no vacío (`UnauthorizedException` si falta) y mapea el
+payload a `GoogleProfile(Subject, Email, Name, Picture)`. El `sub` es el identificador estable
+del usuario en Google; el `email` y el `name` son atributos mutables del perfil.
+
+### Paso 9: upsert por `sub`
+
+`UserRepository.UpsertByGoogleIdAsync` busca al usuario **por `GoogleId` (= `sub`)** y, si no
+existe, lo crea; en cualquier caso sobrescribe `Email`, `Name`, `AvatarUrl` y `UpdatedAt`. Se
+elige `sub` y no `email` como clave de identidad porque el email de una cuenta de Google puede
+cambiar (el usuario lo edita en su cuenta) mientras que el `sub` es inmutable. `google_id` y
+`email` tienen índices únicos en `users`; el upsert es idempotente sobre `google_id`, así que
+un segundo login del mismo usuario devuelve la misma fila en vez de duplicarla.
+
+### Paso 10: emisión de la sesión
+
+Con el `Id` del usuario, `JwtService.Sign` firma un JWT `HS256` (claims `sub` = `userId`, `email`,
+`iat`, `exp` a 7 días) y `GoogleCallback` lo envía en la cookie `access_token` (`HttpOnly`,
+`SameSite=Lax`, `Max-Age` de 7 días) antes de redirigir a `/dashboard`. A partir de ahí la
+cookie es la única credencial: la usan por igual la API HTTP (vía `RequireAuthMiddleware`) y el
+hub SignalR (ver "Canal de tiempo real"), y `POST /api/auth/logout` la borra en el cliente sin
+estado en el servidor.
+
+### Notas de borde
+
+- **Rate limiting**: el callback es el único endpoint sin sesión que provoca una llamada
+  externa y un upsert, así que está limitado a 20 req/15 min por IP (política `auth`). El
+  endpoint de inicio `GET /api/auth/google` no hace trabajo externo ni de base de datos, así
+  que no se limita.
+- **Modo demo/e2e**: en el entorno `Testing` se registra `POST /api/auth/test-login`, que
+  replica el tramo final del flujo (mismo upsert por `sub` derivado del email y misma cookie de
+  sesión) para que los e2e entren autenticados sin pasar por Google.
