@@ -473,18 +473,25 @@ function close() {
       <div class="flex flex-col gap-6">
         <div class="flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs text-ink-500">
-            <span>Step {{ currentStep + 1 }} of {{ steps.length }}</span>
-            <span>{{ steps[currentStep] }}</span>
+            <!--
+              Región viva: al pasar de paso cambia el texto pero el foco se queda
+              en el botón, así que sin esto el avance no se anuncia. La barra de
+              progreso de abajo es el mismo dato en dibujo, y por eso va
+              `aria-hidden`: repetirlo sería anunciar dos veces lo mismo.
+            -->
+            <span role="status">
+              Step {{ currentStep + 1 }} of {{ steps.length }}: {{ steps[currentStep] }}
+            </span>
           </div>
-          <div class="h-2 w-full overflow-hidden rounded-full bg-ink-100">
-            <div class="h-full bg-clearsky-600 transition-all" :style="{ width: `${progress}%` }" />
+          <div aria-hidden="true" class="h-2 w-full overflow-hidden rounded-full bg-ink-100">
+            <div class="h-full bg-clearsky-700 transition-all" :style="{ width: `${progress}%` }" />
           </div>
         </div>
 
         <form class="flex flex-col gap-6" @submit.prevent="onSubmit">
           <section v-if="currentStep === 0" class="flex flex-col gap-6">
-            <h2 class="text-base font-medium text-ink-900">Mood</h2>
-            <MoodScale v-model="form.mood" aria-label="Mood" />
+            <h3 class="text-base font-medium text-ink-700">Mood</h3>
+            <MoodScale v-model="form.mood" aria-label="Mood" aria-required="true" />
             <SliderField
               v-model="form.anxiety"
               label="Anxiety"
@@ -504,7 +511,7 @@ function close() {
           </section>
 
           <section v-if="currentStep === 1" class="flex flex-col gap-6">
-            <h2 class="text-base font-medium text-ink-900">Sleep</h2>
+            <h3 class="text-base font-medium text-ink-700">Sleep</h3>
             <SliderField
               v-model="form.sleepHours"
               label="Sleep hours"
@@ -522,7 +529,7 @@ function close() {
               helper-text="1 = very poor, 5 = very good"
             />
             <fieldset class="flex flex-col gap-3 rounded-2xl border border-ink-200 bg-paper-50 p-4">
-              <legend class="px-1 text-sm font-medium text-ink-900">
+              <legend class="px-1 text-sm font-medium text-ink-700">
                 Sleep disturbances (select all that apply)
               </legend>
               <div class="grid gap-2 sm:grid-cols-2">
@@ -537,17 +544,17 @@ function close() {
                     :value="opt.key"
                     class="h-4 w-4 accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
                   />
-                  <span class="text-sm text-ink-900">{{ opt.label }}</span>
+                  <span class="text-sm text-ink-700">{{ opt.label }}</span>
                 </label>
               </div>
             </fieldset>
           </section>
 
           <section v-if="currentStep === 2" class="flex flex-col gap-6">
-            <h2 class="text-base font-medium text-ink-900">Activity and social life</h2>
+            <h3 class="text-base font-medium text-ink-700">Activity and social life</h3>
 
             <div class="flex flex-col gap-2">
-              <label for="activityType" class="text-sm font-medium text-ink-900"
+              <label for="activityType" class="text-sm font-medium text-ink-700"
                 >Activity type</label
               >
               <select
@@ -581,7 +588,7 @@ function close() {
             />
 
             <div class="flex flex-col gap-2">
-              <label for="socialFrequency" class="text-sm font-medium text-ink-900"
+              <label for="socialFrequency" class="text-sm font-medium text-ink-700"
                 >Social contact frequency</label
               >
               <select
@@ -606,10 +613,10 @@ function close() {
           </section>
 
           <section v-if="currentStep === 3" class="flex flex-col gap-4">
-            <h2 class="text-base font-medium text-ink-900">Symptoms</h2>
+            <h3 class="text-base font-medium text-ink-700">Symptoms</h3>
             <SymptomPicker v-model="form.symptoms" aria-label="Symptoms" />
             <div class="flex flex-col gap-2">
-              <label for="notes" class="text-sm font-medium text-ink-900">Notes</label>
+              <label for="notes" class="text-sm font-medium text-ink-700">Notes</label>
               <textarea
                 id="notes"
                 v-model="form.notes"

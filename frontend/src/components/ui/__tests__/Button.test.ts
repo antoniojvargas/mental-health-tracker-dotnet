@@ -38,7 +38,9 @@ describe('Button', () => {
     it('es primary por defecto, la acción principal de la pantalla', () => {
       // Una vista con dos botones primary no tiene un principal, y es un fallo
       // que se cuela hasta la revisión de diseño.
-      expect(render().classes()).toContain('bg-clearsky-600')
+      // `clearsky-700` y no 600: es el tono con el que el texto `paper-50`
+      // llega a 4.5:1, el mínimo AA para texto normal.
+      expect(render().classes()).toContain('bg-clearsky-700')
     })
 
     it('subtle lleva caja propia, para una acción secundaria con peso', () => {

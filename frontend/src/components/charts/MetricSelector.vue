@@ -14,6 +14,12 @@ import { METRICS } from './metrics'
  * están dentro siguen activos para poder quitarlos. `aria-pressed` refleja el
  * estado, de modo que un lector de pantalla lo anuncia como botón de
  * alternancia.
+ *
+ * El chip activo se rellena con `ink-700` y no con el color de la métrica: los
+ * colores de `METRICS` están pensados para trazos de gráfica, y su luminosidad
+ * media deja el texto por debajo de 4.5:1 tanto en claro como en oscuro. La
+ * correspondencia con la serie la sigue dando el punto, que conserva el color
+ * real. Así leyenda y contraste no se pelean.
  */
 
 /** Series que admite la gráfica a la vez. */
@@ -57,15 +63,14 @@ function toggle(key: string): void {
       class="flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-40"
       :class="
         selected.has(metric.key)
-          ? 'border-transparent text-paper-50'
+          ? 'border-transparent bg-ink-700 text-paper-50'
           : 'border-ink-100 bg-paper-50 text-ink-500 hover:bg-paper-100'
       "
-      :style="selected.has(metric.key) ? { backgroundColor: metric.color } : undefined"
       @click="toggle(metric.key)"
     >
       <span
         class="h-2 w-2 rounded-full"
-        :style="{ backgroundColor: selected.has(metric.key) ? 'white' : metric.color }"
+        :style="{ backgroundColor: metric.color }"
         aria-hidden="true"
       />
       {{ metric.label }}

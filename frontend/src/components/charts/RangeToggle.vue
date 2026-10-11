@@ -36,7 +36,7 @@ const emit = defineEmits<{
       :class="
         modelValue === range.value
           ? 'bg-paper-50 text-ink-700 shadow-sm'
-          : 'text-ink-400 hover:text-ink-600'
+          : 'text-ink-500 hover:text-ink-700'
       "
       @click="emit('update:modelValue', range.value)"
     >

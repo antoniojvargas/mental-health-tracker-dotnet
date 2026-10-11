@@ -148,6 +148,7 @@ async function handleLogout(): Promise<void> {
 
       <section
         aria-labelledby="trends-heading"
+        :aria-busy="logsStore.loading"
         class="animate-fade-in rounded-2xl border border-ink-100 bg-paper-50 p-6"
       >
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -155,9 +156,17 @@ async function handleLogout(): Promise<void> {
           <RangeToggle v-model="range" />
         </div>
         <MetricSelector v-model="metrics" />
+        <!--
+          Región viva para el estado de carga. El `Skeleton` es decoración
+          (`aria-hidden`), así que sin este anuncio quien no ve la pantalla no
+          recibe ninguna señal de que los datos están en camino.
+        -->
+        <p class="sr-only" role="status">
+          {{ logsStore.loading ? 'Loading your trends…' : '' }}
+        </p>
         <div class="mt-4">
           <Skeleton v-if="logsStore.loading" class="h-72 w-full" />
-          <p v-else-if="logsStore.error" class="py-8 text-center text-sm text-ink-400">
+          <p v-else-if="logsStore.error" role="alert" class="py-8 text-center text-sm text-ink-400">
             {{ logsStore.error }}
           </p>
           <TrendChart v-else :logs="logsStore.logs" :metric-keys="metrics" />

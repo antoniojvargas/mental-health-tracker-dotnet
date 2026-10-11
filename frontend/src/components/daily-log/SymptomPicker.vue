@@ -81,6 +81,39 @@ function setSeverity(key: string, severity: number) {
   )
   emit('update:modelValue', next)
 }
+
+/**
+ * Navegación por flechas del radiogroup de severidad. Sin esto, cada botón es un
+ * `role="radio"` al que solo se llega con `Tab` y la flecha no hace nada: un
+ * radiogroup de teclado se recorre con flechas, y esa es justo la expectativa
+ * que el rol promete. El foco sigue a la selección, igual que en `MoodScale`.
+ */
+function onSeverityKeydown(sym: SymptomEntry, event: KeyboardEvent) {
+  if (props.disabled) return
+  let next: number
+  switch (event.key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+      next = Math.min(5, sym.severity + 1)
+      break
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      next = Math.max(1, sym.severity - 1)
+      break
+    case 'Home':
+      next = 1
+      break
+    case 'End':
+      next = 5
+      break
+    default:
+      return
+  }
+  event.preventDefault()
+  setSeverity(sym.key, next)
+  const group = (event.currentTarget as HTMLElement | null)?.closest('[role="radiogroup"]')
+  group?.querySelectorAll<HTMLButtonElement>('button[role="radio"]')[next - 1]?.focus()
+}
 </script>
 
 <template>
@@ -89,7 +122,7 @@ function setSeverity(key: string, severity: number) {
     :aria-label="ariaLabel"
     :disabled="disabled"
   >
-    <legend class="px-1 text-sm font-medium text-ink-900">{{ ariaLabel }}</legend>
+    <legend class="px-1 text-sm font-medium text-ink-700">{{ ariaLabel }}</legend>
 
     <div class="flex flex-col gap-3">
       <div
@@ -106,7 +139,7 @@ function setSeverity(key: string, severity: number) {
             class="h-4 w-4 cursor-pointer accent-clearsky-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500 disabled:cursor-not-allowed disabled:opacity-60"
             @change="toggle(sym.key)"
           />
-          <span class="text-sm text-ink-900">{{ sym.label }}</span>
+          <span class="text-sm text-ink-700">{{ sym.label }}</span>
         </label>
 
         <div v-if="sym.active" class="flex items-center gap-3 pl-7 sm:pl-0">
@@ -115,6 +148,7 @@ function setSeverity(key: string, severity: number) {
             class="flex items-center gap-1"
             role="radiogroup"
             :aria-label="`${sym.label} severity`"
+            @keydown="onSeverityKeydown(sym, $event)"
           >
             <button
               v-for="n in 5"

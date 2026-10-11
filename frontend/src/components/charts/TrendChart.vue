@@ -69,6 +69,17 @@ const props = defineProps<{
 
 const metrics = computed(() => props.metricKeys.map(getMetric))
 
+/**
+ * Nombre accesible del gráfico. Un `<canvas>` no tiene texto alternativo propio:
+ * sin esto, un lector de pantalla no anuncia nada o anuncia "canvas". Se nombra
+ * con las series visibles y el número de días para que la imagen tenga un
+ * resumen útil sin volcar toda la tabla de datos.
+ */
+const chartLabel = computed(() => {
+  const names = metrics.value.map((metric) => metric.label).join(', ')
+  return names ? `Trend chart. Series: ${names}. ${props.logs.length} days shown.` : 'Trend chart'
+})
+
 const chartData = computed<ChartData<'line'>>(() => ({
   labels: props.logs.map((log) => log.logDate),
   datasets: metrics.value.map((metric) => ({
@@ -157,7 +168,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
     <p class="text-sm text-ink-400">Your first entry starts the story.</p>
   </div>
 
-  <div v-else class="h-72">
+  <div v-else class="h-72" role="img" :aria-label="chartLabel">
     <Line :data="chartData" :options="chartOptions" />
   </div>
 </template>

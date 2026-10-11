@@ -60,7 +60,7 @@ function onInput(e: Event) {
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label :for="inputId" class="text-sm font-medium text-ink-900">
+      <label :for="inputId" class="text-sm font-medium text-ink-700">
         {{ label }}
       </label>
       <output
