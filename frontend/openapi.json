@@ -2,10 +2,22 @@
   "openapi": "3.0.4",
   "info": {
     "title": "Mental Health Tracker API",
-    "description": "API del Mental Health Tracker: autenticación y registro diario del bienestar.",
+    "description": "Mental Health Tracker API: authentication and daily wellbeing logging.",
     "version": "v1"
   },
   "paths": {
+    "/api/auth/google": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "302": {
+            "description": "Found"
+          }
+        }
+      }
+    },
     "/api/auth/google/callback": {
       "get": {
         "tags": [
@@ -1124,7 +1136,7 @@
     "securitySchemes": {
       "access_token": {
         "type": "apiKey",
-        "description": "Cookie de sesión emitida tras iniciar sesión con Google.",
+        "description": "Session cookie issued after signing in with Google.",
         "name": "access_token",
         "in": "cookie"
       }

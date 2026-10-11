@@ -4,6 +4,12 @@ Mental Health Tracker es una aplicación diseñada para que pacientes registren 
 
 Con base en esos registros, la aplicación genera tendencias semanales y mensuales que permiten al paciente (y a su profesional de la salud) visualizar la evolución de su estado a lo largo del tiempo. Las tendencias se presentan de forma clara e intuitiva, facilitando la detección de patrones y el acompañamiento en el proceso terapéutico.
 
+## Capturas
+
+| Inicio de sesión | Panel con tendencias | Registro diario |
+| --- | --- | --- |
+| ![Pantalla de inicio de sesión con el botón «Continue with Google»](docs/screenshots/login.png) | ![Panel con saludo diario y gráficas de tendencias](docs/screenshots/dashboard.png) | ![Modal de registro diario con escalas de ánimo, ansiedad y sueño](docs/screenshots/daily-log-modal.png) |
+
 ## Stack
 
 | Tecnología   | Versión       | Uso                              |
@@ -99,6 +105,67 @@ docker compose --env-file .env.production -f docker-compose.prod.yml down
 # Elimina también el volumen de Postgres.
 docker compose --env-file .env.production -f docker-compose.prod.yml down -v
 ```
+
+## Variables de entorno
+
+El backend se configura con el *configuration provider* de .NET: cada clave usa `:` como separador y, como variable de entorno, se escribe con `__` (doble guion bajo), de modo que `GoogleOAuth__ClientId` define `GoogleOAuth:ClientId`. Los **secretos** pueden darse en claro o por archivo con la variante `*_FILE`: `SecretFileConfigurationProvider` lee `JWT_SECRET_FILE`, `GOOGLE_CLIENT_SECRET_FILE` y `Database__ConnectionString_FILE` y los mapea a `Jwt:Secret`, `GoogleOAuth:ClientSecret` y `Database:ConnectionString`. Esa variante **solo** existe para esas tres claves del backend (más `POSTGRES_PASSWORD_FILE`, que la propia imagen de Postgres soporta): ninguna otra variable acepta `*_FILE`. Fíjate en la asimetría de nombres: dos usan el nombre corto (`JWT_SECRET_FILE`, `GOOGLE_CLIENT_SECRET_FILE`) y una el formato `__` (`Database__ConnectionString_FILE`); el equivalente nativo `Jwt__Secret_FILE` **no** funciona. Los secretos pueden darse también con el nombre nativo (`Jwt__Secret`, `GoogleOAuth__ClientSecret`), que el provider de .NET lee directamente.
+
+Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:Secret`, `GoogleOAuth:ClientId`, `GoogleOAuth:ClientSecret`, `GoogleOAuth:RedirectUri`, `AppUrls:FrontendUrl`) se validan al arrancar con `ValidateOnStart`: si falta alguna, el proceso falla antes de atender la primera petición.
+
+| Variable | Dónde se usa | Obligatoria | Acepta `*_FILE` | Ejemplo / valor por defecto |
+| --- | --- | --- | --- | --- |
+| `Database__ConnectionString` | Backend · `Database:ConnectionString` — EF Core, healthcheck (`SELECT 1`) y migraciones | Sí | Sí (`Database__ConnectionString_FILE`) | `Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=…` |
+| `JWT_SECRET` | Backend · `Jwt:Secret` — firma y verificación del JWT (≥ 16 caracteres) | Sí | Sí (`JWT_SECRET_FILE`) | valor aleatorio (`openssl rand -base64 48`) |
+| `Jwt__ExpiresInDays` | Backend · `Jwt:ExpiresInDays` — caducidad de la cookie de sesión | No | No | `7` |
+| `GoogleOAuth__ClientId` | Backend · `GoogleOAuth:ClientId` — flujo OAuth con Google | Sí | No | `xxxxx.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | Backend · `GoogleOAuth:ClientSecret` — intercambio de tokens con Google | Sí | Sí (`GOOGLE_CLIENT_SECRET_FILE`) | secreto de Google Cloud Console |
+| `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/auth/callback` |
+| `AppUrls__FrontendUrl` | Backend · `AppUrls:FrontendUrl` — política CORS y redirecciones al frontend | Sí | No | `http://localhost:5173` |
+| `LOG_LEVEL` | Backend · nivel mínimo de Serilog (`Verbose`…`Fatal`) | No | No | `Information` |
+| `ASPNETCORE_ENVIRONMENT` | Backend · entorno del host (`Development`/`Testing`/`Production`) — habilita Swagger y `POST /api/auth/test-login` | No | No | `Development` (dev) · `Production` (prod) |
+| `ASPNETCORE_URLS` | Backend · direcciones de escucha de Kestrel | No | No | `http://+:3000` (imagen) |
+| `PORT` | — **no consumida** (la imagen fija `ASPNETCORE_URLS`; residuo de la plantilla) | No | No | — |
+| `ConnectionStrings__Default` | — **no consumida** por la app (residuo de la plantilla, presente en `.env.example`) | No | No | — |
+| `VITE_PROXY_TARGET` | Frontend · Vite dev server — destino del proxy `/api` y `/hub` | No | No | `http://localhost:3000` (host) · `http://backend:3000` (Compose) |
+| `POSTGRES_USER` | Contenedor Postgres · usuario de la base de datos | No | No | `postgres` |
+| `POSTGRES_PASSWORD` | Contenedor Postgres · password de la base de datos | No | Sí (`POSTGRES_PASSWORD_FILE`) | `postgres` (dev) · secreto (prod) |
+| `POSTGRES_DB` | Contenedor Postgres · nombre de la base de datos | No | No | `mentalhealthtracker` |
+| `POSTGRES_PORT` | — **no consumida** (el compose publica `5432` fijo) | No | No | — |
+| `HTTP_PORT` | Compose de producción · puerto público del frontend en el host | No | No | `8080` |
+| `GOOGLE_CLIENT_ID` | Compose de producción · se inyecta al backend como `GoogleOAuth__ClientId` | Sí (prod) | No | `xxxxx.apps.googleusercontent.com` |
+| `GOOGLE_REDIRECT_URI` | Compose de producción · se inyecta como `GoogleOAuth__RedirectUri` | No | No | `http://localhost:8080/auth/callback` |
+| `FRONTEND_URL` | Compose de producción · se inyecta como `AppUrls__FrontendUrl` | No | No | `http://localhost:8080` |
+
+Las plantillas `.env.example` (desarrollo/E2E) y `.env.production.example` (producción) traen estos valores prellenados; el detalle de los secretos y cómo generarlos está en [`secrets/README.md`](secrets/README.md).
+
+## Comandos útiles
+
+### Backend
+
+Los comandos se ejecutan desde la raíz del repositorio. `dotnet ef` requiere la herramienta instalada (`dotnet tool install --global dotnet-ef`); el manifiesto del repo solo fija `reportgenerator`.
+
+| Comando | Qué hace |
+| --- | --- |
+| `dotnet run --project backend/MentalHealthTracker.Api` | Arranca la API en local (requiere Postgres en `Database:ConnectionString`). |
+| `dotnet run --project backend/MentalHealthTracker.Api --no-launch-profile -- --seed` | Aplica las migraciones y carga el usuario demo con 60 días de registros. Equivale a `make seed`. |
+| `dotnet ef migrations add <Nombre> --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Crea una migración nueva en `Infrastructure/Persistence/Migrations`. |
+| `dotnet ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
+| `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
+| `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`). |
+| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 70 %. |
+
+### Frontend
+
+Los comandos se ejecutan dentro de `frontend/`.
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run dev` | Levanta el dev server de Vite en `http://localhost:5173` con HMR. |
+| `npm run build` | Comprueba los tipos (`vue-tsc -b`) y genera el bundle de producción. |
+| `npm run test:unit` | Ejecuta las pruebas unitarias con Vitest (una pasada, sin navegador). |
+| `npm run test:unit:coverage` | Igual que la anterior, con informe de cobertura. |
+| `npm run lint` | Verifica el código con ESLint (`npm run lint:fix` para aplicar los arreglos). |
+| `npm run format` | Comprueba el formato con Prettier (`npm run format:fix` para reescribirlo). |
 
 ## Testing
 

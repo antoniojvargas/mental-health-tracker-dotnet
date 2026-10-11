@@ -396,3 +396,511 @@ base y mantener encima una capa fina a mano solo para lo que el documento no pue
 expresar —los rangos de validación, la regla de `[]`, el formato de `createdAt`—, que es
 justo la parte que hoy está en `daily-log.ts`. Hasta entonces, regenerar y mirar el diff es
 la forma barata de detectar que un DTO del backend se movió.
+
+## Decisiones de datos
+
+La tabla `daily_logs` usa tipos relacionales para lo que tiene estructura (FK a `users`,
+`date`, `timestamp with time zone`) y tres decisiones de almacenamiento deliberadas para el
+resto: `symptoms` como `jsonb`, las escalas numéricas como `smallint` con el rango validado
+en la aplicación, y los campos categóricos como `text` / `text[]` con el conjunto cerrado en
+el modelo de la aplicación. No son los tipos que EF Core elegiría por defecto; son elecciones
+de alcance que se justifican abajo.
+
+### `symptoms` como `jsonb` y no una tabla hija normalizada
+
+`symptoms` guarda una lista de `Symptom(Type, Severity)` serializada como JSON en una columna
+`jsonb` del propio log. La alternativa relacional sería una tabla hija
+`daily_log_symptoms(log_id, type, severity)` con FK a `daily_logs`.
+
+**Motivos**
+
+1. **Se lee y se escribe siempre completo, junto al log.** Tanto el `POST /api/logs` (que
+   envía el registro entero) como el `GET /api/logs` (que lo devuelve entero) tratan los
+   síntomas como parte indivisible del log. Nunca hay un caso de uso que actualice un síntoma
+   aislado.
+2. **Nunca se consulta por un síntoma suelto.** No existe una consulta del tipo "logs de
+   usuarios con el síntoma X" ni un filtro por síntoma. Las tendencias y agregados iteran la
+   lista en memoria una vez traído el rango de logs, no agregan por síntoma en la base. Sin
+   esa consulta, la tabla hija no aporta nada.
+3. **La tabla hija costaría más de lo que ahorra.** Añadiría un `join`, una segunda entidad
+   con su configuración EF, reglas de cascada y un orden que hoy no existe, y obligaría a
+   partir el `ON CONFLICT ... DO UPDATE` de una sola fila (`DailyLogRepository.UpsertAsync`)
+   en varias sentencias dentro de una transacción.
+4. **El formato queda flexible sin migración de esquema.** Agregar un miembro a `SymptomType`
+   es un cambio de enum en C#, no una migración: el conjunto de valores válidos vive en el
+   código, no en el esquema.
+
+**Implicaciones técnicas**
+
+- La columna es opaca para SQL: no se puede indexar ni filtrar por síntoma sin índices de
+  expresión. Es aceptable porque no existe tal consulta.
+- La serialización usa `JsonListConverter` con política `snake_case`, la misma del contrato
+  HTTP; lo almacenado y lo que viaja por el cable coinciden.
+- Se registra un `ValueComparer` (`ListComparer<T>`) para que EF Core detecte cambios en la
+  lista y no considere que es la misma referencia.
+- No hay validación de forma a nivel de esquema: el rango de `Severity` (1-5) lo valida
+  `CreateDailyLogValidator` y los `SymptomType` fuera del conjunto cerrado los rechaza el
+  `SnakeCaseEnumJsonConverter` al deserializar.
+
+**Cuándo reconsiderar**: si apareciera una consulta real de "logs con el síntoma X" o un
+agregado de "síntoma más frecuente" que deba ejecutarse en la base (sobre todo con un corpus
+grande), una tabla hija con índice sobre `type` sería lo correcto.
+
+### Escalas numéricas como `smallint` con el rango validado en la aplicación
+
+Las escalas (`mood_rating`, `anxiety_level`, `stress_level`, `sleep_quality`) se almacenan
+como `smallint`, `activity_minutes` como `smallint` nullable, y `sleep_hours` como
+`numeric(3,1)`. Los rangos viven en `CreateDailyLogValidator` (mood 1-5, ansiedad/estrés 1-10,
+calidad de sueño 1-5, minutos de actividad 0-600, horas de sueño 0-24), **no** en
+restricciones `CHECK` del esquema.
+
+**Motivos**
+
+1. **Son un continuo, no un conjunto cerrado de etiquetas.** Estos valores se promedian y se
+   grafican en tendencias; `smallint` es el entero más angosto que cubre el dominio
+   (hasta 600) y evita la falsa precisión de `numeric` en un dato que es ordinal.
+2. **El rango vive en un solo lugar.** Una restricción `CHECK` obligaría a duplicar la regla
+   (validador + esquema) y a una migración cada vez que una escala cambie de rango. Con la
+   validación en la aplicación, la única fuente de verdad es el validador.
+3. **El error encaja con el contrato existente.** Validar en la aplicación produce el cuerpo
+   estructurado `VALIDATION_ERROR` con el detalle por campo que el frontend ya consume
+   (`details[].field`). Una `CHECK` fallida llegaría como `SQLSTATE 23514`, que el manejador
+   global tendría que traducir a mano.
+4. **`smallint` en lugar de `int`** es fiel al dominio (2 bytes frente a 4) y documenta que
+   el valor es de rango pequeño; no implican una ganancia de espacio relevante, pero evitan
+   un `int` que sugeriría un rango que no existe.
+
+**Implicaciones técnicas**
+
+- La base aceptará cualquier `smallint`; el único guardia es la aplicación. Quien escriba
+  directo (psql, una migración, o un bug que salte el validador) puede dejar valores fuera de
+  rango. Se acepta porque el repositorio es el único escritor y siempre pasa por la API.
+- La regla queda verificada por pruebas de validación, no por el motor de base de datos. El
+  contrato observable es el mismo: la API nunca persiste ni devuelve un valor fuera de rango
+  por la vía normal.
+
+**Cuándo reconsiderar**: si la integridad debe garantizarse con independencia de la
+aplicación (varios escritores, ETL, o un almacén de datos que consuma la tabla), añadir
+restricciones `CHECK` en el esquema.
+
+### Campos categóricos como `text` / `text[]` con el conjunto cerrado en la aplicación, no `ENUM` de Postgres
+
+`activity_type` y `social_frequency` son columnas `text`; `sleep_disturbances` es `text[]`.
+Los valores son cadenas `snake_case` (`walking`, `frequent`, `insomnia`, …) que produce y
+consume el enum de C# correspondiente (`ActivityType`, `SocialFrequency`, `SleepDisturbance`)
+a través de `EnumSnakeCaseConverter` / `EnumListToStringArrayConverter`. El conjunto cerrado
+de valores válidos **no** está en el esquema, sino en el modelo de la aplicación: el DTO
+tipa el campo con el enum, y el `SnakeCaseEnumJsonConverter` rechaza cualquier cadena fuera
+del conjunto al deserializar (400), antes de llegar al repositorio.
+
+**Motivos**
+
+1. **Agregar un valor es un cambio de código, no una migración.** Hoy sumar un miembro a
+   `ActivityType` es una línea en el enum. Con un `ENUM` de Postgres sería un
+   `ALTER TYPE ... ADD VALUE`, es decir una migración de esquema para un concepto de producto
+   que cambia al ritmo de la app, no al de la base.
+2. **`ENUM` de Postgres es costoso de evolucionar.** Añadir un valor tiene restricciones
+   transaccionales y de bloqueo (históricamente no podía ejecutarse dentro de un bloque de
+   transacción) y quitar o renombrar un valor obliga a recrear el tipo. El vocabulario de
+   síntomas y actividades es justamente el que más se va a mover.
+3. **Una sola fuente de verdad para el conjunto cerrado.** El valor persistido debe coincidir
+   con el que viaja por el cable (`snake_case`). Con `text` + enum en código, la lista vive en
+   el enum de C# y su converter; con un `ENUM` de Postgres, la lista la posee la base y el
+   código pasa a reflejarla. Se prefiere que el contrato lo dicte el dominio.
+4. **Sin acoplamiento ni orden innecesario.** Una columna `text` mapea limpio con Npgsql sin
+   configuración de tipos; un `ENUM` de Postgres impone además un orden de comparación que
+   nadie necesita, porque estos campos no se filtran ni se ordenan por valor.
+
+**Implicaciones técnicas**
+
+- La columna admite cualquier cadena a nivel de motor; el guardia es el enum tipado en el
+  modelo. Se acepta por la misma razón que en las escalas: el repositorio es el único escritor.
+- Renombrar un miembro del enum en código **sí** requiere tratar las cadenas `snake_case`
+  persistidas como vocabulario apéndice: son la clave almacenada, así que un rename sin
+  migración de datos deja huérfanas las filas antiguas.
+- No hay integridad referencial ni validación de esquema para estos valores; tampoco índices,
+  porque no se consultan.
+
+**Cuándo reconsiderar**: si alguno de estos campos dejara de ser un vocabulario fijo y pasara
+a ser una entidad de primera clase (por ejemplo, actividades definidas por el usuario), lo
+correcto sería una tabla propia con FK, no un `ENUM` de Postgres.
+
+## Flujo de autenticación con Google (OAuth 2.0 + OpenID Connect)
+
+El login se resuelve con el flujo *authorization code* de OAuth 2.0, con `openid` en el scope
+para obtener un `id_token` conforme a OpenID Connect. La lógica vive en
+`Modules/Auth/AuthController` (inicio y callback), `GoogleOAuthClient` (intercambio y lectura
+del `id_token`) y `UserRepository` (identidad del usuario). Esta sección describe el recorrido
+paso a paso; el *por qué* de la cookie de sesión y de la ausencia de CSRF explícito está en
+"Sesión: JWT en cookie `httpOnly`" y "CSRF y SameSite=Lax", arriba.
+
+### Recorrido paso a paso
+
+| Paso | Quién actúa | Qué ocurre |
+| ---- | ----------- | ---------- |
+| 1 | Navegador | El usuario pulsa "Continue with Google", un `<a href="/api/auth/google">` (navegación de página entera, no `fetch`, para que el backend pueda fijar cookies). |
+| 2 | Frontend → Backend | `GET /api/auth/google` (`AuthController.GoogleLogin`). |
+| 3 | Backend | Genera un `state` aleatorio y fija la cookie `oauth_state`; responde `302` al endpoint de autorización de Google con ese `state`. |
+| 4 | Google | Muestra la pantalla de consentimiento y redirige al `redirect_uri` con `code` y `state`. |
+| 5 | Google → Backend | `GET /api/auth/google/callback?code=…&state=…` (`AuthController.GoogleCallback`). |
+| 6 | Backend | Borra la cookie `oauth_state` y valida `state` contra ella. Si no cuadra, redirige a `/login?error=auth_failed` (login CSRF). |
+| 7 | Backend → Google | Intercambio **servidor-a-servidor** del `code` por tokens en el endpoint de token. |
+| 8 | Backend | Valida el `id_token` recibido (firma, expiración y audiencia). |
+| 9 | Backend | Upsert del usuario por `sub` (`UserRepository.UpsertByGoogleIdAsync`). |
+| 10 | Backend | Firma el JWT y lo envía en la cookie de sesión `access_token`; responde `302` a `${FrontendUrl}/dashboard`. |
+
+Cualquier excepción entre el paso 6 y el 10 se registra y se traduce en el mismo redirect a
+`/login?error=auth_failed`: al navegador nunca le llega el detalle interno (mensajes de Google,
+excepciones de validación) ni un `500` en el cuerpo.
+
+### Paso 2–3: inicio del flujo y cookie `state`
+
+`GoogleLogin` no confía en ningún dato del navegador: **inventa** el `state` con
+`RandomNumberGenerator.Fill` sobre 32 bytes codificados con `WebEncoders.Base64UrlEncode` (no
+`Random`, que no es apto para secretos). Después:
+
+- Fija la cookie `oauth_state` con las mismas opciones centralizadas (`HttpOnly`,
+  `SameSite=Lax`, `Path=/`, `Secure` solo en `Production`) más `Max-Age=10 min`: el `state` no
+  es una credencial de sesión, así que caduca rápido y no se espera que sobreviva a la visita.
+- Redirige a `GoogleOAuthClient.BuildAuthUrl(state)`, que arma la URL de autorización
+  (`accounts.google.com/o/oauth2/v2/auth`) con `response_type=code`, `scope=openid email profile`,
+  `access_type=online` y `prompt=select_account`.
+
+El `state` viaja por dos canales: en la query hacia Google y en la cookie `httpOnly`. Solo el
+segundo lo controla el servidor; el primero pasa por el navegador de terceros.
+
+### Paso 6: consumo de la cookie y anti-CSRF
+
+El callback borra `oauth_state` **antes** de validar (`Response.Cookies.Delete`): la cookie es
+de un solo uso, así que un `state` filtrado no puede reutilizarse. La comparación
+(`StateMatches`) exige que exista la cookie y que `state` tenga la misma longitud, y luego usa
+`CryptographicOperations.FixedTimeEquals` para no filtrar por *timing* cuántos caracteres
+coinciden. Si algo falla se redirige a `/login?error=auth_failed`. Esto es lo que neutraliza
+el *login CSRF* (que un atacante inserte su propio `code` en la sesión de la víctima), ya que
+Google no envía la cookie `oauth_state`: sin la cookie que fijó el propio backend, no hay
+forma de que el `state` de vuelta coincida.
+
+### Paso 7: intercambio servidor-a-servidor del `code`
+
+`GoogleOAuthClient.ExchangeCodeAsync` hace un `POST` a
+`https://oauth2.googleapis.com/token` (`application/x-www-form-urlencoded`) con:
+
+| Parámetro       | Origen              |
+| --------------- | ------------------- |
+| `code`          | query del callback  |
+| `client_id`     | `GoogleOAuth:ClientId` |
+| `client_secret` | `GoogleOAuth:ClientSecret` |
+| `redirect_uri`  | `GoogleOAuth:RedirectUri` |
+| `grant_type`    | literal `authorization_code` |
+
+Dos propiedades son importantes: el **`client_secret` no abandona el backend** (solo aparece
+en esta llamada saliente), y el **`code` se vuelve a pasar tal cual**; su validez la determina
+Google, no el backend. Un fallo de la llamada (`EnsureSuccessStatusCode`) o una respuesta sin
+`id_token` lanzan y terminan en el redirect de error.
+
+### Paso 8: validación del `id_token`
+
+El token endpoint devuelve un `id_token` (JWT firmado por Google). El backend lo valida con
+`GoogleJsonWebSignature.ValidateAsync` y `ValidationSettings` con **`Audience = [ClientId]`**:
+eso comprueba la firma contra las claves públicas de Google, la expiración y que el token
+estuviera dirigido a *esta* aplicación (si no, un `id_token` emitido para otra app serviría para
+suplantar). Tras validar, exige un `sub` no vacío (`UnauthorizedException` si falta) y mapea el
+payload a `GoogleProfile(Subject, Email, Name, Picture)`. El `sub` es el identificador estable
+del usuario en Google; el `email` y el `name` son atributos mutables del perfil.
+
+### Paso 9: upsert por `sub`
+
+`UserRepository.UpsertByGoogleIdAsync` busca al usuario **por `GoogleId` (= `sub`)** y, si no
+existe, lo crea; en cualquier caso sobrescribe `Email`, `Name`, `AvatarUrl` y `UpdatedAt`. Se
+elige `sub` y no `email` como clave de identidad porque el email de una cuenta de Google puede
+cambiar (el usuario lo edita en su cuenta) mientras que el `sub` es inmutable. `google_id` y
+`email` tienen índices únicos en `users`; el upsert es idempotente sobre `google_id`, así que
+un segundo login del mismo usuario devuelve la misma fila en vez de duplicarla.
+
+### Paso 10: emisión de la sesión
+
+Con el `Id` del usuario, `JwtService.Sign` firma un JWT `HS256` (claims `sub` = `userId`, `email`,
+`iat`, `exp` a 7 días) y `GoogleCallback` lo envía en la cookie `access_token` (`HttpOnly`,
+`SameSite=Lax`, `Max-Age` de 7 días) antes de redirigir a `/dashboard`. A partir de ahí la
+cookie es la única credencial: la usan por igual la API HTTP (vía `RequireAuthMiddleware`) y el
+hub SignalR (ver "Canal de tiempo real"), y `POST /api/auth/logout` la borra en el cliente sin
+estado en el servidor.
+
+### Notas de borde
+
+- **Rate limiting**: el callback es el único endpoint sin sesión que provoca una llamada
+  externa y un upsert, así que está limitado a 20 req/15 min por IP (política `auth`). El
+  endpoint de inicio `GET /api/auth/google` no hace trabajo externo ni de base de datos, así
+  que no se limita.
+- **Modo demo/e2e**: en el entorno `Testing` se registra `POST /api/auth/test-login`, que
+  replica el tramo final del flujo (mismo upsert por `sub` derivado del email y misma cookie de
+  sesión) para que los e2e entren autenticados sin pasar por Google.
+
+## Observabilidad
+
+El backend no tiene un stack de métricas/tracing distribuido: se observa con **logs
+estructurados de Serilog** y una **correlación por request**. Esta sección cubre las dos piezas
+que hacen esos logs útiles y seguros (el identificador de correlación y la redacción de
+credenciales) y la decisión de salud: por qué `/api/health` prueba la base de verdad.
+
+### Correlación por `X-Request-Id`
+
+`RequestIdMiddleware` (`RequestIdMiddleware.cs`) corre muy temprano en el pipeline, justo
+después del manejador global de excepciones y antes de seguridad, CORS, rate limiting y
+autenticación (`app.UseRequestId()` en `Program.cs`). Por cada petición:
+
+1. Lee la cabecera entrante `X-Request-Id`; si falta o viene vacía, genera una nueva con
+   `Guid.NewGuid().ToString("N")`.
+2. Escribe ese mismo valor en la cabecera de respuesta `X-Request-Id`.
+3. Empuja `RequestId` a `LogContext` de Serilog dentro de un `using`, de modo que quede
+   enriquecido en **todos** los eventos emitidos durante la petición y se limpie al terminar,
+   sin filtrarse a la siguiente.
+
+**Motivos**
+
+1. **Un identificador cose el rastro de una petición.** El cliente recibe en la respuesta el
+   mismo id que aparece en cada línea de log del backend, así que un reporte de error se puede
+   reducir a filtrar por `RequestId` en los logs.
+2. **El `RequestId` va en el output, no en el mensaje.** En Development el template de consola
+   incluye `[{RequestId}]`; en producción el `CompactJsonFormatter` lo emite como propiedad
+   estructurada (ver `SerilogConfigurationExtensions`), de modo que es consultable sin parsear
+   texto.
+3. **Aceptar el id del cliente es deliberado.** Permite que un proxy o el frontend propaguen su
+   propia correlación en lugar de que el backend imponga una. No se valida su formato ni se usa
+   para nada más que correlación: no es un secreto ni un dato de autorización.
+
+**Implicaciones técnicas**
+
+- La cabecera de respuesta se fija antes de invocar el resto del pipeline, así que acompaña
+  también a las respuestas de error (401, 429, 4xx/5xx) generadas más abajo.
+- No hay propagación saliente: el único llamado a un tercero es el intercambio OAuth con
+  Google, que no reenvía el `X-Request-Id`. Si se añadieran llamadas entre servicios, habría
+  que propagar la cabecera explícitamente para no cortar la traza.
+
+### Redacción de cookies y cabeceras de autorización
+
+`RedactSensitiveHeadersPolicy` (`Core/Configuration`) es un `IDestructuringPolicy` de Serilog
+registrado de forma global (`Destructure.With(...)` en `SerilogConfigurationExtensions`). Cuando
+un evento destructure un diccionario de cabeceras —`IDictionary<string, StringValues>`, que es
+exactamente el tipo de `HttpContext.Request.Headers` y `Response.Headers`— la política lo
+reconstruye con un `StructureValue` donde `Cookie`, `Set-Cookie` y `Authorization` se sustituyen
+por `[REDACTED]`; el resto de cabeceras viaja tal cual. La comparación de nombres es
+*case-insensitive*, así que `cookie` y `Cookie` se tratan igual.
+
+**Motivos**
+
+1. **Esas tres cabeceras son credenciales.** La cookie `access_token` es la sesión entera y
+   `Authorization` puede llevar un bearer token; registrarlos en claro deja un secreto
+   persistido en los logs, que suelen ser el artefacto más copiado, agregado y compartido del
+   sistema.
+2. **La redacción vive en la frontera de logging, no en cada llamada.** Al aplicarse como
+   política de Serilog, cualquier `logger.Information("... {@Headers}", headers)` queda
+   redactado sin que el sitio de llamada tenga que acordarse. Es una garantía por defecto, no
+   una convención.
+3. **El test lo fija como contrato.** `SensitiveHeadersTests` afirma que incluso a nivel
+   `Debug` los valores de `Cookie` y `Authorization` nunca aparecen en la salida y que sí
+   aparece `[REDACTED]`.
+
+**Limitación**: la redacción depende de que el valor se destructure como ese diccionario. Un
+sitio que ya haya formateado las cabeceras a string (p. ej. `headers.ToString()`) y lo registre
+como texto plano no pasa por la política; por eso la convención es registrar el diccionario con
+`{@Headers}`, nunca su representación textual.
+
+### `GET /api/health` consulta la base (`SELECT 1`), no devuelve un literal
+
+El endpoint de salud (`Program.cs`) abre una conexión real con `NpgsqlConnection`, ejecuta
+`SELECT 1` y responde `200 {"status":"ok","uptime":…}` solo si la consulta tiene éxito. Si falla,
+registra la excepción y responde `503 {"status":"error","db":"unreachable"}`. No está decorado
+con `[RequireAuth]`: los orquestadores lo consultan sin sesión.
+
+**Motivos**
+
+1. **Un `200` constante enmascara caídas de la base.** El healthcheck no es para el usuario sino
+   para el orquestador (el `healthcheck` de Docker Compose, `curl`/`wget` contra `/api/health`
+   en desarrollo y producción): si siempre devolviera `ok`, un contenedor con la base caída
+   seguiría marcado como *healthy*, no se reiniciaría, no habría alerta y los clientes fallarían
+   más tarde con errores confusos. Solo una consulta real refleja la disponibilidad real.
+2. **La disponibilidad que importa es la del sistema completo, no la del proceso.** La API no
+   sirve para nada sin Postgres; llamar sano a un proceso que no puede leer ni escribir datos
+   sería una definición falsa de salud.
+3. **`uptime` es informativo, no la señal.** Se incluye para diagnóstico humano; la señal
+   automática es el código de estado.
+
+**Implicaciones técnicas**
+
+- El endpoint hereda la dependencia del pool de Postgres: una base lenta lo hace lento. No hay
+  timeout propio más allá de los defaults de Npgsql.
+- No filtra detalle de infraestructura al cliente: la excepción va al log y la respuesta es un
+  literal genérico.
+
+**Cuándo reconsiderar**: si se necesitara separar *liveness* de *readiness* (un reinicio del
+proceso no debería dispararse por una base momentáneamente caída), lo correcto es dividir en
+`/live` —el proceso responde— y `/ready` —la base responde—, y apuntar cada sonda al endpoint
+que le corresponde.
+
+## Límites conocidos de alcance
+
+Tres límites del sistema son **decisiones conscientes de alcance**, no deuda accidental: se
+aceptan hoy porque el despliegue es de **una sola instancia** y cada uno tiene ya identificada
+su mitigación. Se listan juntos para que quede claro que comparten la misma causa y que se
+revocan con dos piezas de infraestructura (Redis y un job de migración), no con cambios de
+diseño de la aplicación.
+
+| Límite | Qué pasa hoy | Cuándo se rompe | Mitigación identificada |
+| ------ | ------------ | --------------- | ----------------------- |
+| SignalR sin backplane | El estado de grupos (`user:{userId}`) y conexiones vive en la memoria de cada instancia | Varias réplicas: el evento de una escritura procesada por la instancia B no llega a un usuario conectado a la A | Backplane de SignalR (Redis o Azure SignalR Service), registrado en `AddSignalR()` |
+| Rate limiting en memoria | Los contadores de `FixedWindowRateLimiter` viven en la memoria de la instancia | Varias réplicas: cada una cuenta por separado y el límite deja de ser una garantía global | Contadores distribuidos en Redis (`INCR`/`EXPIRE`), la misma pieza que el backplane de SignalR |
+| Migraciones al arrancar | La API aplica las migraciones con `DatabaseInitializer.MigrateAsync` antes de empezar a escuchar | Varias réplicas: varias instancias compiten por migrar el esquema a la vez | Job de migración separado, previo a escalar la API |
+
+### SignalR sin backplane
+
+Detalle completo en "Escalado horizontal del canal en tiempo real: señalada limitación, sin
+backplane (decisión de alcance)". En una sola réplica los grupos y el broadcast por conexión
+funcionan porque todo vive en la misma memoria; el estado real nunca se pierde, porque la falla
+es solo de *entrega inmediata* del evento y un refresco HTTP devuelve el dato persistido. El
+emisor (`ILogEventEmitter`) no conoce el transporte, así que introducir el backplane es un
+detalle de infraestructura que no toca el dominio.
+
+### Rate limiting en memoria
+
+Detalle completo en "Rate limiting en memoria: mismo backplane pendiente que SignalR (decisión
+de alcance)". Con una sola réplica el contador es local y exacto; con varias, el límite pasa de
+ser una garantía global a ser probabilístico. Es best-effort *por diseño*: mitiga abuso, no
+garantiza un SLA de consumo. Se trata como **la misma decisión** que el backplane de SignalR
+porque ambas se resuelven con la misma dependencia operativa: **Redis**. Se introducen juntas o
+no se introducen.
+
+### Migraciones aplicadas al arrancar
+
+`Program.cs` llama a `DatabaseInitializer.MigrateAsync` durante el arranque, antes de exponer
+tráfico, y **falla en firme** si no puede migrar; así la API nunca sirve peticiones contra un
+esquema desactualizado. Antes de migrar espera a que la base acepte conexiones con reintentos y
+backoff exponencial (`WaitForDatabaseAsync`: hasta 10 intentos, de 1 s a 10 s), para tolerar que
+el contenedor de la base esté reiniciándose cuando arranca la API.
+
+**Por qué se acepta hoy**: con una única instancia no hay competencia por el esquema, y migrar
+en el arranque es la forma más simple de garantizar "esquema al día antes de servir". También es
+lo que hace que el entorno de test sea autocontenido: `Program.cs` aplica las migraciones al
+iniciar, así que las pruebas de integración no las ejecutan por su cuenta.
+
+**Qué se rompe con varias réplicas**: cada instancia intentaría migrar el mismo esquema a la
+vez; EF Core usa bloqueos para serializar, pero se producen esperas, contención y, ante un fallo
+parcial, riesgo de quedar en un estado intermedio con varias instancias reintentando. El arranque
+de la aplicación queda además acoplado a la disponibilidad de la base.
+
+**Mitigación identificada**: sacar las migraciones de la API y correrlas como un **job de
+migración separado** antes de desplegar/escalar (un `docker compose run` o un job de
+Kubernetes/CI que termina antes de que el servicio reciba tráfico). La API arrancaría sin migrar
+y el despliegue garantizaría el esquema como paso previo. Es la evolución natural junto con
+Redis: ambos separan el estado operativo (esquema, grupos/contadores) del proceso de la API.
+
+## De Node/React a .NET/Vue
+
+Este proyecto es un cambio deliberado de stack: el mismo dominio (autenticación, registro
+diario, tiempo real) resuelto con el ecosistema .NET/Vue en lugar de Node/React. La tabla mapea
+concepto a concepto; después se detallan los tres cambios que **no** son una traducción literal
+sino un cambio de diseño: la inyección de dependencias del framework, la validación con
+FluentValidation en lugar de zod y los grupos de SignalR en lugar de las *rooms* de Socket.IO.
+
+### Tabla de equivalencias
+
+| Concepto | Node/React | .NET/Vue en este proyecto |
+| -------- | ---------- | ------------------------- |
+| Runtime | Node.js | .NET 9 |
+| Lenguaje | TypeScript | C# 13 (`Nullable` + `TreatWarningsAsErrors`) |
+| Framework HTTP | Fastify | ASP.NET Core (controllers + middleware) |
+| Composición / DI | plugins de Fastify o contenedor manual (tsyringe, awilix) | contenedor integrado, composition root en `Program.cs` |
+| Validación | zod (`.parse` dentro del handler) | FluentValidation + filtro de acción global |
+| Acceso a datos | TypeORM (entidades + repositorios) | EF Core + Npgsql (`IEntityTypeConfiguration` + repositorios) |
+| Base de datos | PostgreSQL | PostgreSQL (igual) |
+| Migraciones | scripts / migraciones de TypeORM | migraciones de EF Core aplicadas al arrancar |
+| Sesión y auth | `jsonwebtoken` + cookies | JWT HS256 propio + cookie `httpOnly` + `RequireAuthMiddleware` |
+| Tiempo real (servidor) | Socket.IO con *rooms* | SignalR con *groups* (+ `IHubContext`) |
+| Tiempo real (cliente) | `socket.io-client` | `@microsoft/signalr` |
+| Estado del front | Redux / Zustand / Context | Pinia |
+| Routing del front | React Router | Vue Router (con guard global) |
+| Cliente HTTP | `fetch` / axios | `fetch` envuelto en `api-client.ts` |
+| Estilos | Tailwind CSS | Tailwind CSS (igual) |
+| Build | Vite | Vite (igual) |
+| Tests backend | Jest + Supertest | xUnit + `WebApplicationFactory` + coverlet |
+| Tests frontend | Jest/Vitest + React Testing Library | Vitest + `@vue/test-utils` + jsdom |
+| Logging | pino / winston | Serilog (con redacción de credenciales) |
+| Documentación de API | swagger-jsdoc / zod-openapi | Swashbuckle (OpenAPI derivado de los controllers) |
+| Config y secretos | `dotenv` | `appsettings` + variables de entorno + `SecretFileConfiguration` |
+
+### Inyección de dependencias del framework
+
+**En Node** la composición suele ser explícita a mano (importar y pasar instancias) o delegada a
+un contenedor opcional (`tsyringe`, `awilix`) o a la encapsulación de plugins de Fastify; las
+dependencias se resuelven donde se declaran. **En .NET** el contenedor viene con el framework:
+todo el grafo se declara de forma centralizada en `Program.cs` con su *lifetime*
+(`AddScoped<IUserRepository, UserRepository>`, `AddSingleton<JwtService>`,
+`AddHttpClient<GoogleOAuthClient>()` como cliente tipado) y las clases reciben lo que necesitan
+por **constructor injection**.
+
+Lo que cambió en el diseño, más allá de la sintaxis:
+
+1. **La composición es un artefacto de primera clase.** El "wiring" no está repartido por los
+   módulos: hay un único lugar donde se ve qué implementa cada interfaz y con qué ciclo de vida.
+   Eso hace explícita la separación controller → service → repository, que se sostiene porque
+   cada capa recibe sus colaboradores inyectados y no los construye.
+2. **El ciclo de vida es parte del contrato.** `Scoped` ata una instancia al request (el
+   `AppDbContext`, los repositorios); `Singleton` guarda lo que no tiene estado por petición
+   (`JwtService`, `AuthCookieOptions`). Es una decisión que en Node normalmente se resuelve a
+   mano o no se explicita.
+3. **La validación de configuración arranca con la app.** `AddOptions<T>().ValidateOnStart()`
+   aborta el proceso si falta un secreto (JWT, Google OAuth, connection string), en vez de
+   fallar en la primera petición que lo use.
+4. **El grafo entero es sustituible en los tests.** `WebApplicationFactory` levanta el mismo
+   `Program` con configuración de test; el resto de los detalles (mirar
+   "Separación de capas") se apoya en esta composición.
+
+### FluentValidation en lugar de zod
+
+Con **zod** el patrón típico es declarar el esquema y llamar a `schema.parse(req.body)` dentro de
+cada handler. Aquí la validación es una **preocupación transversal**: `CreateDailyLogValidator`
+(una clase con reglas tipadas) se resuelve por DI y la ejecuta `FluentValidationActionFilter`
+como filtro global **antes** de que el controller se ejecute.
+
+Lo que cambió:
+
+1. **El controller no valida.** No hay una llamada a `parse` dentro del handler; el filtro corre
+   antes y, si algo falla, lanza `ValidationException` (error de dominio), que
+   `GlobalExceptionHandler` traduce al sobre `{ error: { code: "VALIDATION_ERROR", details } }`
+   con un detalle por campo. La misma forma de error que el frontend ya consume.
+2. **Las reglas son objetos de primera clase, no esquemas sueltos.** Al ser clases con DI, un
+   validador puede depender de otros servicios y reutilizarse; y el rango (mood 1-5, ansiedad
+   1-10, etc.) vive en un único sitio.
+3. **Las mismas reglas alimentan la documentación.** `FluentValidationSchemaFilter` traduce las
+   reglas a `minimum`/`maximum` en el OpenAPI. Con zod el equivalente exige un puente
+   (zod-openapi) que mantenga esquema y documento sincronizados. Detalle en "Tipos del
+   contrato".
+
+### Grupos de SignalR en lugar de rooms de Socket.IO
+
+En **Socket.IO** el servidor conserva la referencia del socket y hace `socket.join('user:'+id)`;
+emitir a la *room* es una llamada sobre una conexión concreta. En **SignalR** la idea es
+parecida (`Groups.AddToGroupAsync(connectionId, "user:{userId}")` en `OnConnectedAsync`), pero el
+emisor **no** necesita conocer el hub: `LogEventEmitter` usa `IHubContext<LogsHub>` para enviar a
+`Clients.Group(...)`.
+
+Lo que cambió:
+
+1. **El emisor está desacoplado del transporte.** El servicio que persiste el log emite a través
+   de la interfaz `ILogEventEmitter`; ni sabe que debajo hay SignalR ni maneja conexiones. Eso es
+   lo que permite tratar el backplane como un detalle de infraestructura (ver "Límites conocidos
+   de alcance").
+2. **La conexión se autentica con la misma sesión.** El hub se marca con `[RequireAuth]` y se
+   apoya en la cookie `httpOnly` que ya usa la API; no hay un segundo token de handshake. En el
+   cliente, `@microsoft/signalr` se construye con `withCredentials` y `withAutomaticReconnect`.
+3. **Los grupos se derivan de la identidad, no del socket.** El nombre `user:{userId}` sale del
+   claim del usuario autenticado, no de un identificador de conexión, así que reconectar
+   reingresa al mismo grupo.
+
+### Lo que no cambió
+
+El stack nuevo no reescribió los límites del dominio: se mantiene el patrón repositorio con
+upsert atómico (`ON CONFLICT`), la sesión en cookie `httpOnly` con la misma lógica de
+`SameSite=Lax` y CSRF, el tipado fuerte del contrato, PostgreSQL como base y Vite + Tailwind en
+el front. El stack es lo que cambió; las decisiones de diseño documentadas arriba son, en buena
+parte, independientes de él.

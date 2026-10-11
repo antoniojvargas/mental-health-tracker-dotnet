@@ -13,11 +13,11 @@ public sealed class CreateDailyLogValidator : AbstractValidator<CreateDailyLogRe
     {
         RuleFor(x => x.LogDate)
             .Must(x => DateOnlyFormatRegex.IsMatch(x.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
-            .WithMessage("logDate debe tener formato YYYY-MM-DD.");
+            .WithMessage("logDate must be in YYYY-MM-DD format.");
 
         RuleFor(x => x.LogDate)
             .Must(x => x <= DateOnly.FromDateTime(DateTime.UtcNow))
-            .WithMessage("logDate no puede estar en el futuro.");
+            .WithMessage("logDate cannot be in the future.");
 
         RuleFor(x => x.MoodRating).InclusiveBetween((short)1, (short)5);
 

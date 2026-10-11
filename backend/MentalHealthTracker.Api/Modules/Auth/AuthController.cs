@@ -6,6 +6,7 @@ using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
@@ -24,7 +25,28 @@ public sealed class AuthController(
 
     private const string OAuthStateCookieName = "oauth_state";
 
+    private static readonly TimeSpan OAuthStateCookieMaxAge = TimeSpan.FromMinutes(10);
+
     private const string LoginErrorRoute = "/login?error=auth_failed";
+
+    // Inicia el flujo OAuth: el navegador navega aquí, recibe una cookie httpOnly con un
+    // state aleatorio y un 302 hacia el endpoint de autorización de Google con ese mismo
+    // state. El state se compara en el callback con FixedTimeEquals; sin cookie previa la
+    // navegación de vuelta se rechaza (login CSRF). Es una navegación de página entera,
+    // no un fetch: las cookies la fija el backend, así que el frontend solo enlaza a esta ruta.
+    [HttpGet("google")]
+    [ProducesResponseType(StatusCodes.Status302Found)]
+    public IActionResult GoogleLogin()
+    {
+        var state = GenerateState();
+
+        Response.Cookies.Append(
+            OAuthStateCookieName,
+            state,
+            cookieOptions.CreateWithMaxAge(OAuthStateCookieMaxAge));
+
+        return Redirect(googleOAuthClient.BuildAuthUrl(state));
+    }
 
     [HttpGet("google/callback")]
     [EnableRateLimiting(AuthRateLimitPolicy)]
@@ -121,6 +143,13 @@ public sealed class AuthController(
         return CryptographicOperations.FixedTimeEquals(
             Encoding.UTF8.GetBytes(expectedState),
             Encoding.UTF8.GetBytes(receivedState));
+    }
+
+    private static string GenerateState()
+    {
+        Span<byte> bytes = stackalloc byte[32];
+        RandomNumberGenerator.Fill(bytes);
+        return WebEncoders.Base64UrlEncode(bytes);
     }
 
     private IActionResult RedirectToLogin() =>

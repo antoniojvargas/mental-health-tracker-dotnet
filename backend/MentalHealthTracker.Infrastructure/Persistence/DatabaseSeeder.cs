@@ -140,13 +140,13 @@ public sealed class DatabaseSeeder(AppDbContext dbContext, ILogger<DatabaseSeede
 
     private static readonly string[] DailyNotes =
     [
-        "Día tranquilo en el trabajo.",
-        "Salí a caminar después de comer.",
-        "Me costó dormir, demasiado café.",
-        "Llamada larga con la familia.",
-        "Poca concentración hoy.",
-        "Buen día, me sentí con energía.",
-        "Un poco de ansiedad por la mañana.",
-        "Día de teletrabajo en casa.",
+        "A calm day at work.",
+        "Went for a walk after lunch.",
+        "Had trouble sleeping, too much coffee.",
+        "A long call with the family.",
+        "Little focus today.",
+        "Good day, I felt energized.",
+        "A bit of anxiety in the morning.",
+        "A work-from-home day.",
     ];
 }
