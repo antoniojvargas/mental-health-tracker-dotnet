@@ -2,12 +2,13 @@
 import { computed, reactive, ref, watch } from 'vue'
 import Modal from '../ui/Modal.vue'
 import Button from '../ui/Button.vue'
+import Skeleton from '../ui/Skeleton.vue'
 import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
 import SymptomPicker, { type SymptomEntry } from './SymptomPicker.vue'
 import { create as createLog, today as getToday } from '../../services/logs.api'
+import { describeError } from '../../services/error-messages'
 import { useToast } from '../../composables/useToast'
-import { ApiError } from '../../services/api-client'
 import type {
   CreateDailyLogInput,
   ActivityType,
@@ -44,6 +45,8 @@ type StepIndex = 0 | 1 | 2 | 3
 const currentStep = ref<StepIndex>(0)
 const isSubmitting = ref(false)
 const isLoading = ref(false)
+/** Mensaje si no se pudo traer el registro de hoy, o `null` si no hubo fallo. */
+const loadError = ref<string | null>(null)
 const { success, error: toastError } = useToast()
 
 const sleepDisturbanceOptions = [
@@ -131,6 +134,13 @@ const canGoNext = computed(() => {
 
 const isLastStep = computed(() => currentStep.value === steps.length - 1)
 
+/**
+ * El formulario se puede avanzar y guardar solo cuando la carga de hoy terminó
+ * bien. Mientras carga o si falló, esos botones ni se pintan: no hay sobre qué
+ * actuar y evitan guardar un registro a medias con los valores por defecto.
+ */
+const isReady = computed(() => !isLoading.value && !loadError.value)
+
 function inverseMapActivityType(t: ActivityType | null): string {
   switch (t) {
     case 'walking':
@@ -211,6 +221,7 @@ function inverseMapSymptomType(t: SymptomType): string | null {
 
 function loadToday() {
   isLoading.value = true
+  loadError.value = null
   getToday()
     .then((log: DailyLog | null) => {
       if (log) {
@@ -219,7 +230,10 @@ function loadToday() {
         resetForm()
       }
     })
-    .catch(() => {
+    .catch((thrown: unknown) => {
+      // No se pudo leer el registro de hoy: en vez del formulario se muestra el
+      // aviso con reintento, así que nadie edita sobre datos que no llegaron.
+      loadError.value = describeError(thrown)
       resetForm()
     })
     .finally(() => {
@@ -446,13 +460,11 @@ async function handleSubmit() {
     emit('saved')
     resetForm()
     emit('close')
-  } catch (err) {
-    if (err instanceof ApiError) {
-      toastError(err.message || 'Failed to save log')
-    } else {
-      toastError('Failed to save log')
-    }
-    // No cerramos el modal ante error
+  } catch (thrown) {
+    // Mensaje traducido desde el `code`, nunca `thrown.message`: lo que la API
+    // mande en `message` puede ser jerga o detalle interno y acabaría en pantalla.
+    toastError(describeError(thrown))
+    // No cerramos el modal ante error: lo que se escribió sigue ahí para reintentar.
   } finally {
     isSubmitting.value = false
   }
@@ -471,7 +483,17 @@ function close() {
   <Modal :open="open" :title="title" @close="close">
     <template #default>
       <div class="flex flex-col gap-6">
-        <div class="flex flex-col gap-2">
+        <!--
+          La lectura de hoy falló. Se ofrece reintentar en el sitio en vez de
+          abrir el formulario vacío como si tal cosa: sin este aviso, un fallo de
+          red se leería como "no había nada registrado".
+        -->
+        <div v-if="loadError" class="flex flex-col items-start gap-3">
+          <p role="alert" class="text-sm leading-relaxed text-ink-600">{{ loadError }}</p>
+          <Button variant="subtle" @click="loadToday">Try again</Button>
+        </div>
+
+        <div v-else class="flex flex-col gap-2">
           <div class="flex items-center justify-between text-xs text-ink-500">
             <!--
               Región viva: al pasar de paso cambia el texto pero el foco se queda
@@ -479,7 +501,17 @@ function close() {
               progreso de abajo es el mismo dato en dibujo, y por eso va
               `aria-hidden`: repetirlo sería anunciar dos veces lo mismo.
             -->
-            <span role="status">
+            <!--
+              Mientras carga el registro de hoy el formulario ya está en el DOM: el
+              foco inicial debe caer en el primer campo, no en un botón, así que la
+              espera no puede taparlo. Se anuncia en esta línea y en los botones de
+              avanzar/guardar, que quedan deshabilitados hasta que la carga termina.
+            -->
+            <Skeleton v-if="isLoading" class="h-3 w-40" />
+            <span v-if="isLoading" role="status" class="sr-only">
+              We're getting today's entry ready…
+            </span>
+            <span v-else role="status">
               Step {{ currentStep + 1 }} of {{ steps.length }}: {{ steps[currentStep] }}
             </span>
           </div>
@@ -488,7 +520,7 @@ function close() {
           </div>
         </div>
 
-        <form class="flex flex-col gap-6" @submit.prevent="onSubmit">
+        <form v-if="!loadError" class="flex flex-col gap-6" @submit.prevent="onSubmit">
           <section v-if="currentStep === 0" class="flex flex-col gap-6">
             <h3 class="text-base font-medium text-ink-700">Mood</h3>
             <MoodScale v-model="form.mood" aria-label="Mood" aria-required="true" />
@@ -634,19 +666,23 @@ function close() {
 
     <template #actions>
       <div class="flex w-full items-center justify-between gap-3">
-        <Button variant="ghost" :disabled="currentStep === 0" @click="back"> Back </Button>
+        <Button variant="ghost" :disabled="currentStep === 0 || !isReady" @click="back">
+          Back
+        </Button>
         <div class="flex items-center gap-2">
           <Button variant="subtle" @click="close">Cancel</Button>
-          <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>
-          <Button
-            v-if="!isLastStep"
-            variant="subtle"
-            type="submit"
-            :loading="isSubmitting"
-            @click="onSubmit"
-            >Save now</Button
-          >
-          <Button v-else type="submit" :loading="isSubmitting" @click="onSubmit">Save</Button>
+          <template v-if="isReady">
+            <Button v-if="!isLastStep" :disabled="!canGoNext" @click="next">Next</Button>
+            <Button
+              v-if="!isLastStep"
+              variant="subtle"
+              type="submit"
+              :loading="isSubmitting"
+              @click="onSubmit"
+              >Save now</Button
+            >
+            <Button v-else type="submit" :loading="isSubmitting" @click="onSubmit">Save</Button>
+          </template>
         </div>
       </div>
     </template>

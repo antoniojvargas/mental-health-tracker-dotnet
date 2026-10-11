@@ -229,7 +229,59 @@ describe('DailyLogModal', () => {
     await nextTick()
     await new Promise((r) => setTimeout(r, 0))
 
-    expect(toastError).toHaveBeenCalled()
+    // Se avisa con el texto traducido, no con el `message` crudo de la API.
+    expect(toastError).toHaveBeenCalledWith(
+      'Some entries need another look. Please review and try again.',
+    )
+    expect(document.body.textContent).toContain('Step 1 of 4')
+  })
+
+  it('anuncia la carga y bloquea avanzar sin quitar el formulario del foco', async () => {
+    // La promesa no se resuelve: el modal se queda en su estado de carga.
+    vi.mocked(logsApi.today).mockReturnValue(new Promise(() => {}))
+    wrapper = mount(Harness, { attachTo: document.body })
+    document.getElementById('open')?.click()
+    await nextTick()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(document.body.textContent).toContain("We're getting today's entry ready…")
+    // El formulario sigue montado: el foco inicial debe poder caer en él.
+    expect(document.body.textContent).toContain('Mood')
+    // Pero no se puede avanzar ni guardar hasta que la carga termine.
+    expect(
+      Array.from(document.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Next'),
+    ).toBe(false)
+  })
+
+  it('avisa y ofrece reintentar cuando no puede leer el registro de hoy', async () => {
+    vi.mocked(logsApi.today).mockRejectedValue(
+      new ApiError(500, { code: 'INTERNAL_ERROR', message: 'boom', details: [] }),
+    )
+    wrapper = mount(Harness, { attachTo: document.body })
+    document.getElementById('open')?.click()
+    await nextTick()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(document.body.textContent).toContain(
+      'Something went wrong on our end. Please try again.',
+    )
+    expect(document.body.textContent).not.toContain('boom')
+    expect(document.body.textContent).not.toContain('Step 1 of 4')
+
+    const tryAgain = Array.from(document.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === 'Try again',
+    )
+    expect(tryAgain).toBeTruthy()
+
+    // El reintento sí resuelve: la carga se recupera y el formulario aparece.
+    vi.mocked(logsApi.today).mockResolvedValue(null)
+    tryAgain?.click()
+    await nextTick()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
+
     expect(document.body.textContent).toContain('Step 1 of 4')
   })
 })

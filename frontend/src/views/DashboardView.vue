@@ -67,8 +67,8 @@ function todayIso(): IsoDate {
  * (semana o mes) incluye hoy, no hace falta una petición aparte y el dato se
  * mantiene solo cuando la lista cambia tras un guardado.
  *
- * Mientras carga vale `undefined`, que la sección distingue de `null` ("no hay
- * registro") para poder mostrar su propio estado de espera.
+ * Mientras carga vale `undefined` —distinto de `null`, que es "no hay registro"—,
+ * para que la acción no anuncie "ajustar" sobre un dato que aún no llegó.
  */
 const todayLog = computed(() => {
   if (logsStore.loading) return undefined
@@ -76,13 +76,29 @@ const todayLog = computed(() => {
 })
 
 const dailyMessage = computed(() => {
-  if (todayLog.value === undefined) return 'Checking your day…'
+  // La carga y el fallo van antes que el dato: mientras no sepamos si hay
+  // registro de hoy, decir "¿cómo te sientes?" daría por hecho algo que no es
+  // cierto (a lo mejor ya lo registraste). Solo cuando la carga termina bien se
+  // decide entre invitar a registrarlo o a ajustarlo.
+  if (logsStore.loading) return "We're checking your day…"
+  if (logsStore.error) return "We couldn't check your day just now."
   return todayLog.value
     ? "You already logged how you're feeling today. You can adjust it if something changed."
     : 'How are you feeling today? Take a minute to log it.'
 })
 
 const dailyAction = computed(() => (todayLog.value ? "Adjust today's entry" : 'Log my day'))
+
+/**
+ * Reintenta la carga de la ventana activa. Repetir la petición es lo único que
+ * puede cambiar el resultado, así que el estado de error de las tendencias
+ * siempre ofrece esta salida en vez de dejar al usuario mirando la pared. Como
+ * ambas secciones salen del mismo store, reintentar aquí refresca también el
+ * saludo diario.
+ */
+function retry(): void {
+  void logsStore.fetch(range.value)
+}
 
 /**
  * El modal se cierra solo tras guardar; aquí solo hay que releer la ventana
@@ -162,13 +178,19 @@ async function handleLogout(): Promise<void> {
           recibe ninguna señal de que los datos están en camino.
         -->
         <p class="sr-only" role="status">
-          {{ logsStore.loading ? 'Loading your trends…' : '' }}
+          {{ logsStore.loading ? "We're getting your trends ready…" : '' }}
         </p>
         <div class="mt-4">
           <Skeleton v-if="logsStore.loading" class="h-72 w-full" />
-          <p v-else-if="logsStore.error" role="alert" class="py-8 text-center text-sm text-ink-400">
-            {{ logsStore.error }}
-          </p>
+          <div
+            v-else-if="logsStore.error"
+            class="flex h-72 flex-col items-center justify-center gap-3 rounded-2xl border border-ink-100 bg-paper-50 px-6 text-center"
+          >
+            <p role="alert" class="text-sm leading-relaxed text-ink-600">
+              {{ logsStore.error }}
+            </p>
+            <Button variant="subtle" @click="retry">Try again</Button>
+          </div>
           <TrendChart v-else :logs="logsStore.logs" :metric-keys="metrics" />
         </div>
       </section>
