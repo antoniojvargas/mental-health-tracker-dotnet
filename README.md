@@ -132,6 +132,35 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 
 Las plantillas `.env.example` (desarrollo/E2E) y `.env.production.example` (producción) traen estos valores prellenados; el detalle de los secretos y cómo generarlos está en [`secrets/README.md`](secrets/README.md).
 
+## Comandos útiles
+
+### Backend
+
+Los comandos se ejecutan desde la raíz del repositorio. `dotnet ef` requiere la herramienta instalada (`dotnet tool install --global dotnet-ef`); el manifiesto del repo solo fija `reportgenerator`.
+
+| Comando | Qué hace |
+| --- | --- |
+| `dotnet run --project backend/MentalHealthTracker.Api` | Arranca la API en local (requiere Postgres en `Database:ConnectionString`). |
+| `dotnet run --project backend/MentalHealthTracker.Api --no-launch-profile -- --seed` | Aplica las migraciones y carga el usuario demo con 60 días de registros. Equivale a `make seed`. |
+| `dotnet ef migrations add <Nombre> --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Crea una migración nueva en `Infrastructure/Persistence/Migrations`. |
+| `dotnet ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
+| `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
+| `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`). |
+| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 70 %. |
+
+### Frontend
+
+Los comandos se ejecutan dentro de `frontend/`.
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run dev` | Levanta el dev server de Vite en `http://localhost:5173` con HMR. |
+| `npm run build` | Comprueba los tipos (`vue-tsc -b`) y genera el bundle de producción. |
+| `npm run test:unit` | Ejecuta las pruebas unitarias con Vitest (una pasada, sin navegador). |
+| `npm run test:unit:coverage` | Igual que la anterior, con informe de cobertura. |
+| `npm run lint` | Verifica el código con ESLint (`npm run lint:fix` para aplicar los arreglos). |
+| `npm run format` | Comprueba el formato con Prettier (`npm run format:fix` para reescribirlo). |
+
 ## Testing
 
 ### Capas de pruebas
