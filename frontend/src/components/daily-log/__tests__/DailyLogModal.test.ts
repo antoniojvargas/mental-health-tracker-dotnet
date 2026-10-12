@@ -25,7 +25,16 @@ vi.mock('../../../composables/useToast', () => ({
 
 import { ApiError } from '../../../services/api-client'
 import * as logsApi from '../../../services/logs.api'
-import type { DailyLog } from '../../../types/daily-log'
+import {
+  ACTIVITY_TYPES,
+  SLEEP_DISTURBANCES,
+  SOCIAL_FREQUENCIES,
+  SYMPTOM_TYPES,
+  type ActivityType,
+  type DailyLog,
+  type SleepDisturbance,
+  type SymptomType,
+} from '../../../types/daily-log'
 
 function makeLog(): DailyLog {
   return {
@@ -339,5 +348,167 @@ describe('DailyLogModal', () => {
     await new Promise((r) => setTimeout(r, 0))
 
     expect(document.body.textContent).toContain('Step 1 of 4')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ida y vuelta: abrir el modal con un registro y guardar sin tocar nada debe enviar a
+// `create` exactamente los mismos campos que el registro (A5 del Apéndice de MEJORAS.md).
+//
+// Es la especificación del formulario sin pérdida. Los casos que hoy fallan están
+// marcados con `it.fails` y el comentario "A5": el CI sigue en verde y, cuando un cambio
+// corrige el mapeo, el caso empieza a pasar, `it.fails` lo delata y hay que convertirlo
+// en `it`. No se debe borrar un caso para "arreglar" la suite.
+// ---------------------------------------------------------------------------
+describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
+  const ROUND_TRIP_KEYS = [
+    'moodRating',
+    'anxietyLevel',
+    'stressLevel',
+    'sleepHours',
+    'sleepQuality',
+    'sleepDisturbances',
+    'activityType',
+    'activityMinutes',
+    'socialFrequency',
+    'symptoms',
+    'notes',
+  ] as const
+
+  /** Los campos que viajan en el POST, con los síntomas en orden estable (el orden no es contrato). */
+  function roundTripFields(source: Record<string, unknown>) {
+    const picked: Record<string, unknown> = {}
+    for (const key of ROUND_TRIP_KEYS) {
+      picked[key] = source[key]
+    }
+    const symptoms = (picked.symptoms as { type: string; severity: number }[]).map((s) => ({
+      ...s,
+    }))
+    picked.symptoms = symptoms.sort((a, b) => a.type.localeCompare(b.type))
+    return picked
+  }
+
+  async function settle() {
+    await nextTick()
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
+  }
+
+  async function openWith(log: DailyLog) {
+    vi.mocked(logsApi.today).mockResolvedValue(log)
+    vi.mocked(logsApi.create).mockResolvedValue(makeLog())
+    wrapper = mount(Harness, { attachTo: document.body })
+    document.getElementById('open')?.click()
+    await settle()
+  }
+
+  async function saveUntouchedAndCompare(log: DailyLog) {
+    await openWith(log)
+    clickSaveNow()
+    await settle()
+
+    expect(logsApi.create).toHaveBeenCalledTimes(1)
+    const sent = vi.mocked(logsApi.create).mock.calls[0][0] as unknown as Record<string, unknown>
+    expect(roundTripFields(sent)).toEqual(roundTripFields({ ...log }))
+  }
+
+  /** `it.fails` para lo que hoy pierde datos (A5); `it` para lo que ya viaja bien. */
+  const spec = (knownLoss: boolean) => (knownLoss ? it.fails : it)
+
+  beforeEach(() => {
+    vi.mocked(logsApi.create).mockReset()
+    vi.mocked(logsApi.today).mockReset()
+    document.body.innerHTML = ''
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    document.body.innerHTML = ''
+  })
+
+  it('un registro base sin enums especiales vuelve igual', async () => {
+    await saveUntouchedAndCompare(makeLog())
+  })
+
+  describe('SocialFrequency', () => {
+    for (const value of SOCIAL_FREQUENCIES) {
+      it(`${value}: el payload conserva el valor`, async () => {
+        await saveUntouchedAndCompare({ ...makeLog(), socialFrequency: value })
+      })
+
+      // El select solo ofrece none/once/few/several/daily: con rare, occasional y frequent
+      // el control queda sin opción seleccionada y el usuario ve el campo en blanco. A5.
+      spec(value === 'rare' || value === 'occasional' || value === 'frequent')(
+        `${value}: el select muestra una opción seleccionada`,
+        async () => {
+          await openWith({ ...makeLog(), socialFrequency: value })
+          clickNext()
+          await settle()
+          clickNext()
+          await settle()
+
+          const select = document.getElementById('socialFrequency') as HTMLSelectElement
+          expect(select).toBeTruthy()
+          expect(select.selectedIndex).not.toBe(-1)
+        },
+      )
+    }
+  })
+
+  describe('ActivityType', () => {
+    for (const value of ACTIVITY_TYPES) {
+      // `none` se envía hoy como `null`: el valor del enum no vuelve igual. A5.
+      spec(value === 'none')(`${value}: el payload conserva tipo y minutos`, async () => {
+        await saveUntouchedAndCompare({
+          ...makeLog(),
+          activityType: value as ActivityType,
+          activityMinutes: value === 'none' ? null : 30,
+        })
+      })
+    }
+
+    it('sin actividad (null): vuelve como null y sin minutos', async () => {
+      await saveUntouchedAndCompare({ ...makeLog(), activityType: null, activityMinutes: null })
+    })
+  })
+
+  describe('SleepDisturbance', () => {
+    // `none` no es una alteración: la ausencia se representa con la lista vacía (caso base).
+    const disturbances = SLEEP_DISTURBANCES.filter(
+      (value): value is Exclude<SleepDisturbance, 'none'> => value !== 'none',
+    )
+
+    for (const value of disturbances) {
+      // `early_waking` vuelve como `frequent_waking`. A5.
+      spec(value === 'early_waking')(`${value}: el payload conserva la alteración`, async () => {
+        await saveUntouchedAndCompare({ ...makeLog(), sleepDisturbances: [value] })
+      })
+    }
+
+    // Varias a la vez. Falla por `early_waking`. A5.
+    spec(true)('todas juntas: el payload conserva la lista completa', async () => {
+      await saveUntouchedAndCompare({ ...makeLog(), sleepDisturbances: disturbances })
+    })
+  })
+
+  describe('SymptomType', () => {
+    SYMPTOM_TYPES.forEach((type: SymptomType) => {
+      // `hopelessness` se pinta como "Depression" y vuelve como `low_mood`. A5.
+      spec(type === 'hopelessness')(`${type}: conserva tipo y severidad`, async () => {
+        await saveUntouchedAndCompare({
+          ...makeLog(),
+          symptoms: [{ type, severity: 4 }],
+        })
+      })
+    })
+
+    // Los 8 a la vez, cada uno con su severidad. Falla porque `low_mood` y `hopelessness`
+    // comparten casilla ("Depression"): se pierde uno de los dos. A5.
+    spec(true)('todos juntos: conserva cada tipo con su severidad', async () => {
+      await saveUntouchedAndCompare({
+        ...makeLog(),
+        symptoms: SYMPTOM_TYPES.map((type, index) => ({ type, severity: (index % 5) + 1 })),
+      })
+    })
   })
 })
