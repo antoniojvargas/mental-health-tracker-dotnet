@@ -209,6 +209,26 @@ el backplane es un detalle de implementación para `ILogEventEmitter`. Hasta ent
 operativo entre instancias depende de una decisión única: SignalR y rate limiting escalan
 **juntos**, con la misma pieza, o ninguno lo garantiza.
 
+### HTTPS y HSTS: responsabilidad del proxy de borde, no de la API
+
+El contenedor de la API **solo sirve HTTP** (`ASPNETCORE_URLS=http://+:3000`) y no publica
+puerto: en producción solo nginx lo alcanza por la red interna. El TLS termina en el proxy
+de borde que haya delante de nginx (balanceador, CDN o el propio nginx con certificado), y
+**ese proxy es quien debe**:
+
+- redirigir `http://` a `https://`,
+- emitir `Strict-Transport-Security` (HSTS),
+- reenviar `X-Forwarded-Proto` para que la API conozca el esquema original (ver
+  `ReverseProxy` en la configuración).
+
+La API **no** registra `UseHttpsRedirection`. No había ningún puerto HTTPS al que redirigir
+(el middleware solo registraba el aviso `Failed to determine the https port for redirect`
+en cada petición) y, además, un `307` sobre un `POST` de la API no aporta nada: el cliente
+tiene que reenviar el cuerpo igualmente. La cookie de sesión sí se marca `Secure` en
+`Production`, de modo que solo viaja por HTTPS aunque la API no lo imponga. Un test de
+integración (`HttpsRedirectionTests`) fija que `GET /api/health` por HTTP responde `200`
+sin `Location`, incluso con `HTTPS_PORT` configurado.
+
 ### Separación de capas: controller → service → repository
 
 La API se organiza en tres capas con una responsabilidad estricta por capa:
