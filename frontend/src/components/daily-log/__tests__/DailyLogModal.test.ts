@@ -286,7 +286,9 @@ describe('DailyLogModal', () => {
       await new Promise((r) => setTimeout(r, 0))
 
       expect(logsApi.today).toHaveBeenCalledWith('2026-03-15')
-      expect(logsApi.create).toHaveBeenCalledWith(expect.objectContaining({ logDate: '2026-03-15' }))
+      expect(logsApi.create).toHaveBeenCalledWith(
+        expect.objectContaining({ logDate: '2026-03-15' }),
+      )
     })
   })
 
