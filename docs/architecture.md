@@ -184,6 +184,40 @@ ningún store compartido.
 | Una sola réplica             | El contador es local y exacto: la cuota se aplica de forma firme por IP o por id de usuario. |
 | Varias réplicas sin store    | Cada instancia cuenta por separado, de modo que un cliente repartido entre réplicas puede consumir hasta una ventana por réplica; el límite deja de ser una **garantía global** y pasa a ser probabilístico. |
 
+**Particiones por IP real detrás del proxy**
+
+La política `auth` se particiona por IP de origen. En producción la API no recibe al cliente
+directamente: nginx va delante y, sin más, `RemoteIpAddress` sería siempre la IP de nginx, de
+modo que los 20 intentos por 15 min se compartirían entre **todos** los usuarios (un solo
+atacante bloquearía el login de todos). Para evitarlo, con `ReverseProxy:Enabled=true`
+`UseForwardedHeaders` es el **primer** middleware del pipeline (antes que el rate limiter) y
+sustituye `RemoteIpAddress` por la IP de `X-Forwarded-For`, y el esquema por el de
+`X-Forwarded-Proto`. Dos condiciones lo hacen seguro:
+
+1. **Solo se aceptan las cabeceras de proxies declarados.** `ReverseProxy:KnownProxies` /
+   `KnownNetworks` es la lista de confianza, y arrancar con `Enabled=true` y ambas vacías
+   falla (confiar en cualquier origen permitiría falsificar la IP). En producción la lista es
+   la subred fija `172.28.0.0/24` de la red de Compose, y el backend no publica puerto: solo
+   nginx puede alcanzarlo desde ahí. Una petición que llegue de otra dirección conserva su IP
+   real y su `X-Forwarded-For` se ignora.
+2. **`ForwardLimit=1`: solo se lee la entrada más a la derecha.** nginx añade con
+   `$proxy_add_x_forwarded_for` la IP que él ve (`$remote_addr`) **al final** de lo que el
+   cliente haya enviado, así que un cliente puede mandar `X-Forwarded-For: 1.2.3.4` y llegará
+   `1.2.3.4, <IP real>`. El middleware procesa la cabecera de derecha a izquierda y, con
+   límite 1, consume únicamente la última entrada: la que puso nuestro nginx. Todo lo que el
+   cliente escribió a la izquierda se descarta, y por tanto no puede inventarse otra IP ni
+   repartir sus intentos entre IPs falsas (los tests de `ForwardedHeadersTests` y la prueba
+   con la pila de producción lo confirman: 22 peticiones con IPs falsas distintas agotan la
+   misma cuota).
+
+El límite de 1 es correcto mientras nginx sea el único proxy de la cadena. Si se pusiera otro
+delante (balanceador, CDN), `$remote_addr` de nginx pasaría a ser el de ese proxy: habría que
+subir `ForwardLimit` a 2, añadir su red a `KnownNetworks` y configurar nginx para que confíe en
+él (`real_ip`). Cambiar solo uno de los dos lados vuelve a compartir la cuota o a abrir la
+puerta a IPs falsas.
+
+La política `write` no cambia: se particiona por id de usuario, no por IP.
+
 **Motivos para aceptar la limitación hoy**
 
 1. **La mitigación real es la misma pieza de infraestructura que resolvería el backplane de
