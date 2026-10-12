@@ -48,7 +48,7 @@ public sealed class AuthController(
         return Redirect(googleOAuthClient.BuildAuthUrl(state));
     }
 
-    [HttpGet("google/callback")]
+    [HttpGet(AuthRoutes.GoogleCallbackPath)]
     [EnableRateLimiting(AuthRateLimitPolicy)]
     [ProducesResponseType(StatusCodes.Status302Found)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]

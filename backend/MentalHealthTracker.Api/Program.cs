@@ -53,6 +53,8 @@ builder.Services.AddOptions<GoogleOAuthOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddSingleton<IValidateOptions<GoogleOAuthOptions>, GoogleOAuthOptionsValidator>();
+
 builder.Services.AddOptions<AppUrlsOptions>()
     .Bind(builder.Configuration.GetSection(AppUrlsOptions.SectionName))
     .ValidateDataAnnotations()
