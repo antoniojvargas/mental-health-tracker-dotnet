@@ -60,6 +60,8 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddReverseProxyTrust(builder.Configuration);
+
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDailyLogRepository, DailyLogRepository>();
