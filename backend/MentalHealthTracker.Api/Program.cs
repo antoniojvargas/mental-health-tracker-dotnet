@@ -60,6 +60,8 @@ builder.Services.AddOptions<AppUrlsOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddReverseProxyTrust(builder.Configuration);
+
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDailyLogRepository, DailyLogRepository>();
@@ -93,8 +95,11 @@ builder.Services.AddProblemDetails();
 // El callback de Google OAuth es el único endpoint que acepta tráfico sin sesión y
 // desencadena una redirección externa + upsert de usuario: sin límite sería un vector
 // de abuso (fuerza bruta sobre state/code y trabajo innecesario contra Google/BD).
-// Se particiona por IP de origen porque el stack actual expone Kestrel directamente
-// (docker-compose publica el puerto 3000 sin proxy), así RemoteIpAddress es el cliente.
+// Se particiona por IP de origen. En desarrollo Kestrel recibe al cliente directamente
+// y RemoteIpAddress es su IP. En producción hay nginx delante, así que RemoteIpAddress
+// sería la del proxy y la cuota se compartiría entre todos los usuarios: con
+// ReverseProxy:Enabled, UseForwardedHeaders (primer middleware) sustituye esa IP por la
+// de X-Forwarded-For, aceptada solo si la petición llega de un proxy conocido.
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -212,6 +217,14 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+// Primero de todos: la IP y el esquema reales tienen que estar resueltos antes de que
+// el resto del pipeline (rate limiter, logs, redirecciones) los lea. Solo se activa
+// detrás de un proxy declarado en ReverseProxy:KnownProxies / KnownNetworks.
+if (app.Services.GetRequiredService<IOptions<ReverseProxyOptions>>().Value.Enabled)
+{
+    app.UseForwardedHeaders();
+}
+
 app.UseExceptionHandler();
 app.UseRequestId();
 app.UseSecurityHeaders();
@@ -227,8 +240,6 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = SecurityHeadersMiddleware.DocsRoutePrefix;
     });
 }
-
-app.UseHttpsRedirection();
 
 app.UseRouting();
 

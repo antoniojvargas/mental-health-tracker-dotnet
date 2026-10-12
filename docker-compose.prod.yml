@@ -74,6 +74,12 @@ services:
       GoogleOAuth__RedirectUri: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/api/auth/google/callback}
       AppUrls__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-Information}
+      # Confianza en nginx: el backend solo lo alcanza el frontend por la red interna
+      # (sin puerto publicado), asi que X-Forwarded-For/-Proto se aceptan unicamente
+      # de la subred fija de abajo. Con ForwardLimit=1 (por defecto) se lee la entrada
+      # mas a la derecha, la que anade nginx: un cliente no puede inyectar otra IP.
+      ReverseProxy__Enabled: "true"
+      ReverseProxy__KnownNetworks__0: 172.28.0.0/24
       Database__ConnectionString_FILE: /run/secrets/database_url
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
@@ -119,6 +125,15 @@ services:
       resources:
         limits:
           memory: 128M
+
+# Subred fija para poder declararla como red de proxies de confianza en el backend
+# (ReverseProxy__KnownNetworks__0). Si choca con otra red del host, cambiarla aqui y
+# en esa variable a la vez.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
 
 volumes:
   postgres-data:
