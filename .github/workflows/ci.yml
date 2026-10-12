@@ -256,6 +256,39 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
 
+  dev-stack-smoke:
+    name: Dev stack smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sigue el flujo del README (cp .env.example .env) y solo sustituye los
+      # secretos vacios por valores desechables. Evita que el stack de desarrollo
+      # vuelva a levantarse con un backend sin configuracion (hallazgo A1).
+      - name: Crear .env desde .env.example
+        run: |
+          cp .env.example .env
+          sed -i 's|^JWT_SECRET=.*|JWT_SECRET=smoke-only-disposable-secret-0123456789abcdef|' .env
+          sed -i 's|^GoogleOAuth__ClientId=.*|GoogleOAuth__ClientId=smoke-test-client.apps.googleusercontent.com|' .env
+          sed -i 's|^GoogleOAuth__ClientSecret=.*|GoogleOAuth__ClientSecret=smoke-disposable-client-secret|' .env
+
+      - name: Levantar postgres y backend
+        run: docker compose up -d --build --wait --wait-timeout 600 postgres backend
+
+      - name: Comprobar /api/health
+        run: |
+          body=$(curl -fsS http://localhost:3000/api/health)
+          echo "$body"
+          echo "$body" | grep -q '"status":"ok"'
+
+      - name: Logs del backend
+        if: failure()
+        run: docker compose logs backend
+
+      - name: Bajar la pila
+        if: always()
+        run: docker compose down -v
+
   build-prod-images:
     name: Build prod images
     runs-on: ubuntu-latest
