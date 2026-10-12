@@ -4,15 +4,15 @@ services:
     container_name: mental-health-tracker-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: mentalhealthtracker
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mentalhealthtracker}
     ports:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mentalhealthtracker"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mentalhealthtracker}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,6 +24,17 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # Solo entran al contenedor las variables declaradas aqui: el .env del
+    # proyecto no se inyecta (ver docker-compose.e2e.yml). Compose lee .env para
+    # interpolar; las claves obligatorias fallan con un mensaje claro si faltan.
+    environment:
+      Database__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-mentalhealthtracker};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      AppUrls__FrontendUrl: http://localhost:5173
+      GoogleOAuth__RedirectUri: http://localhost:5173/api/auth/google/callback
+      LOG_LEVEL: ${LOG_LEVEL:-Information}
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required: copy .env.example to .env and set it}"
+      GoogleOAuth__ClientId: "${GoogleOAuth__ClientId:?GoogleOAuth__ClientId is required: set it in .env}"
+      GoogleOAuth__ClientSecret: "${GoogleOAuth__ClientSecret:?GoogleOAuth__ClientSecret is required: set it in .env}"
     depends_on:
       postgres:
         condition: service_healthy

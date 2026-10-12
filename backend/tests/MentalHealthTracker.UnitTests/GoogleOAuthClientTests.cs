@@ -15,7 +15,7 @@ public class GoogleOAuthClientTests
     {
         ClientId = "test-client.apps.googleusercontent.com",
         ClientSecret = "test-client-secret",
-        RedirectUri = "http://localhost:5173/auth/callback",
+        RedirectUri = "http://localhost:5173/api/auth/google/callback",
     };
 
     [Fact]

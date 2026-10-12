@@ -71,7 +71,7 @@ services:
     # Tres de los cuatro secretos los consume el backend via *_FILE.
     environment:
       GoogleOAuth__ClientId: ${GOOGLE_CLIENT_ID:?export GOOGLE_CLIENT_ID}
-      GoogleOAuth__RedirectUri: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/auth/callback}
+      GoogleOAuth__RedirectUri: ${GOOGLE_REDIRECT_URI:-http://localhost:8080/api/auth/google/callback}
       AppUrls__FrontendUrl: ${FRONTEND_URL:-http://localhost:8080}
       LOG_LEVEL: ${LOG_LEVEL:-Information}
       Database__ConnectionString_FILE: /run/secrets/database_url

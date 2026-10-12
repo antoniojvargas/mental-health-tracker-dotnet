@@ -593,6 +593,12 @@ forma de que el `state` de vuelta coincida.
 | `redirect_uri`  | `GoogleOAuth:RedirectUri` |
 | `grant_type`    | literal `authorization_code` |
 
+El `redirect_uri` debe ser la ruta real del callback, `GET /api/auth/google/callback`, a
+través del origen que sirve el frontend (Vite en desarrollo, nginx en producción): así la
+cookie `oauth_state` se escribe y se lee en el mismo origen. Esa URI exacta debe estar
+registrada en *Authorized redirect URIs* de la consola de Google Cloud; Google compara el
+valor carácter a carácter y, si no coincide, responde `redirect_uri_mismatch`.
+
 Dos propiedades son importantes: el **`client_secret` no abandona el backend** (solo aparece
 en esta llamada saliente), y el **`code` se vuelve a pasar tal cual**; su validez la determina
 Google, no el backend. Un fallo de la llamada (`EnsureSuccessStatusCode`) o una respuesta sin
