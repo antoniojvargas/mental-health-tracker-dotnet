@@ -7,6 +7,7 @@ import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
 import SymptomPicker, { type SymptomEntry } from './SymptomPicker.vue'
 import { create as createLog, today as getToday } from '../../services/logs.api'
+import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'
 import { useToast } from '../../composables/useToast'
 import type {
@@ -222,7 +223,7 @@ function inverseMapSymptomType(t: SymptomType): string | null {
 function loadToday() {
   isLoading.value = true
   loadError.value = null
-  getToday()
+  getToday(todayIso())
     .then((log: DailyLog | null) => {
       if (log) {
         fillFromLog(log)
@@ -428,11 +429,8 @@ function buildPayload(): CreateDailyLogInput {
     })
     .filter((x): x is { type: SymptomType; severity: number } => x !== null)
 
-  const today = new Date()
-  const logDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-
   return {
-    logDate,
+    logDate: todayIso(),
     moodRating: form.mood ?? 3,
     anxietyLevel: Math.min(10, Math.max(1, form.anxiety)),
     stressLevel: Math.min(10, Math.max(1, form.stress)),

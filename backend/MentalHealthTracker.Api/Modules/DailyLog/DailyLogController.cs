@@ -58,9 +58,11 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> GetToday(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetToday(
+        [FromQuery] TodayQuery query,
+        CancellationToken cancellationToken)
     {
-        var response = await dailyLogService.GetTodayAsync(UserId, cancellationToken);
+        var response = await dailyLogService.GetTodayAsync(UserId, query.Date, cancellationToken);
 
         return response is null ? NotFound() : Ok(response);
     }

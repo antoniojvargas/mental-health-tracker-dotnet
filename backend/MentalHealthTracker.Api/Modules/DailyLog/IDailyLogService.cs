@@ -16,5 +16,6 @@ public interface IDailyLogService
 
     Task<DailyLogResponse?> GetTodayAsync(
         Guid userId,
+        DateOnly? date,
         CancellationToken cancellationToken = default);
 }

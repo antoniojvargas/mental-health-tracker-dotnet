@@ -50,10 +50,12 @@ public sealed class DailyLogService(
 
     public async Task<DailyLogResponse?> GetTodayAsync(
         Guid userId,
+        DateOnly? date,
         CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var log = await repository.FindByUserAndDateAsync(userId, today, cancellationToken);
+        // El día lo decide el cliente en su zona horaria; sin él, el día UTC del servidor.
+        var day = date ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var log = await repository.FindByUserAndDateAsync(userId, day, cancellationToken);
 
         return log?.ToResponse();
     }

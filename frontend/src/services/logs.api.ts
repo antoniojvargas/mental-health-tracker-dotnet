@@ -65,15 +65,17 @@ export function list(from: IsoDate, to: IsoDate): Promise<DailyLogListResponse> 
  * llegaría como `ApiError` con `code: 'INTERNAL_ERROR'`, que miente: no hubo
  * ningún error interno. Cualquier otro error se propaga sin tocar.
  *
- * Ojo con el "hoy" del servidor: `GetTodayAsync` usa `DateTime.UtcNow`, o sea
- * UTC, no la fecha local del navegador. En un huso positivo, entre medianoche
- * local y la hora a la que corresponde ese mismo instante en UTC, `today()`
- * devuelve el registro de ayer y un formulario que se pinte a partir de él
- * escribiría en el día equivocado. Para la fecha local hay que pasar por `list`.
+ * El día lo decide el cliente: `date` es el "hoy" local del navegador (ver
+ * `todayIso`) y viaja como `?date=`. Sin él, el servidor usaría su día UTC, que
+ * en un huso distinto de UTC puede ser el de ayer o el de mañana y haría que el
+ * formulario se rellenara con el registro de otro día.
+ *
+ * @throws {ApiError} `VALIDATION_ERROR` si `date` supera en más de un día la fecha UTC.
  */
-export async function today(): Promise<DailyLog | null> {
+export async function today(date: IsoDate): Promise<DailyLog | null> {
+  const query = new URLSearchParams({ date })
   try {
-    return await apiRequest<DailyLog>('/logs/today')
+    return await apiRequest<DailyLog>(`/logs/today?${query.toString()}`)
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null

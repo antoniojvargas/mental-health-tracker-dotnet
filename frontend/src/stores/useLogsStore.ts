@@ -12,26 +12,14 @@ import { ref } from 'vue'
 
 import { describeError } from '../services/error-messages'
 import { list } from '../services/logs.api'
-import type { DailyLog, IsoDate } from '../types/daily-log'
+import type { DailyLog } from '../types/daily-log'
+import { toIsoDate } from '../utils/date'
 
 /** Ventanas admitidas: los últimos 7 o 30 días, hoy incluido. */
 export type LogRange = 'week' | 'month'
 
 /** Días que abarca cada ventana, contando hoy. */
 const RANGE_DAYS: Record<LogRange, number> = { week: 7, month: 30 }
-
-/**
- * "yyyy-MM-dd" en hora local, que es justo lo que espera la API.
- *
- * No sirve `toISOString()`: pasa a UTC y en un huso positivo devolvería el día
- * anterior por la noche, como avisa el JSDoc de `logs.api`.
- */
-function toIsoDate(date: Date): IsoDate {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 export const useLogsStore = defineStore('logs', () => {
   /** Los registros cargados, siempre por `logDate` ascendente. */
@@ -62,7 +50,7 @@ export const useLogsStore = defineStore('logs', () => {
     error.value = null
     try {
       const to = new Date()
-      const from = new Date()
+      const from = new Date(to)
       from.setDate(from.getDate() - (RANGE_DAYS[range] - 1))
       const { data } = await list(toIsoDate(from), toIsoDate(to))
       logs.value = [...data].sort((a, b) => a.logDate.localeCompare(b.logDate))
