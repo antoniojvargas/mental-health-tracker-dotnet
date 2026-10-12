@@ -28,7 +28,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
                 ["Jwt:ExpiresInDays"] = "7",
                 ["GoogleOAuth:ClientId"] = "integration-test-client.apps.googleusercontent.com",
                 ["GoogleOAuth:ClientSecret"] = "integration-test-client-secret",
-                ["GoogleOAuth:RedirectUri"] = "http://localhost:5173/auth/callback",
+                ["GoogleOAuth:RedirectUri"] = "http://localhost:5173/api/auth/google/callback",
                 ["AppUrls:FrontendUrl"] = "http://localhost:5173",
             });
         });

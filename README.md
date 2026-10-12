@@ -119,7 +119,7 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | `Jwt__ExpiresInDays` | Backend · `Jwt:ExpiresInDays` — caducidad de la cookie de sesión | No | No | `7` |
 | `GoogleOAuth__ClientId` | Backend · `GoogleOAuth:ClientId` — flujo OAuth con Google | Sí | No | `xxxxx.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Backend · `GoogleOAuth:ClientSecret` — intercambio de tokens con Google | Sí | Sí (`GOOGLE_CLIENT_SECRET_FILE`) | secreto de Google Cloud Console |
-| `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/auth/callback` |
+| `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/api/auth/google/callback` |
 | `AppUrls__FrontendUrl` | Backend · `AppUrls:FrontendUrl` — política CORS y redirecciones al frontend | Sí | No | `http://localhost:5173` |
 | `LOG_LEVEL` | Backend · nivel mínimo de Serilog (`Verbose`…`Fatal`) | No | No | `Information` |
 | `ASPNETCORE_ENVIRONMENT` | Backend · entorno del host (`Development`/`Testing`/`Production`) — habilita Swagger y `POST /api/auth/test-login` | No | No | `Development` (dev) · `Production` (prod) |
@@ -133,8 +133,10 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | `POSTGRES_PORT` | — **no consumida** (el compose publica `5432` fijo) | No | No | — |
 | `HTTP_PORT` | Compose de producción · puerto público del frontend en el host | No | No | `8080` |
 | `GOOGLE_CLIENT_ID` | Compose de producción · se inyecta al backend como `GoogleOAuth__ClientId` | Sí (prod) | No | `xxxxx.apps.googleusercontent.com` |
-| `GOOGLE_REDIRECT_URI` | Compose de producción · se inyecta como `GoogleOAuth__RedirectUri` | No | No | `http://localhost:8080/auth/callback` |
+| `GOOGLE_REDIRECT_URI` | Compose de producción · se inyecta como `GoogleOAuth__RedirectUri` | No | No | `http://localhost:8080/api/auth/google/callback` |
 | `FRONTEND_URL` | Compose de producción · se inyecta como `AppUrls__FrontendUrl` | No | No | `http://localhost:8080` |
+
+> **`GoogleOAuth__RedirectUri` / `GOOGLE_REDIRECT_URI`** debe ser exactamente la ruta del callback del backend, `/api/auth/google/callback`, pasando por el mismo origen que sirve el frontend (Vite en desarrollo, nginx en producción) para que la cookie `oauth_state` se escriba y se lea en el mismo origen. Esa URI exacta tiene que estar registrada en *Authorized redirect URIs* de la consola de Google Cloud; si no coincide, Google rechaza el login con `redirect_uri_mismatch`.
 
 Las plantillas `.env.example` (desarrollo/E2E) y `.env.production.example` (producción) traen estos valores prellenados; el detalle de los secretos y cómo generarlos está en [`secrets/README.md`](secrets/README.md).
 

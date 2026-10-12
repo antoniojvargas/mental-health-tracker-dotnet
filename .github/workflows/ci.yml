@@ -214,7 +214,7 @@ jobs:
           JWT_SECRET=e2e-only-disposable-secret-0123456789abcdef
           GoogleOAuth__ClientId=e2e-test-client.apps.googleusercontent.com
           GoogleOAuth__ClientSecret=e2e-disposable-client-secret
-          GoogleOAuth__RedirectUri=http://localhost:5173/auth/callback
+          GoogleOAuth__RedirectUri=http://localhost:5173/api/auth/google/callback
           AppUrls__FrontendUrl=http://localhost:5173
           LOG_LEVEL=Information
           EOF
@@ -318,7 +318,7 @@ jobs:
             -e JWT_SECRET="ci-only-disposable-secret-0123456789" \
             -e GoogleOAuth__ClientId="ci-test.apps.googleusercontent.com" \
             -e GoogleOAuth__ClientSecret="ci-disposable-secret" \
-            -e GoogleOAuth__RedirectUri="http://localhost:5173/auth/callback" \
+            -e GoogleOAuth__RedirectUri="http://localhost:5173/api/auth/google/callback" \
             -e AppUrls__FrontendUrl="http://localhost:5173" \
             mht-backend:ci
           sleep 15

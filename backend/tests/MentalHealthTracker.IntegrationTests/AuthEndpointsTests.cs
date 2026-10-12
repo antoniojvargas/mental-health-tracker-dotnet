@@ -101,7 +101,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Equal("online", query["access_type"]);
         Assert.Equal("select_account", query["prompt"]);
         Assert.Equal("integration-test-client.apps.googleusercontent.com", query["client_id"]);
-        Assert.Equal("http://localhost:5173/auth/callback", query["redirect_uri"]);
+        Assert.Equal("http://localhost:5173/api/auth/google/callback", query["redirect_uri"]);
     }
 
     private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()

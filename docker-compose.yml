@@ -30,7 +30,7 @@ services:
     environment:
       Database__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-mentalhealthtracker};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
       AppUrls__FrontendUrl: http://localhost:5173
-      GoogleOAuth__RedirectUri: http://localhost:5173/auth/callback
+      GoogleOAuth__RedirectUri: http://localhost:5173/api/auth/google/callback
       LOG_LEVEL: ${LOG_LEVEL:-Information}
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required: copy .env.example to .env and set it}"
       GoogleOAuth__ClientId: "${GoogleOAuth__ClientId:?GoogleOAuth__ClientId is required: set it in .env}"
