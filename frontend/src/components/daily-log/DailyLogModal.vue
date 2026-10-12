@@ -223,7 +223,7 @@ function inverseMapSymptomType(t: SymptomType): string | null {
 function loadToday() {
   isLoading.value = true
   loadError.value = null
-  getToday()
+  getToday(todayIso())
     .then((log: DailyLog | null) => {
       if (log) {
         fillFromLog(log)

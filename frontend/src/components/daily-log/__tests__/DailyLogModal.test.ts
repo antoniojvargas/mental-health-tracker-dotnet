@@ -236,6 +236,60 @@ describe('DailyLogModal', () => {
     expect(document.body.textContent).toContain('Step 1 of 4')
   })
 
+  describe('el día del cliente (20:00 en America/Bogota, ya es el día siguiente en UTC)', () => {
+    beforeEach(() => {
+      vi.stubEnv('TZ', 'America/Bogota')
+      // Solo `Date`: los timers reales siguen haciendo falta para esperar a Vue.
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-03-16T01:00:00Z'))
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.unstubAllEnvs()
+    })
+
+    async function openModal() {
+      wrapper = mount(Harness, { attachTo: document.body })
+      document.getElementById('open')?.click()
+      await nextTick()
+      await nextTick()
+      await new Promise((r) => setTimeout(r, 0))
+    }
+
+    it('pide el registro de hoy con la fecha local y precarga el formulario', async () => {
+      // A estas horas el día UTC ya es el 16: la petición debe llevar el 15 local.
+      expect(new Date().toISOString().slice(0, 10)).toBe('2026-03-16')
+      vi.mocked(logsApi.today).mockResolvedValue({
+        ...makeLog(),
+        logDate: '2026-03-15',
+        moodRating: 4,
+      })
+
+      await openModal()
+
+      expect(logsApi.today).toHaveBeenCalledTimes(1)
+      expect(logsApi.today).toHaveBeenCalledWith('2026-03-15')
+      const checked = document.querySelector('[role="radio"][aria-checked="true"]')
+      expect(checked?.textContent?.trim()).toBe('4')
+    })
+
+    it('guarda con la misma fecha local con la que consultó', async () => {
+      vi.mocked(logsApi.today).mockResolvedValue(null)
+      vi.mocked(logsApi.create).mockResolvedValue(makeLog())
+
+      await openModal()
+      selectMood(3)
+      clickSaveNow()
+      await nextTick()
+      await nextTick()
+      await new Promise((r) => setTimeout(r, 0))
+
+      expect(logsApi.today).toHaveBeenCalledWith('2026-03-15')
+      expect(logsApi.create).toHaveBeenCalledWith(expect.objectContaining({ logDate: '2026-03-15' }))
+    })
+  })
+
   it('anuncia la carga y bloquea avanzar sin quitar el formulario del foco', async () => {
     // La promesa no se resuelve: el modal se queda en su estado de carga.
     vi.mocked(logsApi.today).mockReturnValue(new Promise(() => {}))
