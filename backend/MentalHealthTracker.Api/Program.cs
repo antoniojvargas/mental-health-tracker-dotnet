@@ -79,6 +79,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddSingleton<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
 builder.Services.AddSingleton<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
+builder.Services.AddSingleton<IValidator<TodayQuery>, TodayQueryValidator>();
 builder.Services.AddScoped<IDailyLogService, DailyLogService>();
 builder.Services.AddScoped<ILogEventEmitter, LogEventEmitter>();
 

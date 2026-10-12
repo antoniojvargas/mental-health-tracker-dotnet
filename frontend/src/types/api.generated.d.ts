@@ -448,7 +448,9 @@ export interface paths {
         };
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    Date?: string;
+                };
                 header?: never;
                 path?: never;
                 cookie?: never;
