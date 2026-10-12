@@ -24,6 +24,17 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # Solo entran al contenedor las variables declaradas aqui: el .env del
+    # proyecto no se inyecta (ver docker-compose.e2e.yml). Compose lee .env para
+    # interpolar; las claves obligatorias fallan con un mensaje claro si faltan.
+    environment:
+      Database__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-mentalhealthtracker};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      AppUrls__FrontendUrl: http://localhost:5173
+      GoogleOAuth__RedirectUri: http://localhost:5173/auth/callback
+      LOG_LEVEL: ${LOG_LEVEL:-Information}
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required: copy .env.example to .env and set it}"
+      GoogleOAuth__ClientId: "${GoogleOAuth__ClientId:?GoogleOAuth__ClientId is required: set it in .env}"
+      GoogleOAuth__ClientSecret: "${GoogleOAuth__ClientSecret:?GoogleOAuth__ClientSecret is required: set it in .env}"
     depends_on:
       postgres:
         condition: service_healthy

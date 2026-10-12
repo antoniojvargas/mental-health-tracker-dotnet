@@ -10,10 +10,12 @@
 # aplica explícitamente encadenado al compose de desarrollo durante la suite E2E.
 services:
   backend:
-    # El stack E2E lee el .env del proyecto (con valores desechables: JWT_SECRET,
+    # El compose de desarrollo ya declara en `environment` las variables que el
+    # backend necesita (interpoladas desde .env), y solo esas entran al contenedor.
+    # El stack E2E ademas inyecta el .env completo (valores desechables: JWT_SECRET,
     # GoogleOAuth__*, Database__ConnectionString contra el servicio `postgres`).
-    # Es el unico punto donde se inyecta .env a un contenedor: el compose de
-    # desarrollo no lo usa, asi que los valores reales nunca entran a Docker.
+    # Es el unico punto donde se inyecta .env a un contenedor; `environment` tiene
+    # prioridad sobre `env_file`, asi que lo declarado en el compose base no cambia.
     env_file: .env
     environment:
       ASPNETCORE_ENVIRONMENT: Testing
