@@ -137,10 +137,23 @@ public class CreateDailyLogValidatorTests
         Assert.Equal(expectedValid, result.IsValid);
     }
 
+    // El día lo decide el cliente en su zona. En UTC+N, después de la medianoche local y antes
+    // de la UTC, "hoy" del usuario ya es mañana en UTC: se acepta hasta UTC + 1 día (UTC+14
+    // es la zona más adelantada) y se rechaza a partir de UTC + 2.
     [Fact]
-    public void LogDate_InTheFuture_HasExplicitErrorMessage()
+    public void LogDate_OneDayAheadOfUtc_IsAcceptedForClientsEastOfUtc()
     {
-        var futureDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var tomorrowUtc = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+
+        var result = _validator.Validate(ValidRequest(tomorrowUtc));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void LogDate_TwoDaysAheadOfUtc_HasExplicitErrorMessage()
+    {
+        var futureDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
         var request = ValidRequest(futureDate);
 
         var result = _validator.Validate(request);
