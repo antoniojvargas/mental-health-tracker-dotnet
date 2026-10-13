@@ -496,9 +496,9 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "text/plain": components["schemas"]["ProblemDetails"];
-                        "application/json": components["schemas"]["ProblemDetails"];
-                        "text/json": components["schemas"]["ProblemDetails"];
+                        "text/plain": components["schemas"]["ErrorResponse"];
+                        "application/json": components["schemas"]["ErrorResponse"];
+                        "text/json": components["schemas"]["ErrorResponse"];
                     };
                 };
                 /** @description Too Many Requests */
@@ -645,16 +645,6 @@ export interface components {
         };
         ErrorResponse: {
             error: components["schemas"]["ErrorBody"];
-        };
-        ProblemDetails: {
-            type?: string | null;
-            title?: string | null;
-            /** Format: int32 */
-            status?: number | null;
-            detail?: string | null;
-            instance?: string | null;
-        } & {
-            [key: string]: unknown;
         };
         /** @enum {string} */
         SleepDisturbance: "none" | "insomnia" | "nightmares" | "frequent_waking" | "early_waking";

@@ -33,6 +33,15 @@ describe('logs.api · today', () => {
     await expect(today('2026-03-15')).resolves.toBeNull()
   })
 
+  it('traduce a null el 404 con el sobre NOT_FOUND que manda el backend', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond(404, { error: { code: 'NOT_FOUND', message: 'No log for that day', details: [] } }),
+    )
+
+    await expect(today('2026-03-15')).resolves.toBeNull()
+  })
+
   it('propaga el resto de errores', async () => {
     vi.stubGlobal(
       'fetch',
