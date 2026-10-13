@@ -3,25 +3,45 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace MentalHealthTracker.Api.Modules.Realtime;
 
-public sealed class LogEventEmitter(IHubContext<LogsHub> hubContext) : ILogEventEmitter
+// El aviso en tiempo real es de mejor esfuerzo: cuando se emite, el registro ya está
+// confirmado en la base de datos, así que un fallo del hub no puede convertir un guardado
+// correcto en un 500. Se registra en Warning y no se relanza.
+//
+// El envío usa CancellationToken.None a propósito: si el cliente que guardó corta la
+// conexión tras el commit, el token de la petición se cancela, y las demás pestañas de
+// ese usuario deben enterarse igual. Por eso el token de la interfaz no se usa.
+// OperationCanceledException sí se deja pasar: es un apagado del host, no un fallo del envío.
+public sealed class LogEventEmitter(
+    IHubContext<LogsHub> hubContext,
+    ILogger<LogEventEmitter> logger) : ILogEventEmitter
 {
-    public async Task EmitLogCreatedAsync(
+    public Task EmitLogCreatedAsync(
         Guid userId,
         DailyLogResponse log,
-        CancellationToken cancellationToken = default)
-    {
-        await hubContext.Clients
-            .Group(LogsHub.GroupNameFor(userId))
-            .SendAsync("log:created", log, cancellationToken);
-    }
+        CancellationToken cancellationToken = default) =>
+        SendAsync("log:created", userId, log);
 
-    public async Task EmitLogUpdatedAsync(
+    public Task EmitLogUpdatedAsync(
         Guid userId,
         DailyLogResponse log,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SendAsync("log:updated", userId, log);
+
+    private async Task SendAsync(string eventName, Guid userId, DailyLogResponse log)
     {
-        await hubContext.Clients
-            .Group(LogsHub.GroupNameFor(userId))
-            .SendAsync("log:updated", log, cancellationToken);
+        try
+        {
+            await hubContext.Clients
+                .Group(LogsHub.GroupNameFor(userId))
+                .SendAsync(eventName, log, CancellationToken.None);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "Could not send realtime event {EventName} to user {UserId}",
+                eventName,
+                userId);
+        }
     }
 }
