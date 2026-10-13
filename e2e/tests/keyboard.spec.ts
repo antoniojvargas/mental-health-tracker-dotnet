@@ -146,7 +146,7 @@ test('toda la app es usable solo con teclado, de login a tendencias', async ({ p
   const socialFrequency = dialog.getByRole('combobox', { name: 'Social contact frequency' })
   await expect(socialFrequency).toBeFocused()
   await page.keyboard.press('o')
-  await expect(socialFrequency).toHaveValue('once')
+  await expect(socialFrequency).toHaveValue('rare')
 
   await page.keyboard.press('Tab')
   await expect(dialog.getByRole('slider', { name: 'Social connection' })).toBeFocused()

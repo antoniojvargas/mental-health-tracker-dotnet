@@ -436,22 +436,18 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
         await saveUntouchedAndCompare({ ...makeLog(), socialFrequency: value })
       })
 
-      // El select solo ofrece none/once/few/several/daily: con rare, occasional y frequent
-      // el control queda sin opción seleccionada y el usuario ve el campo en blanco. A5.
-      spec(value === 'rare' || value === 'occasional' || value === 'frequent')(
-        `${value}: el select muestra una opción seleccionada`,
-        async () => {
-          await openWith({ ...makeLog(), socialFrequency: value })
-          clickNext()
-          await settle()
-          clickNext()
-          await settle()
+      it(`${value}: el select muestra una opción seleccionada`, async () => {
+        await openWith({ ...makeLog(), socialFrequency: value })
+        clickNext()
+        await settle()
+        clickNext()
+        await settle()
 
-          const select = document.getElementById('socialFrequency') as HTMLSelectElement
-          expect(select).toBeTruthy()
-          expect(select.selectedIndex).not.toBe(-1)
-        },
-      )
+        const select = document.getElementById('socialFrequency') as HTMLSelectElement
+        expect(select).toBeTruthy()
+        expect(select.selectedIndex).not.toBe(-1)
+        expect(select.value).toBe(value)
+      })
     }
   })
 

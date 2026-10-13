@@ -75,9 +75,9 @@ const activityTypeOptions = [
 
 const socialFrequencyOptions = [
   { key: 'none', label: 'None' },
-  { key: 'once', label: 'Once' },
-  { key: 'few', label: 'A few times' },
-  { key: 'several', label: 'Several times' },
+  { key: 'rare', label: 'Once' },
+  { key: 'occasional', label: 'A few times' },
+  { key: 'frequent', label: 'Several times' },
   { key: 'daily', label: 'Daily' },
 ] as const
 
@@ -116,7 +116,7 @@ export interface DailyLogForm {
   activityType: string
   activityMinutes: number
   activity: number
-  socialFrequency: string
+  socialFrequency: SocialFrequency
   social: number
   symptoms: SymptomEntry[]
   notes: string
@@ -160,22 +160,6 @@ function inverseMapActivityType(t: ActivityType | null): string {
       return 'other'
     case 'none':
     case null:
-    default:
-      return 'none'
-  }
-}
-
-function inverseMapSocialFrequency(f: SocialFrequency): string {
-  switch (f) {
-    case 'rare':
-      return 'rare'
-    case 'occasional':
-      return 'occasional'
-    case 'frequent':
-      return 'frequent'
-    case 'daily':
-      return 'daily'
-    case 'none':
     default:
       return 'none'
   }
@@ -254,7 +238,7 @@ function fillFromLog(log: DailyLog) {
   form.activityType = inverseMapActivityType(log.activityType)
   form.activityMinutes = log.activityMinutes ?? 0
   form.activity = 5
-  form.socialFrequency = inverseMapSocialFrequency(log.socialFrequency)
+  form.socialFrequency = log.socialFrequency
   form.social = 5
   const mappedSymptoms = (log.symptoms || []).map((s) => {
     const key = inverseMapSymptomType(s.type)
@@ -374,26 +358,6 @@ function mapActivityType(t: string): ActivityType | null {
   }
 }
 
-function mapSocialFrequency(f: string): SocialFrequency {
-  switch (f) {
-    case 'none':
-      return 'none' as SocialFrequency
-    case 'once':
-    case 'rare':
-      return 'rare' as SocialFrequency
-    case 'few':
-    case 'occasional':
-      return 'occasional' as SocialFrequency
-    case 'several':
-    case 'frequent':
-      return 'frequent' as SocialFrequency
-    case 'daily':
-      return 'daily' as SocialFrequency
-    default:
-      return 'none' as SocialFrequency
-  }
-}
-
 function mapSymptomType(key: string): SymptomType | null {
   switch (key) {
     case 'anxiety':
@@ -442,7 +406,7 @@ function buildPayload(): CreateDailyLogInput {
       form.activityType === 'none' || form.activityMinutes <= 0
         ? null
         : Math.min(600, Math.max(0, Math.round(form.activityMinutes))),
-    socialFrequency: mapSocialFrequency(form.socialFrequency),
+    socialFrequency: form.socialFrequency,
     symptoms: activeSymptoms,
     notes: form.notes.trim().length > 0 ? form.notes.trim().slice(0, 1000) : null,
   }
