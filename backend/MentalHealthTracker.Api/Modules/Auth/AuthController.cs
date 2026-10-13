@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
+using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -100,14 +101,14 @@ public sealed class AuthController(
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
         {
-            return Unauthorized();
+            throw new UnauthorizedException("Authentication required");
         }
 
         var user = await userRepository.FindByIdAsync(userId, cancellationToken);
         if (user is null)
         {
             logger.LogWarning("Session token references user {UserId} that no longer exists", userId);
-            return Unauthorized();
+            throw new UnauthorizedException("Authentication required");
         }
 
         return Ok(new

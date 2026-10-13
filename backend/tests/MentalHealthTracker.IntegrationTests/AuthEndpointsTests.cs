@@ -5,6 +5,8 @@ using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
+using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
@@ -21,6 +23,26 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var response = await client.GetAsync("/api/auth/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Me_WithValidCookieForDeletedUser_Returns401WithErrorEnvelope()
+    {
+        var (client, _, _) = await CreateAuthenticatedSessionAsync("deleted-user@example.com");
+
+        await using (var scope = Factory.Services.CreateAsyncScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await dbContext.Database.ExecuteSqlRawAsync("TRUNCATE TABLE users, daily_logs CASCADE");
+        }
+
+        var response = await client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var error = body.RootElement.GetProperty("error");
+        Assert.Equal("UNAUTHORIZED", error.GetProperty("code").GetString());
+        Assert.Equal("Authentication required", error.GetProperty("message").GetString());
     }
 
     [Fact]
