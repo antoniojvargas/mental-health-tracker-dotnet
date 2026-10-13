@@ -2,6 +2,7 @@ using System.Security.Claims;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
+using MentalHealthTracker.Domain.Errors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -53,7 +54,7 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
 
     [HttpGet("today")]
     [ProducesResponseType(typeof(DailyLogResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
@@ -62,8 +63,9 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
         [FromQuery] TodayQuery query,
         CancellationToken cancellationToken)
     {
-        var response = await dailyLogService.GetTodayAsync(UserId, query.Date, cancellationToken);
+        var response = await dailyLogService.GetTodayAsync(UserId, query.Date, cancellationToken)
+            ?? throw new NotFoundException("No log for that day");
 
-        return response is null ? NotFound() : Ok(response);
+        return Ok(response);
     }
 }

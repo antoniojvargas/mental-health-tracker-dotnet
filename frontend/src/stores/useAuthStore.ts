@@ -29,10 +29,9 @@ export const useAuthStore = defineStore('auth', () => {
    * caída, eso sí es un problema que alguien tiene que ver, y tragárselo aquí
    * dejaría una pantalla vacía sin explicación.
    *
-   * Ojo con leer el `code` para decidir esto: el 401 de `RequireAuthMiddleware`
-   * trae `code: 'UNAUTHORIZED'`, pero el de `AuthController.Me` —cookie válida
-   * con usuario borrado— llega sin cuerpo y `apiRequest` lo degrada a
-   * `INTERNAL_ERROR`. Por eso se mira el status, no el code.
+   * Se decide por el status y no por el `code`: un 401 que no venga de la API
+   * (un proxy, por ejemplo) llega sin sobre y `apiRequest` lo degrada a
+   * `INTERNAL_ERROR`.
    *
    * @returns El usuario, o `null` si no hay sesión.
    * @throws {ApiError} Cualquier estado que no sea 401.

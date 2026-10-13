@@ -34,9 +34,14 @@ watch(range, (value) => void logsStore.fetch(value), { immediate: true })
 /**
  * Los registros que llegan por el hub (guardados en otra pestaña) entran por
  * `mergeLog`: si el día ya estaba en la lista se reemplaza, y si no se inserta
- * en orden. Así el panel se actualiza sin recargar.
+ * en orden. Así el panel se actualiza sin recargar. Si la conexión se corta y
+ * vuelve, se relee la ventana para recuperar lo que se emitió mientras tanto.
  */
-useLogSocket((log) => logsStore.mergeLog(log))
+useLogSocket(
+  (log) => logsStore.mergeLog(log),
+  // El hub no reenvía lo emitido durante un corte: al volver, la API manda.
+  () => void logsStore.fetch(range.value),
+)
 
 /**
  * El avatar es opcional: Google no siempre entrega una foto, así que la

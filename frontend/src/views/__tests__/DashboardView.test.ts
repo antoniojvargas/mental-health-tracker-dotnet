@@ -7,6 +7,7 @@ import DashboardView from '../DashboardView.vue'
 import Skeleton from '../../components/ui/Skeleton.vue'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useLogsStore } from '../../stores/useLogsStore'
+import { useLogSocket } from '../../composables/useLogSocket'
 import type { DailyLog, IsoDate, User } from '../../types/daily-log'
 
 vi.mock('vue-router', () => ({
@@ -98,6 +99,18 @@ describe('DashboardView', () => {
     wrapper?.unmount()
     wrapper = null
     vi.restoreAllMocks()
+  })
+
+  it('al reconectar el hub vuelve a pedir la ventana activa', () => {
+    mountDashboard({ user: makeUser('Ana Gómez') })
+    const logs = useLogsStore()
+    const onReconnected = vi.mocked(useLogSocket).mock.calls.at(-1)![1]!
+    vi.mocked(logs.fetch).mockClear()
+
+    onReconnected()
+
+    expect(logs.fetch).toHaveBeenCalledTimes(1)
+    expect(logs.fetch).toHaveBeenCalledWith('week')
   })
 
   it('saluda por el primer nombre', () => {

@@ -10,6 +10,7 @@ using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Api.Modules.Realtime;
+using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
@@ -256,6 +257,14 @@ if (app.Environment.IsEnvironment("Testing"))
 {
     app.MapTestAuthEndpoints();
 }
+
+// Cualquier ruta de /api sin endpoint cae aquí y sale por el manejador global con el
+// mismo sobre de error que el resto de la API, en lugar de un 404 vacío. Solo cubre
+// /api: /hub y Swagger quedan fuera. Es el endpoint de menor prioridad, así que no
+// tapa a los reales; por contra, un método no admitido en una ruta existente también
+// termina aquí (404 en vez de 405).
+app.MapFallback("/api/{**path}", (HttpContext context) =>
+    throw new NotFoundException($"Route {context.Request.Path} does not exist"));
 
 var startedAt = DateTimeOffset.UtcNow;
 

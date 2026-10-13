@@ -108,6 +108,19 @@ public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Today_WithoutLog_ReturnsNotFoundErrorEnvelope()
+    {
+        var (_, _, token) = await NewSessionAsync();
+
+        var response = await GetTodayAsync(token);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("NOT_FOUND", body.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
     private async Task<(HttpClient Client, User User, string Token)> NewSessionAsync() =>
         await CreateAuthenticatedSessionAsync($"today-{Guid.NewGuid():N}@example.com");
 

@@ -47,9 +47,7 @@ describe('useAuthStore', () => {
   })
 
   it('trata el 401 sin sobre como ausencia de sesión, sin lanzar', async () => {
-    // El otro camino del mismo 401: AuthController.Me responde con un
-    // `Unauthorized()` a secas cuando la cookie vale pero el usuario ya no
-    // existe. El cuerpo va vacío, así que apiRequest lo degrada a
+    // Un 401 sin cuerpo (p. ej. de un proxy) llega a apiRequest degradado a
     // INTERNAL_ERROR: por eso el store decide por el status y no por el code.
     mockFetch(emptyResponse(401, 'Unauthorized'))
     const store = useAuthStore()
