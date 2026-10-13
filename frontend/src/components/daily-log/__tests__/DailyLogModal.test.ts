@@ -46,7 +46,7 @@ function makeLog(): DailyLog {
     sleepHours: 7,
     sleepQuality: 3,
     sleepDisturbances: [],
-    activityType: null,
+    activityType: 'none',
     activityMinutes: null,
     socialFrequency: 'none',
     symptoms: [],
@@ -355,10 +355,9 @@ describe('DailyLogModal', () => {
 // Ida y vuelta: abrir el modal con un registro y guardar sin tocar nada debe enviar a
 // `create` exactamente los mismos campos que el registro (A5 del Apéndice de MEJORAS.md).
 //
-// Es la especificación del formulario sin pérdida. Los casos que hoy fallan están
-// marcados con `it.fails` y el comentario "A5": el CI sigue en verde y, cuando un cambio
-// corrige el mapeo, el caso empieza a pasar, `it.fails` lo delata y hay que convertirlo
-// en `it`. No se debe borrar un caso para "arreglar" la suite.
+// Es la especificación del formulario sin pérdida: ya no queda ningún `it.fails`. Si un
+// cambio vuelve a perder datos, el caso correspondiente falla. No se debe borrar un caso
+// para "arreglar" la suite.
 // ---------------------------------------------------------------------------
 describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
   const ROUND_TRIP_KEYS = [
@@ -412,9 +411,6 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
     expect(roundTripFields(sent)).toEqual(roundTripFields({ ...log }))
   }
 
-  /** `it.fails` para lo que hoy pierde datos (A5); `it` para lo que ya viaja bien. */
-  const spec = (knownLoss: boolean) => (knownLoss ? it.fails : it)
-
   beforeEach(() => {
     vi.mocked(logsApi.create).mockReset()
     vi.mocked(logsApi.today).mockReset()
@@ -453,8 +449,7 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
 
   describe('ActivityType', () => {
     for (const value of ACTIVITY_TYPES) {
-      // `none` se envía hoy como `null`: el valor del enum no vuelve igual. A5.
-      spec(value === 'none')(`${value}: el payload conserva tipo y minutos`, async () => {
+      it(`${value}: el payload conserva tipo y minutos`, async () => {
         await saveUntouchedAndCompare({
           ...makeLog(),
           activityType: value as ActivityType,
@@ -463,8 +458,15 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
       })
     }
 
-    it('sin actividad (null): vuelve como null y sin minutos', async () => {
-      await saveUntouchedAndCompare({ ...makeLog(), activityType: null, activityMinutes: null })
+    // `null` y `none` significan lo mismo para el usuario; el select solo conoce `none`.
+    it('sin actividad (null): se reenvía como none y sin minutos', async () => {
+      await openWith({ ...makeLog(), activityType: null, activityMinutes: null })
+      clickSaveNow()
+      await settle()
+
+      const sent = vi.mocked(logsApi.create).mock.calls[0][0]
+      expect(sent.activityType).toBe('none')
+      expect(sent.activityMinutes).toBeNull()
     })
   })
 
@@ -476,13 +478,13 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
 
     for (const value of disturbances) {
       // `early_waking` vuelve como `frequent_waking`. A5.
-      spec(value === 'early_waking')(`${value}: el payload conserva la alteración`, async () => {
+      it(`${value}: el payload conserva la alteración`, async () => {
         await saveUntouchedAndCompare({ ...makeLog(), sleepDisturbances: [value] })
       })
     }
 
     // Varias a la vez. Falla por `early_waking`. A5.
-    spec(true)('todas juntas: el payload conserva la lista completa', async () => {
+    it('todas juntas: el payload conserva la lista completa', async () => {
       await saveUntouchedAndCompare({ ...makeLog(), sleepDisturbances: disturbances })
     })
   })

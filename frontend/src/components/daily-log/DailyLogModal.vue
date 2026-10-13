@@ -51,27 +51,22 @@ const loadError = ref<string | null>(null)
 const { success, error: toastError } = useToast()
 
 const sleepDisturbanceOptions = [
-  { key: 'trouble-falling-asleep', label: 'Trouble falling asleep' },
-  { key: 'waking-during-night', label: 'Waking up during the night' },
-  { key: 'waking-too-early', label: 'Waking up too early' },
+  { key: 'insomnia', label: 'Trouble falling asleep' },
+  { key: 'frequent_waking', label: 'Waking up during the night' },
+  { key: 'early_waking', label: 'Waking up too early' },
   { key: 'nightmares', label: 'Nightmares' },
-  { key: 'restless-legs', label: 'Restless legs' },
-  { key: 'interrupted-sleep', label: 'Interrupted sleep' },
-  { key: 'snoring', label: 'Snoring' },
-  { key: 'other', label: 'Other' },
-] as const
+] as const satisfies readonly { key: SleepDisturbance; label: string }[]
 
 const activityTypeOptions = [
   { key: 'none', label: 'None' },
-  { key: 'walk', label: 'Walk' },
-  { key: 'run', label: 'Run' },
+  { key: 'walking', label: 'Walk' },
+  { key: 'running', label: 'Run' },
   { key: 'gym', label: 'Gym' },
   { key: 'yoga', label: 'Yoga/Stretching' },
   { key: 'cycling', label: 'Cycling' },
   { key: 'sports', label: 'Sports' },
-  { key: 'housework', label: 'Housework' },
   { key: 'other', label: 'Other' },
-] as const
+] as const satisfies readonly { key: ActivityType; label: string }[]
 
 const socialFrequencyOptions = [
   { key: 'none', label: 'None' },
@@ -103,8 +98,8 @@ export interface DailyLogForm {
   stress: number
   sleepQuality: number
   sleepHours: number
-  sleepDisturbances: string[]
-  activityType: string
+  sleepDisturbances: SleepDisturbance[]
+  activityType: ActivityType
   activityMinutes: number
   activity: number
   socialFrequency: SocialFrequency
@@ -132,45 +127,6 @@ const isLastStep = computed(() => currentStep.value === steps.length - 1)
  * actuar y evitan guardar un registro a medias con los valores por defecto.
  */
 const isReady = computed(() => !isLoading.value && !loadError.value)
-
-function inverseMapActivityType(t: ActivityType | null): string {
-  switch (t) {
-    case 'walking':
-      return 'walk'
-    case 'running':
-      return 'run'
-    case 'gym':
-      return 'gym'
-    case 'yoga':
-      return 'yoga'
-    case 'cycling':
-      return 'cycling'
-    case 'sports':
-      return 'sports'
-    case 'other':
-      return 'other'
-    case 'none':
-    case null:
-    default:
-      return 'none'
-  }
-}
-
-function inverseMapSleepDisturbance(d: SleepDisturbance): string | null {
-  switch (d) {
-    case 'insomnia':
-      return 'trouble-falling-asleep'
-    case 'frequent_waking':
-      return 'waking-during-night'
-    case 'early_waking':
-      return 'waking-too-early'
-    case 'nightmares':
-      return 'nightmares'
-    case 'none':
-    default:
-      return null
-  }
-}
 
 function loadToday() {
   isLoading.value = true
@@ -200,10 +156,8 @@ function fillFromLog(log: DailyLog) {
   form.stress = log.stressLevel
   form.sleepQuality = log.sleepQuality
   form.sleepHours = log.sleepHours
-  form.sleepDisturbances = (log.sleepDisturbances || [])
-    .map((d) => inverseMapSleepDisturbance(d))
-    .filter((x): x is string => x !== null)
-  form.activityType = inverseMapActivityType(log.activityType)
+  form.sleepDisturbances = (log.sleepDisturbances || []).filter((d) => d !== 'none')
+  form.activityType = log.activityType ?? 'none'
   form.activityMinutes = log.activityMinutes ?? 0
   form.activity = 5
   form.socialFrequency = log.socialFrequency
@@ -256,48 +210,6 @@ function resetForm() {
   currentStep.value = 0
 }
 
-function mapSleepDisturbances(dist: string[]): SleepDisturbance[] {
-  const allowed = new Set(['none', 'insomnia', 'nightmares', 'frequent_waking', 'early_waking'])
-  return dist
-    .map((d) => {
-      if (d === 'trouble-falling-asleep') return 'insomnia' as SleepDisturbance
-      if (d === 'waking-during-night' || d === 'waking-too-early' || d === 'interrupted-sleep')
-        return 'frequent_waking' as SleepDisturbance
-      if (d === 'nightmares') return 'nightmares' as SleepDisturbance
-      if (d === 'restless-legs') return 'frequent_waking' as SleepDisturbance
-      if (d === 'snoring') return 'none' as SleepDisturbance
-      if (d === 'other') return 'none' as SleepDisturbance
-      if (allowed.has(d)) return d as SleepDisturbance
-      return 'none' as SleepDisturbance
-    })
-    .filter((v, i, arr) => arr.indexOf(v) === i)
-}
-
-function mapActivityType(t: string): ActivityType | null {
-  switch (t) {
-    case 'none':
-      return null
-    case 'walk':
-      return 'walking' as ActivityType
-    case 'run':
-      return 'running' as ActivityType
-    case 'gym':
-      return 'gym' as ActivityType
-    case 'yoga':
-      return 'yoga' as ActivityType
-    case 'cycling':
-      return 'cycling' as ActivityType
-    case 'sports':
-      return 'sports' as ActivityType
-    case 'housework':
-      return 'other' as ActivityType
-    case 'other':
-      return 'other' as ActivityType
-    default:
-      return null
-  }
-}
-
 function buildPayload(): CreateDailyLogInput {
   const activeSymptoms = form.symptoms
     .filter((s) => s.active)
@@ -310,8 +222,8 @@ function buildPayload(): CreateDailyLogInput {
     stressLevel: Math.min(10, Math.max(1, form.stress)),
     sleepHours: Math.min(24, Math.max(0, form.sleepHours)),
     sleepQuality: Math.min(5, Math.max(1, form.sleepQuality)),
-    sleepDisturbances: mapSleepDisturbances(form.sleepDisturbances),
-    activityType: mapActivityType(form.activityType),
+    sleepDisturbances: form.sleepDisturbances,
+    activityType: form.activityType,
     activityMinutes:
       form.activityType === 'none' || form.activityMinutes <= 0
         ? null
