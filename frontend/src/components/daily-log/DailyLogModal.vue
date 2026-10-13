@@ -85,9 +85,7 @@ const form = reactive<DailyLogForm>({
   sleepDisturbances: [],
   activityType: 'none',
   activityMinutes: 0,
-  activity: 5,
   socialFrequency: 'none',
-  social: 5,
   symptoms: defaultSymptoms(),
   notes: '',
 })
@@ -101,9 +99,7 @@ export interface DailyLogForm {
   sleepDisturbances: SleepDisturbance[]
   activityType: ActivityType
   activityMinutes: number
-  activity: number
   socialFrequency: SocialFrequency
-  social: number
   symptoms: SymptomEntry[]
   notes: string
 }
@@ -159,9 +155,7 @@ function fillFromLog(log: DailyLog) {
   form.sleepDisturbances = (log.sleepDisturbances || []).filter((d) => d !== 'none')
   form.activityType = log.activityType ?? 'none'
   form.activityMinutes = log.activityMinutes ?? 0
-  form.activity = 5
   form.socialFrequency = log.socialFrequency
-  form.social = 5
   form.symptoms = defaultSymptoms().map((d) => {
     const found = (log.symptoms || []).find((s) => s.type === d.key)
     return found ? { ...d, active: true, severity: Math.min(5, Math.max(1, found.severity)) } : d
@@ -202,9 +196,7 @@ function resetForm() {
   form.sleepDisturbances = []
   form.activityType = 'none'
   form.activityMinutes = 0
-  form.activity = 5
   form.socialFrequency = 'none'
-  form.social = 5
   form.symptoms = defaultSymptoms()
   form.notes = ''
   currentStep.value = 0
@@ -394,15 +386,6 @@ function close() {
               helper-text="0–600 minutes (disabled if no activity)"
             />
 
-            <SliderField
-              v-model="form.activity"
-              label="Activity level"
-              :min="0"
-              :max="10"
-              :step="1"
-              helper-text="0 = very low, 10 = very high"
-            />
-
             <div class="flex flex-col gap-2">
               <label for="socialFrequency" class="text-sm font-medium text-ink-700"
                 >Social contact frequency</label
@@ -417,15 +400,6 @@ function close() {
                 </option>
               </select>
             </div>
-
-            <SliderField
-              v-model="form.social"
-              label="Social connection"
-              :min="0"
-              :max="10"
-              :step="1"
-              helper-text="0 = isolated, 10 = well connected"
-            />
           </section>
 
           <section v-if="currentStep === 3" class="flex flex-col gap-4">
