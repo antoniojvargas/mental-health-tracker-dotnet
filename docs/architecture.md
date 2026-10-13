@@ -134,6 +134,27 @@ canal de tiempo real.**
   devuelve `401` y el cliente jamás establece la conexión: no hay "conexión anónima" con
   autorización diferida por hub.
 
+### Notificación en tiempo real: de mejor esfuerzo, la fuente de verdad es la API
+
+El evento `log:created` / `log:updated` es un **aviso de comodidad**, no un canal fiable de
+datos. Dos reglas lo acotan:
+
+- **En el servidor, un fallo del hub no rompe el guardado.** `LogEventEmitter` se ejecuta
+  cuando el registro ya está confirmado en la base de datos. Si `SendAsync` falla, captura la
+  excepción, la registra en `Warning` (con el nombre del evento y el `userId`) y **no la
+  relanza**: `POST /api/logs` responde igualmente 201. Solo deja pasar
+  `OperationCanceledException`. Además envía con `CancellationToken.None`, de modo que si el
+  cliente que guardó corta la conexión tras el commit, sus otras pestañas se enteran igual.
+- **En el cliente, lo que se pierde se recupera pidiéndolo a la API.** SignalR no reenvía los
+  eventos emitidos mientras una conexión estaba caída. Por eso `useLogSocket` acepta un
+  callback `onReconnected`, que se dispara con `onreconnected` de la reconexión automática, y
+  el dashboard lo usa para volver a pedir la ventana activa (`logsStore.fetch`). Mientras
+  tanto, los eventos que sí llegan se integran con `mergeLog`, que reemplaza por `logDate` y
+  por tanto es idempotente.
+
+Consecuencia de diseño: **nada puede depender de que un evento llegue**. Toda pantalla debe
+poder reconstruirse con una lectura a la API; el hub solo evita tener que recargar.
+
 ### Escalado horizontal del canal en tiempo real: señalada limitación, sin backplane (decisión de alcance)
 
 El canal en tiempo real **no está preparado para correr en varias réplicas de la API**:

@@ -28,6 +28,7 @@ type ConnectionHandler = (log: DailyLog) => void
 const connection = {
   on: vi.fn<(event: string, handler: ConnectionHandler) => void>(),
   off: vi.fn<(event: string, handler: ConnectionHandler) => void>(),
+  onreconnected: vi.fn<(callback: () => void) => void>(),
   start: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   stop: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }
@@ -54,10 +55,10 @@ function makeLog(logDate: IsoDate): DailyLog {
 
 let wrapper: VueWrapper | null = null
 
-function mountSocket(onLog: ConnectionHandler): VueWrapper {
+function mountSocket(onLog: ConnectionHandler, onReconnected?: () => void): VueWrapper {
   const Harness = defineComponent({
     setup() {
-      useLogSocket(onLog)
+      useLogSocket(onLog, onReconnected)
       return () => h('div')
     },
   })
@@ -77,6 +78,7 @@ describe('useLogSocket', () => {
     vi.mocked(getLogHubConnection).mockReturnValue(connection as never)
     connection.on.mockClear()
     connection.off.mockClear()
+    connection.onreconnected.mockClear()
     connection.start.mockClear()
     connection.stop.mockClear()
   })
@@ -130,5 +132,34 @@ describe('useLogSocket', () => {
     expect(connection.off).toHaveBeenCalledWith('log:created', created)
     expect(connection.off).toHaveBeenCalledWith('log:updated', updated)
     expect(connection.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('al reconectar avisa para que el cliente recupere lo perdido durante el corte', () => {
+    const onReconnected = vi.fn()
+    mountSocket(vi.fn(), onReconnected)
+
+    expect(connection.onreconnected).toHaveBeenCalledTimes(1)
+    expect(onReconnected).not.toHaveBeenCalled()
+
+    connection.onreconnected.mock.calls[0][0]()
+
+    expect(onReconnected).toHaveBeenCalledTimes(1)
+  })
+
+  it('tras desmontar, una reconexión ya no avisa', () => {
+    const onReconnected = vi.fn()
+    mountSocket(vi.fn(), onReconnected)
+    const callback = connection.onreconnected.mock.calls[0][0]
+
+    wrapper!.unmount()
+    callback()
+
+    expect(onReconnected).not.toHaveBeenCalled()
+  })
+
+  it('sin callback de reconexión no registra nada', () => {
+    mountSocket(vi.fn())
+
+    expect(connection.onreconnected).not.toHaveBeenCalled()
   })
 })
