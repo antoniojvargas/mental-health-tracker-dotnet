@@ -2,22 +2,35 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
-import SymptomPicker, { type SymptomEntry } from '../SymptomPicker.vue'
+import SymptomPicker from '../SymptomPicker.vue'
+import { defaultSymptoms, type SymptomEntry } from '../symptoms'
+import { SYMPTOM_TYPES } from '../../../types/daily-log'
 
 function defaultEntries(): SymptomEntry[] {
-  return [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ]
+  return defaultSymptoms()
 }
 
 describe('SymptomPicker', () => {
+  it('offers exactly the 8 SymptomType values with their labels', () => {
+    const wrapper = mount(SymptomPicker)
+    const labels = wrapper.findAll('label').map((l) => l.text())
+    expect(labels).toEqual([
+      'Panic',
+      'Low mood',
+      'Fatigue',
+      'Irritability',
+      'Concentration',
+      'Appetite change',
+      'Restlessness',
+      'Hopelessness',
+    ])
+    expect(
+      defaultSymptoms()
+        .map((e) => e.key)
+        .sort(),
+    ).toEqual([...SYMPTOM_TYPES].sort())
+  })
+
   it('emits update:modelValue when toggling symptom', async () => {
     const wrapper = mount(SymptomPicker, { props: { modelValue: defaultEntries() } })
     await wrapper.findAll('input[type="checkbox"]')[0].setValue(true)
@@ -44,7 +57,7 @@ describe('SymptomPicker', () => {
     const events = wrapper.emitted('update:modelValue')
     expect(events).toBeTruthy()
     const last = events![events!.length - 1][0] as SymptomEntry[]
-    const target = last.find((x) => x.key === 'depression') ?? last[last.length - 1]
+    const target = last.find((x) => x.key === 'low_mood') ?? last[last.length - 1]
     expect(target.active).toBe(true)
   })
 

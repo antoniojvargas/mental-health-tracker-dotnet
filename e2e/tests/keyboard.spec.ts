@@ -129,7 +129,7 @@ test('toda la app es usable solo con teclado, de login a tendencias', async ({ p
   // Playwright no puede manejar el popup nativo de opciones en headless, así que
   // el type-ahead es la vía de teclado que sí es portable al CI.
   await page.keyboard.press('w')
-  await expect(activityType).toHaveValue('walk')
+  await expect(activityType).toHaveValue('walking')
 
   await page.keyboard.press('Tab')
   const activityMinutes = dialog.getByRole('slider', { name: 'Activity minutes' })
@@ -139,41 +139,34 @@ test('toda la app es usable solo con teclado, de login a tendencias', async ({ p
   await expectSliderValue(page, activityMinutes, '10')
 
   await page.keyboard.press('Tab')
-  await expect(dialog.getByRole('slider', { name: 'Activity level' })).toBeFocused()
-  await page.keyboard.press('ArrowLeft')
-
-  await page.keyboard.press('Tab')
   const socialFrequency = dialog.getByRole('combobox', { name: 'Social contact frequency' })
   await expect(socialFrequency).toBeFocused()
   await page.keyboard.press('o')
-  await expect(socialFrequency).toHaveValue('once')
+  await expect(socialFrequency).toHaveValue('rare')
 
-  await page.keyboard.press('Tab')
-  await expect(dialog.getByRole('slider', { name: 'Social connection' })).toBeFocused()
-  await page.keyboard.press('ArrowRight')
 
   await tabUntil(page, dialog.getByRole('button', { name: 'Next' }))
   await page.keyboard.press('Enter')
   await expect(page.getByText('Step 4 of 4: Symptoms')).toBeVisible()
 
   // ------------------------------------------------- Paso 4 de 4: symptoms
-  const anxietyCheck = dialog.getByRole('checkbox', { name: 'Anxiety' })
-  await tabUntil(page, anxietyCheck)
+  const panicCheck = dialog.getByRole('checkbox', { name: 'Panic' })
+  await tabUntil(page, panicCheck)
   await page.keyboard.press('Space')
-  await expect(anxietyCheck).toBeChecked()
+  await expect(panicCheck).toBeChecked()
 
   await page.keyboard.press('Tab')
-  const severity = dialog.getByRole('radiogroup', { name: 'Anxiety severity' })
+  const severity = dialog.getByRole('radiogroup', { name: 'Panic severity' })
   await expect(severity.getByRole('radio', { name: '1' })).toBeFocused()
   await page.keyboard.press('ArrowRight')
   await expect(severity.getByRole('radio', { name: '2' })).toBeFocused()
   await expect(severity.getByRole('radio', { name: '2' })).toHaveAttribute('aria-checked', 'true')
 
-  const sleepCheck = dialog.getByRole('checkbox', { name: 'Sleep' })
-  // Entre la severidad y Sleep va el síntoma "Depression".
-  await tabUntil(page, sleepCheck)
+  const fatigueCheck = dialog.getByRole('checkbox', { name: 'Fatigue' })
+  // Entre la severidad y Fatigue va el síntoma "Low mood".
+  await tabUntil(page, fatigueCheck)
   await page.keyboard.press('Space')
-  await expect(sleepCheck).toBeChecked()
+  await expect(fatigueCheck).toBeChecked()
 
   const notes = dialog.getByRole('textbox', { name: 'Notes' })
   await tabUntil(page, notes)

@@ -5,7 +5,8 @@ import Button from '../ui/Button.vue'
 import Skeleton from '../ui/Skeleton.vue'
 import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
-import SymptomPicker, { type SymptomEntry } from './SymptomPicker.vue'
+import SymptomPicker from './SymptomPicker.vue'
+import { defaultSymptoms, type SymptomEntry } from './symptoms'
 import { create as createLog, today as getToday } from '../../services/logs.api'
 import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'
@@ -14,7 +15,6 @@ import type {
   CreateDailyLogInput,
   ActivityType,
   SocialFrequency,
-  SymptomType,
   SleepDisturbance,
   DailyLog,
 } from '../../types/daily-log'
@@ -38,7 +38,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: DailyLogForm): void
-  (e: 'saved'): void
+  (e: 'saved', log: DailyLog): void
 }>()
 
 const steps = ['Mood', 'Sleep', 'Activity and social life', 'Symptoms'] as const
@@ -51,33 +51,28 @@ const loadError = ref<string | null>(null)
 const { success, error: toastError } = useToast()
 
 const sleepDisturbanceOptions = [
-  { key: 'trouble-falling-asleep', label: 'Trouble falling asleep' },
-  { key: 'waking-during-night', label: 'Waking up during the night' },
-  { key: 'waking-too-early', label: 'Waking up too early' },
+  { key: 'insomnia', label: 'Trouble falling asleep' },
+  { key: 'frequent_waking', label: 'Waking up during the night' },
+  { key: 'early_waking', label: 'Waking up too early' },
   { key: 'nightmares', label: 'Nightmares' },
-  { key: 'restless-legs', label: 'Restless legs' },
-  { key: 'interrupted-sleep', label: 'Interrupted sleep' },
-  { key: 'snoring', label: 'Snoring' },
-  { key: 'other', label: 'Other' },
-] as const
+] as const satisfies readonly { key: SleepDisturbance; label: string }[]
 
 const activityTypeOptions = [
   { key: 'none', label: 'None' },
-  { key: 'walk', label: 'Walk' },
-  { key: 'run', label: 'Run' },
+  { key: 'walking', label: 'Walk' },
+  { key: 'running', label: 'Run' },
   { key: 'gym', label: 'Gym' },
   { key: 'yoga', label: 'Yoga/Stretching' },
   { key: 'cycling', label: 'Cycling' },
   { key: 'sports', label: 'Sports' },
-  { key: 'housework', label: 'Housework' },
   { key: 'other', label: 'Other' },
-] as const
+] as const satisfies readonly { key: ActivityType; label: string }[]
 
 const socialFrequencyOptions = [
   { key: 'none', label: 'None' },
-  { key: 'once', label: 'Once' },
-  { key: 'few', label: 'A few times' },
-  { key: 'several', label: 'Several times' },
+  { key: 'rare', label: 'Once' },
+  { key: 'occasional', label: 'A few times' },
+  { key: 'frequent', label: 'Several times' },
   { key: 'daily', label: 'Daily' },
 ] as const
 
@@ -90,19 +85,8 @@ const form = reactive<DailyLogForm>({
   sleepDisturbances: [],
   activityType: 'none',
   activityMinutes: 0,
-  activity: 5,
   socialFrequency: 'none',
-  social: 5,
-  symptoms: [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ],
+  symptoms: defaultSymptoms(),
   notes: '',
 })
 
@@ -112,12 +96,10 @@ export interface DailyLogForm {
   stress: number
   sleepQuality: number
   sleepHours: number
-  sleepDisturbances: string[]
-  activityType: string
+  sleepDisturbances: SleepDisturbance[]
+  activityType: ActivityType
   activityMinutes: number
-  activity: number
-  socialFrequency: string
-  social: number
+  socialFrequency: SocialFrequency
   symptoms: SymptomEntry[]
   notes: string
 }
@@ -141,84 +123,6 @@ const isLastStep = computed(() => currentStep.value === steps.length - 1)
  * actuar y evitan guardar un registro a medias con los valores por defecto.
  */
 const isReady = computed(() => !isLoading.value && !loadError.value)
-
-function inverseMapActivityType(t: ActivityType | null): string {
-  switch (t) {
-    case 'walking':
-      return 'walk'
-    case 'running':
-      return 'run'
-    case 'gym':
-      return 'gym'
-    case 'yoga':
-      return 'yoga'
-    case 'cycling':
-      return 'cycling'
-    case 'sports':
-      return 'sports'
-    case 'other':
-      return 'other'
-    case 'none':
-    case null:
-    default:
-      return 'none'
-  }
-}
-
-function inverseMapSocialFrequency(f: SocialFrequency): string {
-  switch (f) {
-    case 'rare':
-      return 'rare'
-    case 'occasional':
-      return 'occasional'
-    case 'frequent':
-      return 'frequent'
-    case 'daily':
-      return 'daily'
-    case 'none':
-    default:
-      return 'none'
-  }
-}
-
-function inverseMapSleepDisturbance(d: SleepDisturbance): string | null {
-  switch (d) {
-    case 'insomnia':
-      return 'trouble-falling-asleep'
-    case 'frequent_waking':
-      return 'waking-during-night'
-    case 'early_waking':
-      return 'waking-too-early'
-    case 'nightmares':
-      return 'nightmares'
-    case 'none':
-    default:
-      return null
-  }
-}
-
-function inverseMapSymptomType(t: SymptomType): string | null {
-  switch (t) {
-    case 'panic':
-      return 'anxiety'
-    case 'low_mood':
-      return 'depression'
-    case 'fatigue':
-      return 'energy'
-    case 'irritability':
-      return 'irritability'
-    case 'concentration':
-      return 'concentration'
-    case 'appetite_change':
-      return 'appetite'
-    case 'restlessness':
-      return 'pain'
-    case 'hopelessness':
-      return 'depression'
-    default:
-      return null
-  }
-}
 
 function loadToday() {
   isLoading.value = true
@@ -248,36 +152,13 @@ function fillFromLog(log: DailyLog) {
   form.stress = log.stressLevel
   form.sleepQuality = log.sleepQuality
   form.sleepHours = log.sleepHours
-  form.sleepDisturbances = (log.sleepDisturbances || [])
-    .map((d) => inverseMapSleepDisturbance(d))
-    .filter((x): x is string => x !== null)
-  form.activityType = inverseMapActivityType(log.activityType)
+  form.sleepDisturbances = (log.sleepDisturbances || []).filter((d) => d !== 'none')
+  form.activityType = log.activityType ?? 'none'
   form.activityMinutes = log.activityMinutes ?? 0
-  form.activity = 5
-  form.socialFrequency = inverseMapSocialFrequency(log.socialFrequency)
-  form.social = 5
-  const mappedSymptoms = (log.symptoms || []).map((s) => {
-    const key = inverseMapSymptomType(s.type)
-    return {
-      key: key ?? s.type,
-      label: key ? key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') : s.type,
-      active: true,
-      severity: Math.min(5, Math.max(1, s.severity)),
-    }
-  })
-  const defaults = [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ]
-  form.symptoms = defaults.map((d) => {
-    const found = mappedSymptoms.find((m) => m.key === d.key)
-    return found ? { ...found } : { ...d }
+  form.socialFrequency = log.socialFrequency
+  form.symptoms = defaultSymptoms().map((d) => {
+    const found = (log.symptoms || []).find((s) => s.type === d.key)
+    return found ? { ...d, active: true, severity: Math.min(5, Math.max(1, found.severity)) } : d
   })
   form.notes = log.notes ?? ''
   currentStep.value = 0
@@ -315,119 +196,16 @@ function resetForm() {
   form.sleepDisturbances = []
   form.activityType = 'none'
   form.activityMinutes = 0
-  form.activity = 5
   form.socialFrequency = 'none'
-  form.social = 5
-  form.symptoms = [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ]
+  form.symptoms = defaultSymptoms()
   form.notes = ''
   currentStep.value = 0
-}
-
-function mapSleepDisturbances(dist: string[]): SleepDisturbance[] {
-  const allowed = new Set(['none', 'insomnia', 'nightmares', 'frequent_waking', 'early_waking'])
-  return dist
-    .map((d) => {
-      if (d === 'trouble-falling-asleep') return 'insomnia' as SleepDisturbance
-      if (d === 'waking-during-night' || d === 'waking-too-early' || d === 'interrupted-sleep')
-        return 'frequent_waking' as SleepDisturbance
-      if (d === 'nightmares') return 'nightmares' as SleepDisturbance
-      if (d === 'restless-legs') return 'frequent_waking' as SleepDisturbance
-      if (d === 'snoring') return 'none' as SleepDisturbance
-      if (d === 'other') return 'none' as SleepDisturbance
-      if (allowed.has(d)) return d as SleepDisturbance
-      return 'none' as SleepDisturbance
-    })
-    .filter((v, i, arr) => arr.indexOf(v) === i)
-}
-
-function mapActivityType(t: string): ActivityType | null {
-  switch (t) {
-    case 'none':
-      return null
-    case 'walk':
-      return 'walking' as ActivityType
-    case 'run':
-      return 'running' as ActivityType
-    case 'gym':
-      return 'gym' as ActivityType
-    case 'yoga':
-      return 'yoga' as ActivityType
-    case 'cycling':
-      return 'cycling' as ActivityType
-    case 'sports':
-      return 'sports' as ActivityType
-    case 'housework':
-      return 'other' as ActivityType
-    case 'other':
-      return 'other' as ActivityType
-    default:
-      return null
-  }
-}
-
-function mapSocialFrequency(f: string): SocialFrequency {
-  switch (f) {
-    case 'none':
-      return 'none' as SocialFrequency
-    case 'once':
-    case 'rare':
-      return 'rare' as SocialFrequency
-    case 'few':
-    case 'occasional':
-      return 'occasional' as SocialFrequency
-    case 'several':
-    case 'frequent':
-      return 'frequent' as SocialFrequency
-    case 'daily':
-      return 'daily' as SocialFrequency
-    default:
-      return 'none' as SocialFrequency
-  }
-}
-
-function mapSymptomType(key: string): SymptomType | null {
-  switch (key) {
-    case 'anxiety':
-    case 'panic':
-      return 'panic' as SymptomType
-    case 'depression':
-    case 'low_mood':
-      return 'low_mood' as SymptomType
-    case 'sleep':
-      return 'fatigue' as SymptomType
-    case 'appetite':
-      return 'appetite_change' as SymptomType
-    case 'energy':
-    case 'fatigue':
-      return 'fatigue' as SymptomType
-    case 'concentration':
-      return 'concentration' as SymptomType
-    case 'irritability':
-      return 'irritability' as SymptomType
-    case 'pain':
-      return 'restlessness' as SymptomType
-    default:
-      return null
-  }
 }
 
 function buildPayload(): CreateDailyLogInput {
   const activeSymptoms = form.symptoms
     .filter((s) => s.active)
-    .map((s) => {
-      const t = mapSymptomType(s.key)
-      return t ? { type: t, severity: Math.min(5, Math.max(1, s.severity)) } : null
-    })
-    .filter((x): x is { type: SymptomType; severity: number } => x !== null)
+    .map((s) => ({ type: s.key, severity: Math.min(5, Math.max(1, s.severity)) }))
 
   return {
     logDate: todayIso(),
@@ -436,13 +214,13 @@ function buildPayload(): CreateDailyLogInput {
     stressLevel: Math.min(10, Math.max(1, form.stress)),
     sleepHours: Math.min(24, Math.max(0, form.sleepHours)),
     sleepQuality: Math.min(5, Math.max(1, form.sleepQuality)),
-    sleepDisturbances: mapSleepDisturbances(form.sleepDisturbances),
-    activityType: mapActivityType(form.activityType),
+    sleepDisturbances: form.sleepDisturbances,
+    activityType: form.activityType,
     activityMinutes:
       form.activityType === 'none' || form.activityMinutes <= 0
         ? null
         : Math.min(600, Math.max(0, Math.round(form.activityMinutes))),
-    socialFrequency: mapSocialFrequency(form.socialFrequency),
+    socialFrequency: form.socialFrequency,
     symptoms: activeSymptoms,
     notes: form.notes.trim().length > 0 ? form.notes.trim().slice(0, 1000) : null,
   }
@@ -452,10 +230,10 @@ async function handleSubmit() {
   if (isSubmitting.value) return
   isSubmitting.value = true
   try {
-    await createLog(buildPayload())
+    const savedLog = await createLog(buildPayload())
     success('Thanks for logging today!')
     emit('submit', { ...form, symptoms: form.symptoms.map((s) => ({ ...s })) })
-    emit('saved')
+    emit('saved', savedLog)
     resetForm()
     emit('close')
   } catch (thrown) {
@@ -608,15 +386,6 @@ function close() {
               helper-text="0–600 minutes (disabled if no activity)"
             />
 
-            <SliderField
-              v-model="form.activity"
-              label="Activity level"
-              :min="0"
-              :max="10"
-              :step="1"
-              helper-text="0 = very low, 10 = very high"
-            />
-
             <div class="flex flex-col gap-2">
               <label for="socialFrequency" class="text-sm font-medium text-ink-700"
                 >Social contact frequency</label
@@ -631,15 +400,6 @@ function close() {
                 </option>
               </select>
             </div>
-
-            <SliderField
-              v-model="form.social"
-              label="Social connection"
-              :min="0"
-              :max="10"
-              :step="1"
-              helper-text="0 = isolated, 10 = well connected"
-            />
           </section>
 
           <section v-if="currentStep === 3" class="flex flex-col gap-4">

@@ -1,33 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { defaultSymptoms, type SymptomEntry } from './symptoms'
 
 /**
  * Selector de síntomas para registro diario.
- * 8 síntomas del dominio (anxiety, depression, sleep, appetite, energy,
- * concentration, irritability, pain). Cada síntoma puede activarse/desactivarse
+ * Ofrece exactamente los 8 valores de SymptomType. Cada síntoma puede activarse/desactivarse
  * y, al activarse, incluye un control de severidad 1-5.
  */
-
-export interface SymptomEntry {
-  /** Clave estable para el síntoma */
-  key: string
-  /** Etiqueta legible */
-  label: string
-  /** Activo */
-  active: boolean
-  /** Severidad 1-5 cuando está activo */
-  severity: number
-}
-
-export type SymptomKey =
-  | 'anxiety'
-  | 'depression'
-  | 'sleep'
-  | 'appetite'
-  | 'energy'
-  | 'concentration'
-  | 'irritability'
-  | 'pain'
 
 const props = withDefaults(
   defineProps<{
@@ -39,16 +18,7 @@ const props = withDefaults(
     ariaLabel?: string
   }>(),
   {
-    modelValue: () => [
-      { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-      { key: 'depression', label: 'Depression', active: false, severity: 1 },
-      { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-      { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-      { key: 'energy', label: 'Energy', active: false, severity: 1 },
-      { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-      { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-      { key: 'pain', label: 'Pain', active: false, severity: 1 },
-    ],
+    modelValue: defaultSymptoms,
     disabled: false,
     ariaLabel: 'Symptom picker',
   },
@@ -60,7 +30,7 @@ const emit = defineEmits<{
 
 const entries = computed(() => props.modelValue)
 
-function toggle(key: string) {
+function toggle(key: SymptomEntry['key']) {
   if (props.disabled) return
   const next = entries.value.map((s) => {
     if (s.key !== key) return s
@@ -73,7 +43,7 @@ function toggle(key: string) {
   emit('update:modelValue', next)
 }
 
-function setSeverity(key: string, severity: number) {
+function setSeverity(key: SymptomEntry['key'], severity: number) {
   if (props.disabled) return
   const clamped = Math.min(5, Math.max(1, severity))
   const next = entries.value.map((s) =>
