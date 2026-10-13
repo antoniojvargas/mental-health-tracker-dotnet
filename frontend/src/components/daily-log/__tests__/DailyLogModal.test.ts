@@ -489,8 +489,7 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
 
   describe('SymptomType', () => {
     SYMPTOM_TYPES.forEach((type: SymptomType) => {
-      // `hopelessness` se pinta como "Depression" y vuelve como `low_mood`. A5.
-      spec(type === 'hopelessness')(`${type}: conserva tipo y severidad`, async () => {
+      it(`${type}: conserva tipo y severidad`, async () => {
         await saveUntouchedAndCompare({
           ...makeLog(),
           symptoms: [{ type, severity: 4 }],
@@ -498,9 +497,7 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
       })
     })
 
-    // Los 8 a la vez, cada uno con su severidad. Falla porque `low_mood` y `hopelessness`
-    // comparten casilla ("Depression"): se pierde uno de los dos. A5.
-    spec(true)('todos juntos: conserva cada tipo con su severidad', async () => {
+    it('todos juntos: conserva cada tipo con su severidad', async () => {
       await saveUntouchedAndCompare({
         ...makeLog(),
         symptoms: SYMPTOM_TYPES.map((type, index) => ({ type, severity: (index % 5) + 1 })),

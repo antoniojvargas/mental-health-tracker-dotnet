@@ -157,23 +157,23 @@ test('toda la app es usable solo con teclado, de login a tendencias', async ({ p
   await expect(page.getByText('Step 4 of 4: Symptoms')).toBeVisible()
 
   // ------------------------------------------------- Paso 4 de 4: symptoms
-  const anxietyCheck = dialog.getByRole('checkbox', { name: 'Anxiety' })
-  await tabUntil(page, anxietyCheck)
+  const panicCheck = dialog.getByRole('checkbox', { name: 'Panic' })
+  await tabUntil(page, panicCheck)
   await page.keyboard.press('Space')
-  await expect(anxietyCheck).toBeChecked()
+  await expect(panicCheck).toBeChecked()
 
   await page.keyboard.press('Tab')
-  const severity = dialog.getByRole('radiogroup', { name: 'Anxiety severity' })
+  const severity = dialog.getByRole('radiogroup', { name: 'Panic severity' })
   await expect(severity.getByRole('radio', { name: '1' })).toBeFocused()
   await page.keyboard.press('ArrowRight')
   await expect(severity.getByRole('radio', { name: '2' })).toBeFocused()
   await expect(severity.getByRole('radio', { name: '2' })).toHaveAttribute('aria-checked', 'true')
 
-  const sleepCheck = dialog.getByRole('checkbox', { name: 'Sleep' })
-  // Entre la severidad y Sleep va el síntoma "Depression".
-  await tabUntil(page, sleepCheck)
+  const fatigueCheck = dialog.getByRole('checkbox', { name: 'Fatigue' })
+  // Entre la severidad y Fatigue va el síntoma "Low mood".
+  await tabUntil(page, fatigueCheck)
   await page.keyboard.press('Space')
-  await expect(sleepCheck).toBeChecked()
+  await expect(fatigueCheck).toBeChecked()
 
   const notes = dialog.getByRole('textbox', { name: 'Notes' })
   await tabUntil(page, notes)

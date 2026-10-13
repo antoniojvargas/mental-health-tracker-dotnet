@@ -5,7 +5,8 @@ import Button from '../ui/Button.vue'
 import Skeleton from '../ui/Skeleton.vue'
 import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
-import SymptomPicker, { type SymptomEntry } from './SymptomPicker.vue'
+import SymptomPicker from './SymptomPicker.vue'
+import { defaultSymptoms, type SymptomEntry } from './symptoms'
 import { create as createLog, today as getToday } from '../../services/logs.api'
 import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'
@@ -14,7 +15,6 @@ import type {
   CreateDailyLogInput,
   ActivityType,
   SocialFrequency,
-  SymptomType,
   SleepDisturbance,
   DailyLog,
 } from '../../types/daily-log'
@@ -93,16 +93,7 @@ const form = reactive<DailyLogForm>({
   activity: 5,
   socialFrequency: 'none',
   social: 5,
-  symptoms: [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ],
+  symptoms: defaultSymptoms(),
   notes: '',
 })
 
@@ -181,29 +172,6 @@ function inverseMapSleepDisturbance(d: SleepDisturbance): string | null {
   }
 }
 
-function inverseMapSymptomType(t: SymptomType): string | null {
-  switch (t) {
-    case 'panic':
-      return 'anxiety'
-    case 'low_mood':
-      return 'depression'
-    case 'fatigue':
-      return 'energy'
-    case 'irritability':
-      return 'irritability'
-    case 'concentration':
-      return 'concentration'
-    case 'appetite_change':
-      return 'appetite'
-    case 'restlessness':
-      return 'pain'
-    case 'hopelessness':
-      return 'depression'
-    default:
-      return null
-  }
-}
-
 function loadToday() {
   isLoading.value = true
   loadError.value = null
@@ -240,28 +208,9 @@ function fillFromLog(log: DailyLog) {
   form.activity = 5
   form.socialFrequency = log.socialFrequency
   form.social = 5
-  const mappedSymptoms = (log.symptoms || []).map((s) => {
-    const key = inverseMapSymptomType(s.type)
-    return {
-      key: key ?? s.type,
-      label: key ? key.charAt(0).toUpperCase() + key.slice(1).replace('-', ' ') : s.type,
-      active: true,
-      severity: Math.min(5, Math.max(1, s.severity)),
-    }
-  })
-  const defaults = [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ]
-  form.symptoms = defaults.map((d) => {
-    const found = mappedSymptoms.find((m) => m.key === d.key)
-    return found ? { ...found } : { ...d }
+  form.symptoms = defaultSymptoms().map((d) => {
+    const found = (log.symptoms || []).find((s) => s.type === d.key)
+    return found ? { ...d, active: true, severity: Math.min(5, Math.max(1, found.severity)) } : d
   })
   form.notes = log.notes ?? ''
   currentStep.value = 0
@@ -302,16 +251,7 @@ function resetForm() {
   form.activity = 5
   form.socialFrequency = 'none'
   form.social = 5
-  form.symptoms = [
-    { key: 'anxiety', label: 'Anxiety', active: false, severity: 1 },
-    { key: 'depression', label: 'Depression', active: false, severity: 1 },
-    { key: 'sleep', label: 'Sleep', active: false, severity: 1 },
-    { key: 'appetite', label: 'Appetite', active: false, severity: 1 },
-    { key: 'energy', label: 'Energy', active: false, severity: 1 },
-    { key: 'concentration', label: 'Concentration', active: false, severity: 1 },
-    { key: 'irritability', label: 'Irritability', active: false, severity: 1 },
-    { key: 'pain', label: 'Pain', active: false, severity: 1 },
-  ]
+  form.symptoms = defaultSymptoms()
   form.notes = ''
   currentStep.value = 0
 }
@@ -358,40 +298,10 @@ function mapActivityType(t: string): ActivityType | null {
   }
 }
 
-function mapSymptomType(key: string): SymptomType | null {
-  switch (key) {
-    case 'anxiety':
-    case 'panic':
-      return 'panic' as SymptomType
-    case 'depression':
-    case 'low_mood':
-      return 'low_mood' as SymptomType
-    case 'sleep':
-      return 'fatigue' as SymptomType
-    case 'appetite':
-      return 'appetite_change' as SymptomType
-    case 'energy':
-    case 'fatigue':
-      return 'fatigue' as SymptomType
-    case 'concentration':
-      return 'concentration' as SymptomType
-    case 'irritability':
-      return 'irritability' as SymptomType
-    case 'pain':
-      return 'restlessness' as SymptomType
-    default:
-      return null
-  }
-}
-
 function buildPayload(): CreateDailyLogInput {
   const activeSymptoms = form.symptoms
     .filter((s) => s.active)
-    .map((s) => {
-      const t = mapSymptomType(s.key)
-      return t ? { type: t, severity: Math.min(5, Math.max(1, s.severity)) } : null
-    })
-    .filter((x): x is { type: SymptomType; severity: number } => x !== null)
+    .map((s) => ({ type: s.key, severity: Math.min(5, Math.max(1, s.severity)) }))
 
   return {
     logDate: todayIso(),
