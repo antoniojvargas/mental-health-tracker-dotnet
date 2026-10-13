@@ -12,7 +12,7 @@ import Skeleton from '../components/ui/Skeleton.vue'
 import { useLogSocket } from '../composables/useLogSocket'
 import { useAuthStore } from '../stores/useAuthStore'
 import { useLogsStore, type LogRange } from '../stores/useLogsStore'
-import type { IsoDate } from '../types/daily-log'
+import type { DailyLog, IsoDate } from '../types/daily-log'
 
 const auth = useAuthStore()
 const logsStore = useLogsStore()
@@ -101,11 +101,12 @@ function retry(): void {
 }
 
 /**
- * El modal se cierra solo tras guardar; aquí solo hay que releer la ventana
- * para que el saludo y las gráficas vean el registro nuevo.
+ * El modal se cierra solo tras guardar. El POST ya devuelve el registro, así que
+ * se integra en la lista con `mergeLog` en vez de volver a pedir la ventana: el
+ * saludo y las gráficas lo ven sin una segunda petición.
  */
-function handleSaved(): void {
-  void logsStore.fetch(range.value)
+function handleSaved(log: DailyLog): void {
+  logsStore.mergeLog(log)
 }
 
 /**

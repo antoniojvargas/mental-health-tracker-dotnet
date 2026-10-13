@@ -38,7 +38,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'submit', data: DailyLogForm): void
-  (e: 'saved'): void
+  (e: 'saved', log: DailyLog): void
 }>()
 
 const steps = ['Mood', 'Sleep', 'Activity and social life', 'Symptoms'] as const
@@ -230,10 +230,10 @@ async function handleSubmit() {
   if (isSubmitting.value) return
   isSubmitting.value = true
   try {
-    await createLog(buildPayload())
+    const savedLog = await createLog(buildPayload())
     success('Thanks for logging today!')
     emit('submit', { ...form, symptoms: form.symptoms.map((s) => ({ ...s })) })
-    emit('saved')
+    emit('saved', savedLog)
     resetForm()
     emit('close')
   } catch (thrown) {
