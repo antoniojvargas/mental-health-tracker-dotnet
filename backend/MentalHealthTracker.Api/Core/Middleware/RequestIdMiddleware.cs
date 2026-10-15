@@ -14,7 +14,13 @@ public sealed class RequestIdMiddleware(RequestDelegate next)
             requestId = Guid.NewGuid().ToString("N");
         }
 
-        context.Response.Headers[HeaderName] = requestId;
+        // En OnStarting y no al entrar: el manejador global de excepciones reinicia la
+        // respuesta y borraría el id justo en los errores, donde más hace falta.
+        context.Response.OnStarting(() =>
+        {
+            context.Response.Headers[HeaderName] = requestId;
+            return Task.CompletedTask;
+        });
 
         using (LogContext.PushProperty("RequestId", requestId))
         {
