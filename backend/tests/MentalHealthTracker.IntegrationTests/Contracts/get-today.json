@@ -1,0 +1,29 @@
+{
+  "id": "<guid>",
+  "logDate": "2026-03-15",
+  "moodRating": 4,
+  "anxietyLevel": 6,
+  "stressLevel": 3,
+  "sleepHours": 7.5,
+  "sleepQuality": 4,
+  "sleepDisturbances": [
+    "frequent_waking",
+    "early_waking"
+  ],
+  "activityType": "walking",
+  "activityMinutes": 30,
+  "socialFrequency": "occasional",
+  "symptoms": [
+    {
+      "type": "appetite_change",
+      "severity": 3
+    },
+    {
+      "type": "low_mood",
+      "severity": 2
+    }
+  ],
+  "notes": "fixed body",
+  "createdAt": "<o-datetime>",
+  "updatedAt": "<o-datetime>"
+}

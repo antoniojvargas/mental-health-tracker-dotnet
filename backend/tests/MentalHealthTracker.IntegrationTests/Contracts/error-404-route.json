@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Route /api/does-not-exist does not exist",
+    "details": []
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Validation failed.",
+    "details": [
+      {
+        "field": "MoodRating",
+        "message": "'Mood Rating' must be between 1 and 5. You entered 9."
+      }
+    ]
+  }
+}
