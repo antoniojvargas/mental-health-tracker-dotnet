@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { today } from './logs.api'
+import { create, list, today } from './logs.api'
 
 function respond(status: number, body: unknown = {}) {
   return vi.fn().mockResolvedValue(
@@ -49,5 +49,81 @@ describe('logs.api · today', () => {
     )
 
     await expect(today('2030-01-01')).rejects.toMatchObject({ status: 400 })
+  })
+})
+
+describe('logs.api · list', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('arma from y to en la query y devuelve la respuesta tal cual', async () => {
+    const body = {
+      data: [{ id: '1', logDate: '2026-03-10' }],
+      meta: { from: '2026-03-01', to: '2026-03-31', limit: 100, offset: 0, total: 1 },
+    }
+    const fetchMock = respond(200, body)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await list('2026-03-01', '2026-03-31')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/logs?from=2026-03-01&to=2026-03-31')
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('GET')
+    expect(result).toEqual(body)
+  })
+
+  it('propaga el error de validación del rango', async () => {
+    vi.stubGlobal(
+      'fetch',
+      respond(400, { error: { code: 'VALIDATION_ERROR', message: 'x', details: [] } }),
+    )
+
+    await expect(list('2026-03-31', '2026-03-01')).rejects.toMatchObject({
+      status: 400,
+      code: 'VALIDATION_ERROR',
+    })
+  })
+})
+
+describe('logs.api · today · propagación', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it.each([
+    [401, 'UNAUTHORIZED'],
+    [429, 'RATE_LIMITED'],
+    [500, 'INTERNAL_ERROR'],
+  ])('propaga el %i como ApiError', async (status, code) => {
+    vi.stubGlobal('fetch', respond(status, { error: { code, message: 'x', details: [] } }))
+
+    await expect(today('2026-03-15')).rejects.toMatchObject({ status, code })
+  })
+
+  it('propaga un fallo de red', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    await expect(today('2026-03-15')).rejects.toBeInstanceOf(TypeError)
+  })
+})
+
+describe('logs.api · create', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('hace POST /api/logs con el cuerpo en JSON y devuelve el registro', async () => {
+    const saved = { id: '1', logDate: '2026-03-15' }
+    const fetchMock = respond(201, saved)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const input = { logDate: '2026-03-15', moodRating: 3 } as Parameters<typeof create>[0]
+    const result = await create(input)
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/logs')
+    expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
+    expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual(input)
+    expect(result).toEqual(saved)
   })
 })
