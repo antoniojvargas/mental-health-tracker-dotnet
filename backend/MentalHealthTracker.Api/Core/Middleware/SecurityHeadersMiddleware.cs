@@ -23,14 +23,23 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
 
     public Task InvokeAsync(HttpContext context)
     {
-        var headers = context.Response.Headers;
-        headers["X-Content-Type-Options"] = "nosniff";
-        headers["X-Frame-Options"] = "SAMEORIGIN";
-        headers["Referrer-Policy"] = "no-referrer";
-        headers["Content-Security-Policy"] =
-            context.Request.Path.StartsWithSegments($"/{DocsRoutePrefix}")
-                ? DocsContentSecurityPolicy
-                : ApiContentSecurityPolicy;
+        // Las cabeceras se fijan en OnStarting, justo antes de enviar la respuesta, y no
+        // al entrar: UseExceptionHandler está por encima de este middleware y, al recoger
+        // una excepción, reinicia la respuesta y borra las cabeceras ya puestas. Así
+        // también las respuestas de error (401, 404, 400, 500) las llevan.
+        context.Response.OnStarting(() =>
+        {
+            var headers = context.Response.Headers;
+            headers["X-Content-Type-Options"] = "nosniff";
+            headers["X-Frame-Options"] = "SAMEORIGIN";
+            headers["Referrer-Policy"] = "no-referrer";
+            headers["Content-Security-Policy"] =
+                context.Request.Path.StartsWithSegments($"/{DocsRoutePrefix}")
+                    ? DocsContentSecurityPolicy
+                    : ApiContentSecurityPolicy;
+            return Task.CompletedTask;
+        });
+
         return next(context);
     }
 }

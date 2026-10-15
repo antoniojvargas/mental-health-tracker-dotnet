@@ -193,7 +193,7 @@ test('toda la app es usable solo con teclado, de login a tendencias', async ({ p
   await expect(month).toBeFocused()
   await month.press('Space')
   await expect(month).toHaveAttribute('aria-pressed', 'true')
-  await expect(page.getByText('Loading your trends…')).toBeHidden()
+  await expect(page.getByRole('region', { name: 'Your trends' })).toHaveAttribute('aria-busy', 'false')
 
   // --------------------------------------------- Métricas con el teclado
   await page.keyboard.press('Tab')

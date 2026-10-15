@@ -28,6 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Contracts\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\MentalHealthTracker.Api\MentalHealthTracker.Api.csproj" />
   </ItemGroup>
 
