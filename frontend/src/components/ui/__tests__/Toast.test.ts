@@ -131,14 +131,14 @@ describe('Toast', () => {
   describe('cierre a mano', () => {
     it('el botón de cerrar nombra el aviso que descarta', async () => {
       montar()
-      useToast().error('No se pudo guardar')
+      useToast().error('Could not save')
       await nextTick()
 
       const boton = document.querySelector('button')!
 
       // Con un `aria-label` de una palabra fija, tres errores apilados tendrían
       // tres botones idénticos y no se podría saber cuál cerrar.
-      expect(boton.getAttribute('aria-label')).toBe('Descartar: No se pudo guardar')
+      expect(boton.getAttribute('aria-label')).toBe('Dismiss: Could not save')
     })
 
     it('descarta el aviso al pulsar el botón', async () => {
