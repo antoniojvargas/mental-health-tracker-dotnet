@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from '../fixtures/csp'
 
 test('recorrido crítico: test-login, dashboard, registrar ánimo y confirmar sin recargar', async ({ page }) => {
   // Contador de cargas de documento: sigue valiendo 1 si la SPA actualiza el

@@ -1,0 +1,37 @@
+# Override SOLO para la prueba de la imagen de PRODUCCION (prod-smoke).
+#
+# Uso (es lo que hace el job `prod-smoke` del CI):
+#   e2e/prod-secrets.sh        # genera secretos desechables en e2e/prod-secrets/
+#   docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
+#     -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml up -d --build --wait
+#   cd e2e && npm run test:prod-smoke
+#   docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
+#     -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml down -v
+#
+# Levanta las imagenes reales (nginx sirviendo el bundle compilado, con sus cabeceras
+# y su CSP) en el puerto 8080. La suite e2e normal corre contra el servidor de Vite y
+# no ejercita nada de eso.
+#
+# Dos diferencias respecto a produccion, y solo estas:
+#   * ASPNETCORE_ENVIRONMENT=Testing en el backend, para registrar POST
+#     /api/auth/test-login (Playwright entra sin pasar por Google).
+#   * Los secretos salen de e2e/prod-secrets/ (desechables, generados y fuera de git)
+#     en lugar de secrets/, para no tocar los de una pila de produccion real.
+#
+# NUNCA se usa para un despliegue real. Se levanta con `-p mht-prod-e2e` para que sus
+# contenedores y volumenes no se mezclen con los del proyecto `mht-prod`, pero comparte
+# la subred fija 172.28.0.0/24: no pueden estar arriba las dos pilas a la vez.
+services:
+  backend:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Testing
+
+secrets:
+  postgres_password:
+    file: e2e/prod-secrets/postgres_password.txt
+  database_url:
+    file: e2e/prod-secrets/database_url.txt
+  jwt_secret:
+    file: e2e/prod-secrets/jwt_secret.txt
+  google_client_secret:
+    file: e2e/prod-secrets/google_client_secret.txt

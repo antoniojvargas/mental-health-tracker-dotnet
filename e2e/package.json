@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test --project=chromium",
+    "test:prod-smoke": "playwright test --project=prod-smoke",
     "test:smoke": "playwright test --grep @smoke",
     "test:ui": "playwright test --ui",
     "report": "playwright show-report"
