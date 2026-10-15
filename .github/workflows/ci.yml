@@ -256,6 +256,65 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml down -v
 
+  prod-smoke:
+    name: Prod smoke (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Imagenes reales de produccion (nginx + bundle compilado) en el puerto 8080: la
+      # suite `e2e` corre contra el servidor de Vite y no ejercita las cabeceras ni la
+      # CSP de nginx. Secretos desechables generados al vuelo; el override fija
+      # ASPNETCORE_ENVIRONMENT=Testing solo para exponer POST /api/auth/test-login.
+      - name: Generar secretos desechables
+        run: ./e2e/prod-secrets.sh
+
+      - name: Levantar la pila de produccion
+        run: |
+          docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
+            -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml \
+            up -d --build --wait --wait-timeout 600
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Instalar Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Recorrido critico contra la imagen de produccion
+        working-directory: e2e
+        run: npm run test:prod-smoke
+
+      - name: Guardar logs de la pila
+        if: failure()
+        run: |
+          docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
+            -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml \
+            logs > prod-smoke.logs.txt
+
+      - name: Subir reporte y logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-smoke-artifacts
+          path: |
+            e2e/playwright-report/
+            prod-smoke.logs.txt
+          retention-days: 7
+
+      - name: Bajar la pila
+        if: always()
+        run: |
+          docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
+            -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml \
+            down -v
+
   dev-stack-smoke:
     name: Dev stack smoke
     runs-on: ubuntu-latest
