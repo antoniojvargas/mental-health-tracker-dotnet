@@ -18,7 +18,4 @@
     <InternalsVisibleTo Include="MentalHealthTracker.UnitTests" />
   </ItemGroup>
 
-  <PropertyGroup>
-  </PropertyGroup>
-
 </Project>
