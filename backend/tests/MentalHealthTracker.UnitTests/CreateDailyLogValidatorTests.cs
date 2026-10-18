@@ -1,3 +1,4 @@
+using System.Globalization;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Domain.Enums;
@@ -7,7 +8,13 @@ namespace MentalHealthTracker.UnitTests;
 
 public class CreateDailyLogValidatorTests
 {
-    private readonly CreateDailyLogValidator _validator = new(TimeProvider.System);
+    private readonly FixedTimeProvider _clock = new();
+    private readonly CreateDailyLogValidator _validator;
+
+    public CreateDailyLogValidatorTests()
+    {
+        _validator = new CreateDailyLogValidator(_clock);
+    }
 
     [Theory]
     [InlineData(0, false)]
@@ -143,7 +150,7 @@ public class CreateDailyLogValidatorTests
     [Fact]
     public void LogDate_OneDayAheadOfUtc_IsAcceptedForClientsEastOfUtc()
     {
-        var tomorrowUtc = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var tomorrowUtc = UtcToday().AddDays(1);
 
         var result = _validator.Validate(ValidRequest(tomorrowUtc));
 
@@ -153,7 +160,7 @@ public class CreateDailyLogValidatorTests
     [Fact]
     public void LogDate_TwoDaysAheadOfUtc_HasExplicitErrorMessage()
     {
-        var futureDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
+        var futureDate = UtcToday().AddDays(2);
         var request = ValidRequest(futureDate);
 
         var result = _validator.Validate(request);
@@ -164,23 +171,27 @@ public class CreateDailyLogValidatorTests
             error.ErrorMessage == "logDate cannot be in the future.");
     }
 
-    [Fact]
-    public void LogDate_Limit_FollowsTheInjectedClock()
+    // Justo antes de medianoche UTC el límite es el día siguiente; al cruzarla se desplaza un día.
+    [Theory]
+    [InlineData("2030-06-15T23:59:59.9999999+00:00", "2030-06-16", true)]
+    [InlineData("2030-06-15T23:59:59.9999999+00:00", "2030-06-17", false)]
+    [InlineData("2030-06-16T00:00:00+00:00", "2030-06-16", true)]
+    [InlineData("2030-06-16T00:00:00+00:00", "2030-06-17", true)]
+    [InlineData("2030-06-16T00:00:00+00:00", "2030-06-18", false)]
+    public void LogDate_Limit_MovesAtUtcMidnight(string now, string logDate, bool expectedValid)
     {
-        var clock = new FixedTimeProvider(new DateTimeOffset(2030, 6, 15, 23, 59, 59, TimeSpan.Zero));
-        var validator = new CreateDailyLogValidator(clock);
-        var dayAfterTomorrow = new DateOnly(2030, 6, 17);
+        var validator = new CreateDailyLogValidator(
+            new FixedTimeProvider(DateTimeOffset.Parse(now, CultureInfo.InvariantCulture)));
 
-        Assert.True(validator.Validate(ValidRequest(new DateOnly(2030, 6, 16))).IsValid);
-        Assert.False(validator.Validate(ValidRequest(dayAfterTomorrow)).IsValid);
+        var result = validator.Validate(ValidRequest(DateOnly.Parse(logDate, CultureInfo.InvariantCulture)));
 
-        clock.Advance(TimeSpan.FromSeconds(1));
-
-        Assert.True(validator.Validate(ValidRequest(dayAfterTomorrow)).IsValid);
+        Assert.Equal(expectedValid, result.IsValid);
     }
 
-    private static CreateDailyLogRequest ValidRequest(DateOnly? logDate = null) => new(
-        LogDate: logDate ?? DateOnly.FromDateTime(DateTime.UtcNow),
+    private DateOnly UtcToday() => DateOnly.FromDateTime(_clock.GetUtcNow().UtcDateTime);
+
+    private CreateDailyLogRequest ValidRequest(DateOnly? logDate = null) => new(
+        LogDate: logDate ?? UtcToday(),
         MoodRating: 3,
         AnxietyLevel: 5,
         StressLevel: 5,

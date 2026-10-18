@@ -21,7 +21,7 @@ public class DailyLogServiceTests
     {
         var emitter = new FakeLogEventEmitter();
         var repository = new FakeDailyLogRepository(created);
-        var service = new DailyLogService(repository, emitter, TimeProvider.System);
+        var service = new DailyLogService(repository, emitter, new FixedTimeProvider());
 
         await service.UpsertAsync(UserId, ValidRequest(), CancellationToken.None);
 
@@ -34,7 +34,7 @@ public class DailyLogServiceTests
     {
         var emitter = new FakeLogEventEmitter();
         var repository = new FakeDailyLogRepository(created: true);
-        var service = new DailyLogService(repository, emitter, TimeProvider.System);
+        var service = new DailyLogService(repository, emitter, new FixedTimeProvider());
         var request = ValidRequest();
 
         await service.UpsertAsync(UserId, request, CancellationToken.None);
@@ -49,7 +49,7 @@ public class DailyLogServiceTests
     {
         var emitter = new FakeLogEventEmitter();
         var repository = new FakeDailyLogRepository(created: false);
-        var service = new DailyLogService(repository, emitter, TimeProvider.System);
+        var service = new DailyLogService(repository, emitter, new FixedTimeProvider());
         var request = ValidRequest();
 
         await service.UpsertAsync(UserId, request, CancellationToken.None);
@@ -57,6 +57,68 @@ public class DailyLogServiceTests
         var emitted = Assert.Single(emitter.EmittedLogs);
         Assert.Equal(UserId, emitter.EmittedUserId);
         Assert.Equal(ExpectedDto(request), emitted);
+    }
+
+    // El rango por defecto y el "hoy" por defecto salen del día UTC del reloj, no de la hora local.
+    [Theory]
+    [InlineData("2030-06-15T12:00:00+00:00", "2030-05-17", "2030-06-15")]
+    [InlineData("2030-06-15T23:59:59.9999999+00:00", "2030-05-17", "2030-06-15")]
+    [InlineData("2030-06-16T00:00:00+00:00", "2030-05-18", "2030-06-16")]
+    public async Task List_WithoutRange_DefaultsToTheLast30UtcDaysEndingToday(string now, string expectedFrom, string expectedTo)
+    {
+        var repository = new FakeDailyLogRepository(created: true);
+        var service = new DailyLogService(
+            repository,
+            new FakeLogEventEmitter(),
+            new FixedTimeProvider(DateTimeOffset.Parse(now, CultureInfo.InvariantCulture)));
+
+        var response = await service.ListAsync(UserId, new ListDailyLogsQuery(), CancellationToken.None);
+
+        var (from, to) = Assert.Single(repository.RangesQueried);
+        Assert.Equal(DateOnly.Parse(expectedFrom, CultureInfo.InvariantCulture), from);
+        Assert.Equal(DateOnly.Parse(expectedTo, CultureInfo.InvariantCulture), to);
+        Assert.Equal(from, response.Meta.From);
+        Assert.Equal(to, response.Meta.To);
+        Assert.Equal(29, to.DayNumber - from.DayNumber);
+    }
+
+    [Fact]
+    public async Task List_WithExplicitRange_IgnoresTheClock()
+    {
+        var repository = new FakeDailyLogRepository(created: true);
+        var service = new DailyLogService(repository, new FakeLogEventEmitter(), new FixedTimeProvider());
+        var query = new ListDailyLogsQuery(new DateOnly(2030, 1, 1), new DateOnly(2030, 1, 10));
+
+        await service.ListAsync(UserId, query, CancellationToken.None);
+
+        Assert.Equal((new DateOnly(2030, 1, 1), new DateOnly(2030, 1, 10)), Assert.Single(repository.RangesQueried));
+    }
+
+    [Theory]
+    [InlineData("2030-06-15T23:59:59.9999999+00:00", "2030-06-15")]
+    [InlineData("2030-06-16T00:00:00+00:00", "2030-06-16")]
+    public async Task GetToday_WithoutDate_UsesTheUtcDayOfTheClock(string now, string expectedDay)
+    {
+        var repository = new FakeDailyLogRepository(created: true);
+        var service = new DailyLogService(
+            repository,
+            new FakeLogEventEmitter(),
+            new FixedTimeProvider(DateTimeOffset.Parse(now, CultureInfo.InvariantCulture)));
+
+        await service.GetTodayAsync(UserId, null, CancellationToken.None);
+
+        Assert.Equal(DateOnly.Parse(expectedDay, CultureInfo.InvariantCulture), Assert.Single(repository.DatesQueried));
+    }
+
+    [Fact]
+    public async Task GetToday_WithClientDate_UsesThatDate()
+    {
+        var repository = new FakeDailyLogRepository(created: true);
+        var service = new DailyLogService(repository, new FakeLogEventEmitter(), new FixedTimeProvider());
+
+        await service.GetTodayAsync(UserId, new DateOnly(2030, 6, 16), CancellationToken.None);
+
+        Assert.Equal(new DateOnly(2030, 6, 16), Assert.Single(repository.DatesQueried));
     }
 
     private static CreateDailyLogRequest ValidRequest() => new(
@@ -112,9 +174,16 @@ public class DailyLogServiceTests
 
     private sealed class FakeDailyLogRepository(bool created) : IDailyLogRepository
     {
+        public List<DateOnly> DatesQueried { get; } = [];
+
+        public List<(DateOnly From, DateOnly To)> RangesQueried { get; } = [];
+
         public Task<DailyLog?> FindByUserAndDateAsync(
-            Guid userId, DateOnly logDate, CancellationToken cancellationToken = default) =>
-            Task.FromResult<DailyLog?>(null);
+            Guid userId, DateOnly logDate, CancellationToken cancellationToken = default)
+        {
+            DatesQueried.Add(logDate);
+            return Task.FromResult<DailyLog?>(null);
+        }
 
         public Task<PagedResult<DailyLog>> FindByUserAndRangeAsync(
             Guid userId,
@@ -122,8 +191,11 @@ public class DailyLogServiceTests
             DateOnly toDate,
             int limit,
             int offset,
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new PagedResult<DailyLog>([], 0));
+            CancellationToken cancellationToken = default)
+        {
+            RangesQueried.Add((fromDate, toDate));
+            return Task.FromResult(new PagedResult<DailyLog>([], 0));
+        }
 
         public Task<UpsertedDailyLog> UpsertAsync(
             DailyLog log, CancellationToken cancellationToken = default)
