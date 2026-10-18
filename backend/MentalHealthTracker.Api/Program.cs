@@ -1,336 +1,39 @@
-using FluentValidation;
 using MentalHealthTracker.Api.Core.Configuration;
-using MentalHealthTracker.Api.Core.Exceptions;
+using MentalHealthTracker.Api.Core.Errors;
+using MentalHealthTracker.Api.Core.Health;
 using MentalHealthTracker.Api.Core.Hosting;
-using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Core.OpenApi;
-using MentalHealthTracker.Api.Core.Validation;
+using MentalHealthTracker.Api.Core.RateLimiting;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
-using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
-using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Api.Modules.Realtime;
-using MentalHealthTracker.Domain.Errors;
-using MentalHealthTracker.Domain.Repositories;
-using MentalHealthTracker.Infrastructure.Persistence;
-using MentalHealthTracker.Infrastructure.Persistence.Repositories;
-using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.OpenApi;
-using Npgsql;
-using System.Globalization;
-using System.Threading.RateLimiting;
+using MentalHealthTracker.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
-
 builder.Configuration.AddSecretFileConfiguration();
+builder.Host.UseSerilogLogging().UseGracefulShutdownTimeout();
 
-builder.Host.UseSerilogLogging();
-
-// Apagado ordenado: SIGTERM para de aceptar conexiones nuevas y da margen a
-// cerrar las conexiones SignalR y el pool de Postgres, pero si algo se queda
-// colgado el host forza la salida al cumplirse los 10 segundos (Kestrel aborta
-// entonces cualquier request/WebSocket pendiente).
-builder.Host.ConfigureHostOptions(options =>
-{
-    options.ShutdownTimeout = TimeSpan.FromSeconds(10);
-});
-
-// Add services to the container.
-
-builder.Services.AddOptions<DatabaseOptions>()
-    .Bind(builder.Configuration.GetSection(DatabaseOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddOptions<JwtOptions>()
-    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddOptions<GoogleOAuthOptions>()
-    .Bind(builder.Configuration.GetSection(GoogleOAuthOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddSingleton<IValidateOptions<GoogleOAuthOptions>, GoogleOAuthOptionsValidator>();
-
-builder.Services.AddOptions<AppUrlsOptions>()
-    .Bind(builder.Configuration.GetSection(AppUrlsOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddReverseProxyTrust(builder.Configuration);
-
-builder.Services.AddScoped<DatabaseSeeder>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IDailyLogRepository, DailyLogRepository>();
-builder.Services.AddSingleton<JwtService>();
-builder.Services.AddSingleton<AuthCookieOptions>();
-builder.Services.AddHttpClient<GoogleOAuthClient>();
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    var connectionString = builder.Configuration
-        .GetSection(DatabaseOptions.SectionName)
-        .Get<DatabaseOptions>()?.ConnectionString;
-    options.UseNpgsql(connectionString);
-});
-
-builder.Services.AddSingleton<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
-builder.Services.AddSingleton<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
-builder.Services.AddSingleton<IValidator<TodayQuery>, TodayQueryValidator>();
-builder.Services.AddScoped<IDailyLogService, DailyLogService>();
-builder.Services.AddScoped<ILogEventEmitter, LogEventEmitter>();
-
-builder.Services.AddControllers(options =>
-{
-    options.Filters.Add<FluentValidationActionFilter>();
-});
-builder.Services.AddSignalR();
-builder.Services.AddSingleton<SignalRConnectionTracker>();
-builder.Services.AddHostedService<GracefulShutdownService>();
-builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
-builder.Services.AddProblemDetails();
-
-// El callback de Google OAuth es el único endpoint que acepta tráfico sin sesión y
-// desencadena una redirección externa + upsert de usuario: sin límite sería un vector
-// de abuso (fuerza bruta sobre state/code y trabajo innecesario contra Google/BD).
-// Se particiona por IP de origen. En desarrollo Kestrel recibe al cliente directamente
-// y RemoteIpAddress es su IP. En producción hay nginx delante, así que RemoteIpAddress
-// sería la del proxy y la cuota se compartiría entre todos los usuarios: con
-// ReverseProxy:Enabled, UseForwardedHeaders (primer middleware) sustituye esa IP por la
-// de X-Forwarded-For, aceptada solo si la petición llega de un proxy conocido.
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-    options.OnRejected = async (context, cancellationToken) =>
-    {
-        if (context.HttpContext.Response.HasStarted)
-        {
-            return;
-        }
-
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-
-        var permitLimit = context.HttpContext.GetEndpoint()?
-            .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName switch
-        {
-            AuthController.AuthRateLimitPolicy => 20,
-            DailyLogController.WriteRateLimitPolicy => 30,
-            _ => 0,
-        };
-
-        context.HttpContext.Response.Headers["RateLimit-Limit"] =
-            permitLimit.ToString(CultureInfo.InvariantCulture);
-        context.HttpContext.Response.Headers["RateLimit-Remaining"] = "0";
-
-        // El limiter fija la metadata RETRY_AFTER con el tiempo restante hasta que se
-        // reabra la ventana; es lo que alimenta RateLimit-Reset y Retry-After.
-        if (context.Lease.TryGetMetadata("RETRY_AFTER", out var retryAfter) &&
-            retryAfter is TimeSpan retryDelay)
-        {
-            var seconds = Math.Max(0, (int)Math.Ceiling(retryDelay.TotalSeconds))
-                .ToString(CultureInfo.InvariantCulture);
-            context.HttpContext.Response.Headers["RateLimit-Reset"] = seconds;
-            context.HttpContext.Response.Headers.RetryAfter = seconds;
-        }
-
-        await context.HttpContext.Response.WriteAsJsonAsync(
-            new ErrorResponse(new ErrorBody("RATE_LIMITED", "Too many requests. Please try again later.", [])),
-            cancellationToken);
-    };
-
-    options.AddPolicy(AuthController.AuthRateLimitPolicy, httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(15),
-                AutoReplenishment = true,
-            }));
-
-    // POST /api/logs (upsert de registros) se limita por id de usuario y no por IP:
-    // dos pacientes detrás de la misma red (NAT de empresa, campus) no deben consumir
-    // la cuota del otro. La partición sale del JWT firmado en la cookie; si el token
-    // falta o es inválido no se limita (GetNoLimiter) porque RequireAuth los rechaza
-    // igual con 401 y nunca llegan a escribir.
-    options.AddPolicy(DailyLogController.WriteRateLimitPolicy, httpContext =>
-    {
-        var token = httpContext.Request.Cookies[JwtService.SessionCookieName];
-        var userId = httpContext.RequestServices
-            .GetRequiredService<JwtService>()
-            .Verify(token)?
-            .UserId;
-
-        if (userId is null)
-        {
-            return RateLimitPartition.GetNoLimiter((Guid?)null);
-        }
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            userId,
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(15),
-                AutoReplenishment = true,
-            });
-    });
-});
-
-const string CorsPolicyName = "Frontend";
-var appUrls = builder.Configuration
-    .GetSection(AppUrlsOptions.SectionName)
-    .Get<AppUrlsOptions>();
-builder.Services.AddCors(options =>
-    options.AddPolicy(CorsPolicyName, policy =>
-        policy.WithOrigins(appUrls?.FrontendUrl ?? string.Empty).AllowCredentials()));
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Mental Health Tracker API",
-        Version = "v1",
-        Description = "Mental Health Tracker API: authentication and daily wellbeing logging.",
-    });
-
-    options.AddSecurityDefinition(
-        JwtService.SessionCookieName,
-        new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.ApiKey,
-            Name = JwtService.SessionCookieName,
-            In = ParameterLocation.Cookie,
-            Description = "Session cookie issued after signing in with Google.",
-        });
-
-    options.OperationFilter<RequireAuthSecurityOperationFilter>();
-
-    options.SchemaFilter<FluentValidationSchemaFilter>();
-    options.ParameterFilter<FluentValidationParameterFilter>();
-});
+builder.Services.AddAppOptions(builder.Configuration).AddReverseProxyTrust();
+builder.Services.AddPersistence(builder.Configuration).AddApiCore().AddFrontendCors(builder.Configuration);
+builder.Services.AddAuthModule().AddDailyLogModule().AddRealtimeModule();
+builder.Services.AddApiRateLimiting().AddApiDocumentation().AddApplicationUptime();
 
 var app = builder.Build();
-
-// Primero de todos: la IP y el esquema reales tienen que estar resueltos antes de que
-// el resto del pipeline (rate limiter, logs, redirecciones) los lea. Solo se activa
-// detrás de un proxy declarado en ReverseProxy:KnownProxies / KnownNetworks.
-if (app.Services.GetRequiredService<IOptions<ReverseProxyOptions>>().Value.Enabled)
-{
-    app.UseForwardedHeaders();
-}
-
-app.UseExceptionHandler();
-app.UseRequestId();
-app.UseSecurityHeaders();
-app.UseCors(CorsPolicyName);
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Mental Health Tracker API v1");
-        options.RoutePrefix = SecurityHeadersMiddleware.DocsRoutePrefix;
-    });
-}
-
-app.UseRouting();
-
-app.UseRateLimiter();
-
-app.UseRequireAuth();
-
+app.UseApiPipeline();
 app.MapControllers();
+app.MapRealtimeHubs();
+app.MapAuthEndpoints(app.Environment);
+app.MapApiFallback();
+app.MapHealthEndpoints();
+await app.InitializeDatabaseAsync();
 
-app.MapHub<LogsHub>("/hub/logs");
-
-if (app.Environment.IsEnvironment("Testing"))
-{
-    app.MapTestAuthEndpoints();
-}
-
-// Cualquier ruta de /api sin endpoint cae aquí y sale por el manejador global con el
-// mismo sobre de error que el resto de la API, en lugar de un 404 vacío. Solo cubre
-// /api: /hub y Swagger quedan fuera. Es el endpoint de menor prioridad, así que no
-// tapa a los reales; por contra, un método no admitido en una ruta existente también
-// termina aquí (404 en vez de 405).
-app.MapFallback("/api/{**path}", (HttpContext context) =>
-    throw new NotFoundException($"Route {context.Request.Path} does not exist"));
-
-var startedAt = DateTimeOffset.UtcNow;
-
-// Health check con prueba real de conectividad: devolver un literal "ok" fijo no basta
-// porque los orquestadores (Docker healthcheck, load balancers) usan este endpoint para
-// decidir si el contenedor está sano. Un 200 constante enmascara caídas de la base de
-// datos: no se reiniciaría el contenedor, no habría alertas y los clientes fallarían
-// después con errores confusos. Solo un SELECT 1 real refleja la disponibilidad real.
-app.MapGet("/api/health", async (
-    IOptions<DatabaseOptions> databaseOptions,
-    ILogger<Program> logger) =>
-{
-    var uptime = DateTimeOffset.UtcNow - startedAt;
-
-    try
-    {
-        await using var connection = new NpgsqlConnection(databaseOptions.Value.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1";
-        await command.ExecuteScalarAsync();
-    }
-    catch (Exception exception)
-    {
-        Program.LogHealthCheckFailed(logger, exception);
-        return Results.Json(
-            new { status = "error", db = "unreachable" },
-            statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-
-    return Results.Json(
-        new { status = "ok", uptime = (int)uptime.TotalSeconds });
-});
-
-await InitializeDatabaseAsync(app);
-
-// Modo demo: dotnet run --seed aplica migraciones y carga el usuario demo con 60 días
-// de registros (ver DatabaseSeeder). Se resuelve un scope propio y se sale antes de
-// arrancar Kestrel.
 if (args.Contains("--seed"))
 {
-    await SeedDatabaseAsync(app);
+    await app.SeedDatabaseAsync();
     return;
 }
 
 app.Run();
 
-static async Task SeedDatabaseAsync(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var seeder = scope.ServiceProvider.GetRequiredService<DatabaseSeeder>();
-    await seeder.SeedAsync();
-}
-
-static async Task InitializeDatabaseAsync(WebApplication app)
-{
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(DatabaseInitializer).FullName ?? "DatabaseInitializer");
-    await DatabaseInitializer.MigrateAsync(dbContext, logger);
-}
-
-// Clase generada por los top-level statements. Se declara pública para que
-// WebApplicationFactory<Program> (tests de integración) pueda usarla como entry point.
-public partial class Program
-{
-    [LoggerMessage(Level = LogLevel.Error, Message = "Database health check failed")]
-    private static partial void LogHealthCheckFailed(ILogger logger, Exception exception);
-}
+// Pública para que WebApplicationFactory<Program> (tests de integración) la use como entry point.
+public partial class Program;
