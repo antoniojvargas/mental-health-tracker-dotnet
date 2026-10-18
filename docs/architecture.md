@@ -459,10 +459,11 @@ preferencia.
 
 **Por qué el consumo directo del generado no es viable hoy**
 
-1. **Falta un endpoint entero.** `GET /api/auth/me` documenta su `200` como
-   `{ "description": "OK" }`, sin schema: `AuthController` devuelve un objeto anónimo que
-   Swashbuckle no sabe describir. El tipo `User` es **inevitablemente manual**; un contrato
-   "100 % generado" lo rompería en el primer import.
+1. **El tipo `User` seguiría siendo manual.** `GET /api/auth/me` ya documenta su `200` con el
+   schema `UserResponse` (el record que devuelve `AuthController.Me`), pero Swashbuckle lo
+   emite con `email` y `name` como `string | null` y `avatarUrl` como opcional, aunque la API
+   siempre los envía. El espejo a mano declara `email: string` y `name: string`, que es lo
+   correcto; consumir el generado reintroduciría ese ruido defensivo en cada punto de uso.
 2. **El tipo generado rechaza un payload que la API sí acepta.** Swashbuckle traduce el
    `ActivityType?` de C# como `activityType?: ActivityType`, es decir opcional pero *no*
    nullable, así que envía `activityType: null` —que es como se dice "no hay actividad"— falla

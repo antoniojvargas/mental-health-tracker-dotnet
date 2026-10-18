@@ -88,7 +88,7 @@ public sealed partial class AuthController(
 
     [HttpGet("me")]
     [RequireAuth]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
@@ -107,13 +107,7 @@ public sealed partial class AuthController(
             throw new UnauthorizedException("Authentication required");
         }
 
-        return Ok(new
-        {
-            id = user.Id,
-            email = user.Email,
-            name = user.Name,
-            avatarUrl = user.AvatarUrl,
-        });
+        return Ok(new UserResponse(user.Id, user.Email, user.Name, user.AvatarUrl));
     }
 
     [HttpPost("logout")]
