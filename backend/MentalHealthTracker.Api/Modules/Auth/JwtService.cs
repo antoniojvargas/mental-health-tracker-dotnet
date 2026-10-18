@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -115,27 +116,9 @@ public class JwtService
         }
     }
 
-    private byte[] ComputeSignature(byte[] data)
-    {
-        using var hmac = new HMACSHA256(_key);
-        return hmac.ComputeHash(data);
-    }
+    private byte[] ComputeSignature(byte[] data) => HMACSHA256.HashData(_key, data);
 
-    private static string Encode(byte[] data) =>
-        Convert.ToBase64String(data)
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+    private static string Encode(byte[] data) => Base64Url.EncodeToString(data);
 
-    private static byte[] Decode(string value)
-    {
-        var base64 = value.Replace('-', '+').Replace('_', '/');
-        base64 = (base64.Length % 4) switch
-        {
-            2 => base64 + "==",
-            3 => base64 + "=",
-            _ => base64,
-        };
-        return Convert.FromBase64String(base64);
-    }
+    private static byte[] Decode(string value) => Base64Url.DecodeFromChars(value);
 }
