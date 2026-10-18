@@ -124,13 +124,10 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | `LOG_LEVEL` | Backend · nivel mínimo de Serilog (`Verbose`…`Fatal`) | No | No | `Information` |
 | `ASPNETCORE_ENVIRONMENT` | Backend · entorno del host (`Development`/`Testing`/`Production`) — habilita Swagger y `POST /api/auth/test-login` | No | No | `Development` (dev) · `Production` (prod) |
 | `ASPNETCORE_URLS` | Backend · direcciones de escucha de Kestrel | No | No | `http://+:3000` (imagen) |
-| `PORT` | — **no consumida** (la imagen fija `ASPNETCORE_URLS`; residuo de la plantilla) | No | No | — |
-| `ConnectionStrings__Default` | — **no consumida** por la app (residuo de la plantilla, presente en `.env.example`) | No | No | — |
 | `VITE_PROXY_TARGET` | Frontend · Vite dev server — destino del proxy `/api` y `/hub` | No | No | `http://localhost:3000` (host) · `http://backend:3000` (Compose) |
 | `POSTGRES_USER` | Contenedor Postgres · usuario de la base de datos | No | No | `postgres` |
 | `POSTGRES_PASSWORD` | Contenedor Postgres · password de la base de datos | No | Sí (`POSTGRES_PASSWORD_FILE`) | `postgres` (dev) · secreto (prod) |
 | `POSTGRES_DB` | Contenedor Postgres · nombre de la base de datos | No | No | `mentalhealthtracker` |
-| `POSTGRES_PORT` | — **no consumida** (el compose publica `5432` fijo) | No | No | — |
 | `HTTP_PORT` | Compose de producción · puerto público del frontend en el host | No | No | `8080` |
 | `GOOGLE_CLIENT_ID` | Compose de producción · se inyecta al backend como `GoogleOAuth__ClientId` | Sí (prod) | No | `xxxxx.apps.googleusercontent.com` |
 | `GOOGLE_REDIRECT_URI` | Compose de producción · se inyecta como `GoogleOAuth__RedirectUri` | No | No | `http://localhost:8080/api/auth/google/callback` |
