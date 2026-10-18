@@ -5,14 +5,11 @@ namespace MentalHealthTracker.Api.Modules.DailyLog.Validators;
 
 public sealed class ListDailyLogsQueryValidator : AbstractValidator<ListDailyLogsQuery>
 {
-    private const int MaxRangeDays = 366;
-    private const int MaxLimit = 366;
-
     public ListDailyLogsQueryValidator()
     {
         RuleFor(x => x.Limit)
-            .LessThanOrEqualTo(MaxLimit)
-            .WithMessage($"limit cannot exceed {MaxLimit}.");
+            .LessThanOrEqualTo(DailyLogDefaults.MaxLimit)
+            .WithMessage($"limit cannot exceed {DailyLogDefaults.MaxLimit}.");
 
         RuleFor(x => x.Offset)
             .GreaterThanOrEqualTo(0)
@@ -24,7 +21,7 @@ public sealed class ListDailyLogsQueryValidator : AbstractValidator<ListDailyLog
 
         RuleFor(x => x)
             .Must(query => !query.From.HasValue || !query.To.HasValue ||
-                           (query.To.Value.DayNumber - query.From.Value.DayNumber) <= MaxRangeDays)
-            .WithMessage($"The range between from and to cannot exceed {MaxRangeDays} days.");
+                           (query.To.Value.DayNumber - query.From.Value.DayNumber) <= DailyLogDefaults.MaxRangeDays)
+            .WithMessage($"The range between from and to cannot exceed {DailyLogDefaults.MaxRangeDays} days.");
     }
 }

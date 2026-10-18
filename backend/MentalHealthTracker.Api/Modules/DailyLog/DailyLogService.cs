@@ -38,7 +38,7 @@ public sealed class DailyLogService(
         CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-        var from = query.From ?? today.AddDays(-29);
+        var from = query.From ?? today.AddDays(1 - DailyLogDefaults.DefaultRangeDays);
         var to = query.To ?? today;
 
         var result = await repository.FindByUserAndRangeAsync(
