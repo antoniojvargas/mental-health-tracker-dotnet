@@ -1,5 +1,7 @@
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Api.Core.Errors;
 using MentalHealthTracker.Api.Core.Exceptions;
+using MentalHealthTracker.Api.Core.Health;
 using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Core.OpenApi;
 using MentalHealthTracker.Api.Core.RateLimiting;
@@ -7,12 +9,10 @@ using MentalHealthTracker.Api.Core.Validation;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.Realtime;
-using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Infrastructure;
 using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,6 +58,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(appUrls?.FrontendUrl ?? string.Empty).AllowCredentials()));
 
 builder.Services.AddApiDocumentation();
+builder.Services.AddApplicationUptime();
 
 var app = builder.Build();
 
@@ -89,46 +90,9 @@ app.MapRealtimeHubs();
 
 app.MapAuthEndpoints(app.Environment);
 
-// Cualquier ruta de /api sin endpoint cae aquí y sale por el manejador global con el
-// mismo sobre de error que el resto de la API, en lugar de un 404 vacío. Solo cubre
-// /api: /hub y Swagger quedan fuera. Es el endpoint de menor prioridad, así que no
-// tapa a los reales; por contra, un método no admitido en una ruta existente también
-// termina aquí (404 en vez de 405).
-app.MapFallback("/api/{**path}", (HttpContext context) =>
-    throw new NotFoundException($"Route {context.Request.Path} does not exist"));
+app.MapApiFallback();
 
-var startedAt = DateTimeOffset.UtcNow;
-
-// Health check con prueba real de conectividad: devolver un literal "ok" fijo no basta
-// porque los orquestadores (Docker healthcheck, load balancers) usan este endpoint para
-// decidir si el contenedor está sano. Un 200 constante enmascara caídas de la base de
-// datos: no se reiniciaría el contenedor, no habría alertas y los clientes fallarían
-// después con errores confusos. Solo un SELECT 1 real refleja la disponibilidad real.
-app.MapGet("/api/health", async (
-    IOptions<DatabaseOptions> databaseOptions,
-    ILogger<Program> logger) =>
-{
-    var uptime = DateTimeOffset.UtcNow - startedAt;
-
-    try
-    {
-        await using var connection = new NpgsqlConnection(databaseOptions.Value.ConnectionString);
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT 1";
-        await command.ExecuteScalarAsync();
-    }
-    catch (Exception exception)
-    {
-        Program.LogHealthCheckFailed(logger, exception);
-        return Results.Json(
-            new { status = "error", db = "unreachable" },
-            statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-
-    return Results.Json(
-        new { status = "ok", uptime = (int)uptime.TotalSeconds });
-});
+app.MapHealthEndpoints();
 
 await InitializeDatabaseAsync(app);
 
@@ -160,8 +124,4 @@ static async Task InitializeDatabaseAsync(WebApplication app)
 
 // Clase generada por los top-level statements. Se declara pública para que
 // WebApplicationFactory<Program> (tests de integración) pueda usarla como entry point.
-public partial class Program
-{
-    [LoggerMessage(Level = LogLevel.Error, Message = "Database health check failed")]
-    private static partial void LogHealthCheckFailed(ILogger logger, Exception exception);
-}
+public partial class Program;

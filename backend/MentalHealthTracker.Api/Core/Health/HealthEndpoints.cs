@@ -1,0 +1,56 @@
+using MentalHealthTracker.Api.Core.Configuration;
+using Microsoft.Extensions.Options;
+using Npgsql;
+
+namespace MentalHealthTracker.Api.Core.Health;
+
+public static partial class HealthEndpoints
+{
+    public static IServiceCollection AddApplicationUptime(this IServiceCollection services)
+    {
+        // Instancia creada al registrar (no de forma perezosa) para que el uptime cuente
+        // desde el arranque y no desde la primera petición.
+        services.AddSingleton(new ApplicationUptime());
+        return services;
+    }
+
+    // Health check con prueba real de conectividad: devolver un literal "ok" fijo no basta
+    // porque los orquestadores (Docker healthcheck, load balancers) usan este endpoint para
+    // decidir si el contenedor está sano. Un 200 constante enmascara caídas de la base de
+    // datos: no se reiniciaría el contenedor, no habría alertas y los clientes fallarían
+    // después con errores confusos. Solo un SELECT 1 real refleja la disponibilidad real.
+    public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/health", async (
+            IOptions<DatabaseOptions> databaseOptions,
+            ApplicationUptime applicationUptime,
+            ILogger<Program> logger) =>
+        {
+            var uptime = applicationUptime.Elapsed;
+
+            try
+            {
+                await using var connection = new NpgsqlConnection(databaseOptions.Value.ConnectionString);
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "SELECT 1";
+                await command.ExecuteScalarAsync();
+            }
+            catch (Exception exception)
+            {
+                LogHealthCheckFailed(logger, exception);
+                return Results.Json(
+                    new { status = "error", db = "unreachable" },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            return Results.Json(
+                new { status = "ok", uptime = (int)uptime.TotalSeconds });
+        });
+
+        return app;
+    }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Database health check failed")]
+    private static partial void LogHealthCheckFailed(ILogger logger, Exception exception);
+}
