@@ -11,9 +11,8 @@ using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Api.Modules.Realtime;
 using MentalHealthTracker.Domain.Errors;
-using MentalHealthTracker.Domain.Repositories;
+using MentalHealthTracker.Infrastructure;
 using MentalHealthTracker.Infrastructure.Persistence;
-using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -42,20 +41,10 @@ builder.Host.ConfigureHostOptions(options =>
 builder.Services.AddAppOptions(builder.Configuration);
 builder.Services.AddReverseProxyTrust();
 
-builder.Services.AddScoped<DatabaseSeeder>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IDailyLogRepository, DailyLogRepository>();
+builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddSingleton<JwtService>();
 builder.Services.AddSingleton<AuthCookieOptions>();
 builder.Services.AddHttpClient<GoogleOAuthClient>();
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    var connectionString = builder.Configuration
-        .GetSection(DatabaseOptions.SectionName)
-        .Get<DatabaseOptions>()?.ConnectionString;
-    options.UseNpgsql(connectionString);
-});
 
 builder.Services.AddSingleton<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
 builder.Services.AddSingleton<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
