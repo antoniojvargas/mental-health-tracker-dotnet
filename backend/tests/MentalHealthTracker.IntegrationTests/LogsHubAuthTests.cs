@@ -31,7 +31,7 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
         var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
         request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={tampered}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={tampered}");
 
         var response = await client.SendAsync(request);
 
@@ -46,7 +46,7 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
         var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
         request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         var response = await client.SendAsync(request);
 

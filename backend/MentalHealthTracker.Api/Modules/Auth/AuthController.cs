@@ -23,8 +23,6 @@ public sealed partial class AuthController(
 {
     internal const string AuthRateLimitPolicy = "auth";
 
-    private const string OAuthStateCookieName = "oauth_state";
-
     private static readonly TimeSpan OAuthStateCookieMaxAge = TimeSpan.FromMinutes(10);
 
     private const string LoginErrorRoute = "/login?error=auth_failed";
@@ -41,7 +39,7 @@ public sealed partial class AuthController(
         var state = GenerateState();
 
         Response.Cookies.Append(
-            OAuthStateCookieName,
+            SessionCookie.OAuthStateName,
             state,
             cookieOptions.CreateWithMaxAge(OAuthStateCookieMaxAge));
 
@@ -60,7 +58,7 @@ public sealed partial class AuthController(
         [FromQuery] string? code,
         CancellationToken cancellationToken)
     {
-        Response.Cookies.Delete(OAuthStateCookieName, cookieOptions.Create());
+        Response.Cookies.Delete(SessionCookie.OAuthStateName, cookieOptions.Create());
 
         if (string.IsNullOrEmpty(code) || !StateMatches(state))
         {
@@ -75,7 +73,7 @@ public sealed partial class AuthController(
             var token = jwtService.Sign(user.Id, user.Email);
 
             Response.Cookies.Append(
-                JwtService.SessionCookieName,
+                SessionCookie.AccessTokenName,
                 token,
                 cookieOptions.CreateWithMaxAge(jwtService.SessionLifetime));
 
@@ -126,13 +124,13 @@ public sealed partial class AuthController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public IActionResult Logout()
     {
-        Response.Cookies.Delete(JwtService.SessionCookieName, cookieOptions.Create());
+        Response.Cookies.Delete(SessionCookie.AccessTokenName, cookieOptions.Create());
         return NoContent();
     }
 
     private bool StateMatches(string? receivedState)
     {
-        var expectedState = Request.Cookies[OAuthStateCookieName];
+        var expectedState = Request.Cookies[SessionCookie.OAuthStateName];
         if (expectedState is null || receivedState is null ||
             expectedState.Length != receivedState.Length)
         {

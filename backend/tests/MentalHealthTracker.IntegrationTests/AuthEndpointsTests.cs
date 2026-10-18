@@ -54,7 +54,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var (user, token) = await CreateAuthenticatedSessionAsync();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         var response = await Factory.CreateClient().SendAsync(request);
 
@@ -75,7 +75,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var tampered = TamperSignature(token);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={tampered}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={tampered}");
 
         var response = await Factory.CreateClient().SendAsync(request);
 
@@ -88,14 +88,14 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var (_, token) = await CreateAuthenticatedSessionAsync();
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         var response = await Factory.CreateClient().SendAsync(request);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 
         var setCookie = string.Join("; ", response.Headers.TryGetValues("Set-Cookie", out var values) ? values : []);
-        Assert.Contains("access_token=", setCookie);
+        Assert.Contains($"{SessionCookie.AccessTokenName}=", setCookie);
         Assert.True(
             setCookie.Contains("Max-Age=0", StringComparison.OrdinalIgnoreCase) ||
             setCookie.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase),
@@ -130,7 +130,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
             new { email = $"maxage-{Guid.NewGuid():N}@example.com", name = "Max Age" });
 
         var setCookie = response.Headers.GetValues("Set-Cookie")
-            .Single(value => value.StartsWith($"{JwtService.SessionCookieName}=", StringComparison.Ordinal));
+            .Single(value => value.StartsWith($"{SessionCookie.AccessTokenName}=", StringComparison.Ordinal));
         return Regex.Match(setCookie, @"max-age=(\d+)", RegexOptions.IgnoreCase).Groups[1].Value;
     }
 
@@ -144,7 +144,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
 
         var setCookie = Assert.Single(response.Headers.GetValues("Set-Cookie"));
-        Assert.StartsWith("oauth_state=", setCookie, StringComparison.Ordinal);
+        Assert.StartsWith($"{SessionCookie.OAuthStateName}=", setCookie, StringComparison.Ordinal);
         Assert.Contains("HttpOnly", setCookie, StringComparison.OrdinalIgnoreCase);
 
         var stateFromCookie = setCookie.Split(';')[0].Split('=', 2)[1];

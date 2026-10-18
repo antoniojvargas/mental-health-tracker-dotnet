@@ -80,7 +80,7 @@ public static class RateLimitingServiceCollectionExtensions
             // igual con 401 y nunca llegan a escribir.
             options.AddPolicy(DailyLogController.WriteRateLimitPolicy, httpContext =>
             {
-                var token = httpContext.Request.Cookies[JwtService.SessionCookieName];
+                var token = httpContext.Request.Cookies[SessionCookie.AccessTokenName];
                 var userId = httpContext.RequestServices
                     .GetRequiredService<JwtService>()
                     .Verify(token)?

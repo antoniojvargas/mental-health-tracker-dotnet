@@ -41,7 +41,7 @@ public static class TestAuthEndpoints
             var token = jwtService.Sign(user.Id, user.Email);
 
             httpContext.Response.Cookies.Append(
-                JwtService.SessionCookieName,
+                SessionCookie.AccessTokenName,
                 token,
                 cookieOptions.CreateWithMaxAge(jwtService.SessionLifetime));
 

@@ -25,7 +25,7 @@ public sealed class RealtimeFailureTests(CustomWebApplicationFactory factory)
                 services.AddSingleton<IHubContext<LogsHub>, ThrowingHubContext>()));
 
         var (_, _, token) = await CreateAuthenticatedSessionAsync($"rt-{Guid.NewGuid():N}@example.com");
-        var cookie = $"{JwtService.SessionCookieName}={token}";
+        var cookie = $"{SessionCookie.AccessTokenName}={token}";
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

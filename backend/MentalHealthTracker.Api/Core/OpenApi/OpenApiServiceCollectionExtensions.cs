@@ -20,11 +20,11 @@ public static class OpenApiServiceCollectionExtensions
             });
 
             options.AddSecurityDefinition(
-                JwtService.SessionCookieName,
+                SessionCookie.AccessTokenName,
                 new OpenApiSecurityScheme
                 {
                     Type = SecuritySchemeType.ApiKey,
-                    Name = JwtService.SessionCookieName,
+                    Name = SessionCookie.AccessTokenName,
                     In = ParameterLocation.Cookie,
                     Description = "Session cookie issued after signing in with Google.",
                 });

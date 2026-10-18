@@ -8,8 +8,6 @@ namespace MentalHealthTracker.Api.Modules.Auth;
 
 public sealed class JwtService
 {
-    public const string SessionCookieName = "access_token";
-
     private const string Algorithm = "HS256";
 
     private const string HeaderJson = """{"alg":"HS256","typ":"JWT"}""";

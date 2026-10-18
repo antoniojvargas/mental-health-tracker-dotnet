@@ -130,7 +130,7 @@ public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"/api/logs/today{(query is null ? "" : $"?{query}")}");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         return await Factory.CreateClient().SendAsync(request);
     }

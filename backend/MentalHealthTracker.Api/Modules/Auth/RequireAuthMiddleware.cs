@@ -9,7 +9,7 @@ public sealed class RequireAuthMiddleware(RequestDelegate next, JwtService jwtSe
     {
         if (context.GetEndpoint()?.Metadata.GetMetadata<RequireAuthAttribute>() is not null)
         {
-            var token = context.Request.Cookies[JwtService.SessionCookieName];
+            var token = context.Request.Cookies[SessionCookie.AccessTokenName];
             if (string.IsNullOrEmpty(token) || jwtService.Verify(token) is not (var userId, var email))
             {
                 throw new UnauthorizedException("Authentication required");
