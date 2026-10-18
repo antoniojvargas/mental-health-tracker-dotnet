@@ -1,3 +1,5 @@
+using MentalHealthTracker.Api.Modules.Auth.Testing;
+
 namespace MentalHealthTracker.Api.Modules.Auth;
 
 public static class AuthModule
@@ -25,9 +27,9 @@ public static class AuthModule
         this IEndpointRouteBuilder endpoints,
         IHostEnvironment environment)
     {
-        if (environment.IsEnvironment("Testing"))
+        if (environment.IsEnvironment(TestAuthEndpoints.EnvironmentName))
         {
-            endpoints.MapTestAuthEndpoints();
+            endpoints.MapTestAuthEndpoints(environment);
         }
 
         return endpoints;

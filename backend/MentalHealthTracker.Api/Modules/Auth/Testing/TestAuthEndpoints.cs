@@ -1,7 +1,7 @@
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 
-namespace MentalHealthTracker.Api.Modules.Auth;
+namespace MentalHealthTracker.Api.Modules.Auth.Testing;
 
 // Endpoint solo para entornos de prueba (ASPNETCORE_ENVIRONMENT=Testing); se registra
 // condicionalmente para que no exista en rutas de producción ni desarrollo.
@@ -16,8 +16,20 @@ namespace MentalHealthTracker.Api.Modules.Auth;
 // autenticados sin depender de Google.
 public static class TestAuthEndpoints
 {
-    public static void MapTestAuthEndpoints(this IEndpointRouteBuilder app)
+    public const string EnvironmentName = "Testing";
+
+    // Falla el arranque si algo intenta mapear el endpoint fuera de Testing: un test-login
+    // que emite sesiones sin pasar por Google en desarrollo o en producción sería una puerta
+    // trasera, así que no basta con que el llamador habitual compruebe el entorno.
+    public static void MapTestAuthEndpoints(this IEndpointRouteBuilder app, IHostEnvironment environment)
     {
+        if (!environment.IsEnvironment(EnvironmentName))
+        {
+            throw new InvalidOperationException(
+                $"The test-login endpoint can only be mapped in the '{EnvironmentName}' environment, " +
+                $"but the current environment is '{environment.EnvironmentName}'.");
+        }
+
         app.MapPost("/api/auth/test-login", async (
             TestLoginRequest request,
             IUserRepository userRepository,
