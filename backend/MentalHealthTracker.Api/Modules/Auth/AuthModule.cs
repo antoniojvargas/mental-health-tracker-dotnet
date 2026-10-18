@@ -12,6 +12,7 @@ public static class AuthModule
         services.AddSingleton<SessionTokenReader>();
         services.AddSingleton<AuthCookieOptions>();
         services.AddSingleton<OAuthStateService>();
+        services.AddSingleton<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
         services.AddHttpClient<GoogleOAuthClient>();
 
         return services;

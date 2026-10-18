@@ -1,6 +1,5 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using Google.Apis.Auth;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Domain.Models;
@@ -21,19 +20,12 @@ public sealed class GoogleOAuthClient
 
     private readonly HttpClient _httpClient;
     private readonly GoogleOAuthOptions _options;
-    private readonly Func<string, Task<GoogleJsonWebSignature.Payload>> _idTokenValidator;
+    private readonly IGoogleIdTokenValidator _idTokenValidator;
 
-    public GoogleOAuthClient(HttpClient httpClient, IOptions<GoogleOAuthOptions> options)
-    {
-        _httpClient = httpClient;
-        _options = options.Value;
-        _idTokenValidator = ValidateIdTokenAsync;
-    }
-
-    internal GoogleOAuthClient(
+    public GoogleOAuthClient(
         HttpClient httpClient,
         IOptions<GoogleOAuthOptions> options,
-        Func<string, Task<GoogleJsonWebSignature.Payload>> idTokenValidator)
+        IGoogleIdTokenValidator idTokenValidator)
     {
         _httpClient = httpClient;
         _options = options.Value;
@@ -62,7 +54,7 @@ public sealed class GoogleOAuthClient
         var idToken = tokenResponse.IdToken
             ?? throw new InvalidOperationException("Token endpoint did not return an id_token");
 
-        var validatedPayload = await _idTokenValidator(idToken);
+        var validatedPayload = await _idTokenValidator.ValidateAsync(idToken);
         if (string.IsNullOrEmpty(validatedPayload.Subject))
         {
             throw new UnauthorizedException("Validated id_token is missing the sub claim");
@@ -91,17 +83,6 @@ public sealed class GoogleOAuthClient
 
         return await response.Content.ReadFromJsonAsync<TokenResponse>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Token endpoint returned empty response");
-    }
-
-    private Task<GoogleJsonWebSignature.Payload> ValidateIdTokenAsync(string idToken)
-    {
-        var validationSettings = new GoogleJsonWebSignature.ValidationSettings
-        {
-            Audience = [_options.ClientId],
-            ForceGoogleCertRefresh = false,
-        };
-
-        return GoogleJsonWebSignature.ValidateAsync(idToken, validationSettings);
     }
 
     private sealed class TokenResponse
