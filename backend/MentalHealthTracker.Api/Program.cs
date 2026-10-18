@@ -12,7 +12,6 @@ using MentalHealthTracker.Infrastructure;
 using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Microsoft.OpenApi;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -58,32 +57,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy(CorsPolicyName, policy =>
         policy.WithOrigins(appUrls?.FrontendUrl ?? string.Empty).AllowCredentials()));
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    options.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "Mental Health Tracker API",
-        Version = "v1",
-        Description = "Mental Health Tracker API: authentication and daily wellbeing logging.",
-    });
-
-    options.AddSecurityDefinition(
-        JwtService.SessionCookieName,
-        new OpenApiSecurityScheme
-        {
-            Type = SecuritySchemeType.ApiKey,
-            Name = JwtService.SessionCookieName,
-            In = ParameterLocation.Cookie,
-            Description = "Session cookie issued after signing in with Google.",
-        });
-
-    options.OperationFilter<RequireAuthSecurityOperationFilter>();
-
-    options.SchemaFilter<FluentValidationSchemaFilter>();
-    options.ParameterFilter<FluentValidationParameterFilter>();
-});
+builder.Services.AddApiDocumentation();
 
 var app = builder.Build();
 
@@ -101,15 +75,7 @@ app.UseSecurityHeaders();
 app.UseCors(CorsPolicyName);
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Mental Health Tracker API v1");
-        options.RoutePrefix = SecurityHeadersMiddleware.DocsRoutePrefix;
-    });
-}
+app.UseApiDocumentation(app.Environment);
 
 app.UseRouting();
 
