@@ -17,11 +17,14 @@ public sealed class DatabaseInitializerTests
             new DbContextOptionsBuilder<AppDbContext>()
                 .UseNpgsql("Host=db-that-does-not-exist.invalid;Port=5432;Database=x;Username=x;Password=x;Timeout=2")
                 .Options);
-        var logger = new CapturingLogger();
         using var cancellation = new CancellationTokenSource();
+        var logger = new CapturingLogger();
 
-        // El primer intento falla enseguida; la espera de 1 s antes del segundo se cancela.
-        cancellation.CancelAfter(TimeSpan.FromMilliseconds(600));
+        // La resolución de DNS tarda lo que tarde cada entorno, así que no se cancela por
+        // tiempo: en cuanto se registra el aviso del primer intento se corta la espera
+        // (1 s) antes del segundo. El tope de abajo solo evita un test colgado.
+        logger.OnWarning = cancellation.Cancel;
+        cancellation.CancelAfter(TimeSpan.FromSeconds(60));
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => DatabaseInitializer.MigrateAsync(dbContext, logger, cancellation.Token));
@@ -37,6 +40,8 @@ public sealed class DatabaseInitializerTests
     {
         public List<Entry> Entries { get; } = [];
 
+        public Action? OnWarning { get; set; }
+
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => null;
 
@@ -47,7 +52,13 @@ public sealed class DatabaseInitializerTests
             EventId eventId,
             TState state,
             Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
+            Func<TState, Exception?, string> formatter)
+        {
             Entries.Add(new Entry(logLevel, formatter(state, exception), exception));
+            if (logLevel == LogLevel.Warning)
+            {
+                OnWarning?.Invoke();
+            }
+        }
     }
 }
