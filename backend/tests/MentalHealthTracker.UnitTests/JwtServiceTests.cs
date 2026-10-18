@@ -17,8 +17,10 @@ public sealed class JwtServiceTests
 
     private static readonly Guid UserId = Guid.Parse("3f2c1a9e-7b4d-4e8a-9c55-0d6e2b1f4a73");
 
-    private static JwtService CreateService(string secret = Secret, int expiresInDays = 7) =>
-        new(Options.Create(new JwtOptions { Secret = secret, ExpiresInDays = expiresInDays }));
+    private readonly FixedTimeProvider _clock = new();
+
+    private JwtService CreateService(string secret = Secret, int expiresInDays = 7) =>
+        new(Options.Create(new JwtOptions { Secret = secret, ExpiresInDays = expiresInDays }), _clock);
 
     [Fact]
     public void SignThenVerify_ReturnsTheSameUserAndEmail()
@@ -46,15 +48,46 @@ public sealed class JwtServiceTests
     }
 
     [Fact]
-    public void Sign_SetsExpirationFromExpiresInDays()
+    public void Sign_SetsIssuedAtAndExpirationFromTheClockAndExpiresInDays()
     {
-        var before = DateTimeOffset.UtcNow;
         var token = CreateService(expiresInDays: 3).Sign(UserId, "ana@example.com");
-        var after = DateTimeOffset.UtcNow;
 
         using var payload = JsonDocument.Parse(Decode(token.Split('.')[1]));
-        var exp = payload.RootElement.GetProperty("exp").GetInt64();
-        Assert.InRange(exp, before.AddDays(3).ToUnixTimeSeconds(), after.AddDays(3).ToUnixTimeSeconds());
+        Assert.Equal(_clock.GetUtcNow().ToUnixTimeSeconds(), payload.RootElement.GetProperty("iat").GetInt64());
+        Assert.Equal(
+            _clock.GetUtcNow().AddDays(3).ToUnixTimeSeconds(),
+            payload.RootElement.GetProperty("exp").GetInt64());
+    }
+
+    [Fact]
+    public void Verify_TokenIsValidUntilItsExpirationSecondAndRejectedOneSecondLater()
+    {
+        var service = CreateService(expiresInDays: 7);
+        var token = service.Sign(UserId, "ana@example.com");
+
+        _clock.Advance(TimeSpan.FromDays(7) - TimeSpan.FromSeconds(1));
+        Assert.NotNull(service.Verify(token));
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.NotNull(service.Verify(token));
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        Assert.Null(service.Verify(token));
+    }
+
+    [Fact]
+    public void SessionLifetime_WithDefaultOptions_Is604800Seconds()
+    {
+        var service = new JwtService(
+            Options.Create(new JwtOptions { Secret = "unit-test-jwt-secret-key-value" }), _clock);
+
+        Assert.Equal(604800, service.SessionLifetime.TotalSeconds);
+    }
+
+    [Fact]
+    public void SessionLifetime_FollowsExpiresInDays()
+    {
+        Assert.Equal(TimeSpan.FromDays(3), CreateService(expiresInDays: 3).SessionLifetime);
     }
 
     [Fact]
@@ -125,7 +158,7 @@ public sealed class JwtServiceTests
     [Fact]
     public void Verify_ExpiredToken_ReturnsNull()
     {
-        var token = BuildToken(exp: DateTimeOffset.UtcNow.AddSeconds(-10).ToUnixTimeSeconds());
+        var token = BuildToken(exp: _clock.GetUtcNow().AddSeconds(-10).ToUnixTimeSeconds());
 
         Assert.Null(CreateService().Verify(token));
     }
@@ -216,9 +249,9 @@ public sealed class JwtServiceTests
 
     // --- constructor de tokens a mano, con el mismo secreto y la misma codificación ---
 
-    private static long FutureExp() => DateTimeOffset.UtcNow.AddDays(1).ToUnixTimeSeconds();
+    private long FutureExp() => _clock.GetUtcNow().AddDays(1).ToUnixTimeSeconds();
 
-    private static string BuildToken(
+    private string BuildToken(
         string secret = Secret,
         string header = """{"alg":"HS256","typ":"JWT"}""",
         string? sub = null,

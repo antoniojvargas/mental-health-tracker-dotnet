@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace MentalHealthTracker.Infrastructure.Persistence.Repositories;
 
-public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
+public sealed class UserRepository(AppDbContext dbContext, TimeProvider timeProvider) : IUserRepository
 {
     // El upsert se hace por GoogleId, no por email: el email de una cuenta puede
     // cambiar (el usuario lo modifica en su cuenta de Google) y el sub no.
@@ -14,7 +14,7 @@ public sealed class UserRepository(AppDbContext dbContext) : IUserRepository
         var user = await dbContext.Users
             .SingleOrDefaultAsync(u => u.GoogleId == profile.GoogleId, cancellationToken);
 
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
 
         if (user is null)
         {

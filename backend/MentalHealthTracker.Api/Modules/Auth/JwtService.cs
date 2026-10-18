@@ -10,8 +10,6 @@ public sealed class JwtService
 {
     public const string SessionCookieName = "access_token";
 
-    public static readonly TimeSpan SessionCookieMaxAge = TimeSpan.FromDays(7);
-
     private const string Algorithm = "HS256";
 
     private const string HeaderJson = """{"alg":"HS256","typ":"JWT"}""";
@@ -20,21 +18,29 @@ public sealed class JwtService
 
     private readonly int _expiresInDays;
 
-    public JwtService(IOptions<JwtOptions> options)
+    private readonly TimeProvider _timeProvider;
+
+    public JwtService(IOptions<JwtOptions> options, TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _key = Encoding.UTF8.GetBytes(options.Value.Secret);
         _expiresInDays = options.Value.ExpiresInDays;
     }
 
+    // Vida de la sesión: es a la vez la caducidad (exp) del JWT y el Max-Age de la cookie
+    // que lo transporta, para que ambas caduquen en el mismo instante. Sale de
+    // Jwt:ExpiresInDays (7 días por defecto).
+    public TimeSpan SessionLifetime => TimeSpan.FromDays(_expiresInDays);
+
     public string Sign(Guid userId, string email)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var claims = new Dictionary<string, object>
         {
             ["sub"] = userId.ToString(),
             ["email"] = email,
             ["iat"] = now.ToUnixTimeSeconds(),
-            ["exp"] = now.AddDays(_expiresInDays).ToUnixTimeSeconds(),
+            ["exp"] = now.Add(SessionLifetime).ToUnixTimeSeconds(),
         };
 
         var header = Encode(Encoding.UTF8.GetBytes(HeaderJson));
@@ -97,7 +103,7 @@ public sealed class JwtService
                 return null;
             }
 
-            if (expiresAt < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            if (expiresAt < _timeProvider.GetUtcNow().ToUnixTimeSeconds())
             {
                 return null;
             }

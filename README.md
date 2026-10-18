@@ -116,7 +116,7 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | --- | --- | --- | --- | --- |
 | `Database__ConnectionString` | Backend · `Database:ConnectionString` — EF Core, healthcheck (`SELECT 1`) y migraciones | Sí | Sí (`Database__ConnectionString_FILE`) | `Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=…` |
 | `JWT_SECRET` | Backend · `Jwt:Secret` — firma y verificación del JWT (≥ 16 caracteres) | Sí | Sí (`JWT_SECRET_FILE`) | valor aleatorio (`openssl rand -base64 48`) |
-| `Jwt__ExpiresInDays` | Backend · `Jwt:ExpiresInDays` — caducidad de la cookie de sesión | No | No | `7` |
+| `Jwt__ExpiresInDays` | Backend · `Jwt:ExpiresInDays` — caducidad de la sesión: `exp` del JWT y `Max-Age` de la cookie (en días) | No | No | `7` |
 | `GoogleOAuth__ClientId` | Backend · `GoogleOAuth:ClientId` — flujo OAuth con Google | Sí | No | `xxxxx.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Backend · `GoogleOAuth:ClientSecret` — intercambio de tokens con Google | Sí | Sí (`GOOGLE_CLIENT_SECRET_FILE`) | secreto de Google Cloud Console |
 | `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/api/auth/google/callback` |
@@ -136,6 +136,8 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | `ReverseProxy__KnownNetworks__0` | Backend · `ReverseProxy:KnownNetworks` — redes de proxies de confianza en CIDR (un índice por entrada: `__0`, `__1`…). Con `Enabled=true` hace falta al menos una red o un proxy | Sí, si `Enabled` | No | `172.28.0.0/24` (subred fija del compose de producción) |
 | `ReverseProxy__KnownProxies__0` | Backend · `ReverseProxy:KnownProxies` — IPs individuales de proxies de confianza (`__0`, `__1`…) | Sí, si `Enabled` y no hay redes | No | `10.0.0.2` |
 | `ReverseProxy__ForwardLimit` | Backend · `ReverseProxy:ForwardLimit` — entradas de `X-Forwarded-For` que se leen, desde la derecha (1–10) | No | No | `1` |
+| `RateLimiting__Auth__PermitLimit` / `RateLimiting__Auth__WindowMinutes` | Backend · `RateLimiting:Auth:*` — peticiones permitidas por ventana y duración de la ventana (minutos) de la política `auth` (callback de Google, por IP) | No | No | `20` / `15` |
+| `RateLimiting__Write__PermitLimit` / `RateLimiting__Write__WindowMinutes` | Backend · `RateLimiting:Write:*` — lo mismo para la política `write` (`POST /api/logs`, por usuario) | No | No | `30` / `15` |
 
 > **`ReverseProxy__*`:** detrás de nginx el backend ve la IP del proxy, no la del cliente. Con `Enabled=true` toma la IP real de `X-Forwarded-For` (para que la cuota de login sea por cliente y no global), pero solo si la petición llega de una IP o red declarada. `docker-compose.prod.yml` fija la subred de la red a `172.28.0.0/24` y la declara como red de confianza; si esa subred choca con otra del host, cámbiala en `networks.default.ipam` y en `ReverseProxy__KnownNetworks__0` a la vez. Un valor de IP o CIDR inválido, o `Enabled=true` sin proxies ni redes, hace que el backend no arranque. Deja `ForwardLimit` en `1` mientras nginx sea el único proxy; ver [`docs/architecture.md`](docs/architecture.md#rate-limiting-en-memoria-mismo-backplane-pendiente-que-signalr-decisión-de-alcance).
 

@@ -7,11 +7,9 @@ namespace MentalHealthTracker.Api.Modules.DailyLog.Validators;
 
 public sealed class CreateDailyLogValidator : AbstractValidator<CreateDailyLogRequest>
 {
-    private const int MaxDaysAheadOfUtc = 1;
-
     private static readonly Regex DateOnlyFormatRegex = new(@"^\d{4}-\d{2}-\d{2}$", RegexOptions.Compiled);
 
-    public CreateDailyLogValidator()
+    public CreateDailyLogValidator(TimeProvider timeProvider)
     {
         RuleFor(x => x.LogDate)
             .Must(x => DateOnlyFormatRegex.IsMatch(x.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
@@ -21,7 +19,7 @@ public sealed class CreateDailyLogValidator : AbstractValidator<CreateDailyLogRe
         // y la UTC, el "hoy" del usuario ya es mañana en UTC; UTC+14 es la zona más adelantada,
         // así que el límite es la fecha UTC + 1 día.
         RuleFor(x => x.LogDate)
-            .Must(x => x <= DateOnly.FromDateTime(DateTime.UtcNow).AddDays(MaxDaysAheadOfUtc))
+            .Must(x => x <= DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime).AddDays(DailyLogDefaults.MaxClientDayAheadOfUtc))
             .WithMessage("logDate cannot be in the future.");
 
         RuleFor(x => x.MoodRating).InclusiveBetween((short)1, (short)5);

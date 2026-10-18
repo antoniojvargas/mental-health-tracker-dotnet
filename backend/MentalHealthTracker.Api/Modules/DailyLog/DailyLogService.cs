@@ -7,7 +7,8 @@ namespace MentalHealthTracker.Api.Modules.DailyLog;
 
 public sealed class DailyLogService(
     IDailyLogRepository repository,
-    ILogEventEmitter logEventEmitter) : IDailyLogService
+    ILogEventEmitter logEventEmitter,
+    TimeProvider timeProvider) : IDailyLogService
 {
     public async Task<(DailyLogResponse Response, bool Created)> UpsertAsync(
         Guid userId,
@@ -36,8 +37,8 @@ public sealed class DailyLogService(
         ListDailyLogsQuery query,
         CancellationToken cancellationToken = default)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var from = query.From ?? today.AddDays(-29);
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+        var from = query.From ?? today.AddDays(1 - DailyLogDefaults.DefaultRangeDays);
         var to = query.To ?? today;
 
         var result = await repository.FindByUserAndRangeAsync(
@@ -54,7 +55,7 @@ public sealed class DailyLogService(
         CancellationToken cancellationToken = default)
     {
         // El día lo decide el cliente en su zona horaria; sin él, el día UTC del servidor.
-        var day = logDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var day = logDate ?? DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         var log = await repository.FindByUserAndDateAsync(userId, day, cancellationToken);
 
         return log?.ToResponse();

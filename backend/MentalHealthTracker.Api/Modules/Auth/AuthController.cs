@@ -78,7 +78,7 @@ public sealed partial class AuthController(
             Response.Cookies.Append(
                 JwtService.SessionCookieName,
                 token,
-                cookieOptions.CreateWithMaxAge(JwtService.SessionCookieMaxAge));
+                cookieOptions.CreateWithMaxAge(jwtService.SessionLifetime));
 
             return Redirect($"{appUrls.Value.FrontendUrl}/dashboard");
         }

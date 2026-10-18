@@ -128,14 +128,33 @@ public sealed class SecretFileConfigurationProviderTests : IDisposable
         Assert.Equal(string.Empty, Build()["Jwt:Secret"]);
     }
 
-    [Fact]
-    public void FileVariablePointingToAMissingFile_ThrowsWhenBuilding()
+    [Theory]
+    [InlineData("JWT_SECRET_FILE")]
+    [InlineData("GOOGLE_CLIENT_SECRET_FILE")]
+    [InlineData("Database__ConnectionString_FILE")]
+    public void FileVariablePointingToAMissingFile_ThrowsAnErrorNamingTheVariableAndThePath(string variable)
     {
-        Environment.SetEnvironmentVariable(
-            "JWT_SECRET_FILE",
-            Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.txt"));
+        var missing = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}.txt");
+        Environment.SetEnvironmentVariable(variable, missing);
 
-        Assert.Throws<FileNotFoundException>(Build);
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.Contains(variable, exception.Message);
+        Assert.Contains(missing, exception.Message);
+        Assert.IsType<FileNotFoundException>(exception.InnerException);
+    }
+
+    [Fact]
+    public void FileVariablePointingToAMissingDirectory_ThrowsTheSameClearError()
+    {
+        var missing = Path.Combine(Path.GetTempPath(), $"missing-{Guid.NewGuid():N}", "secret.txt");
+        Environment.SetEnvironmentVariable("JWT_SECRET_FILE", missing);
+
+        var exception = Assert.Throws<InvalidOperationException>(Build);
+
+        Assert.Contains("JWT_SECRET_FILE", exception.Message);
+        Assert.Contains(missing, exception.Message);
+        Assert.IsType<DirectoryNotFoundException>(exception.InnerException);
     }
 
     [Fact]

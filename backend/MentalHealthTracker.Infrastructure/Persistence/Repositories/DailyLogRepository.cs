@@ -9,7 +9,7 @@ using NpgsqlTypes;
 
 namespace MentalHealthTracker.Infrastructure.Persistence.Repositories;
 
-public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogRepository
+public sealed class DailyLogRepository(AppDbContext dbContext, TimeProvider timeProvider) : IDailyLogRepository
 {
     // Un select-then-insert del estilo "buscar por (user_id, log_date); si no existe,
     // insertar" tiene una condición de carrera: dos peticiones concurrentes del mismo
@@ -27,7 +27,7 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
     // creó la fila y false si solo la actualizó.
     public async Task<UpsertedDailyLog> UpsertAsync(DailyLog log, CancellationToken cancellationToken = default)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = timeProvider.GetUtcNow();
 
         var connection = dbContext.Database.GetDbConnection();
         await using var command = connection.CreateCommand();

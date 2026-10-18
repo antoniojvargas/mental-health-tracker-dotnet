@@ -18,6 +18,7 @@ public sealed class AuthModuleTests
 
         // Minimal API infiere los parámetros del handler al mapear, y para ello necesita ver
         // los servicios registrados; con el módulo y un repositorio falso basta (no se invoca).
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddAuthModule();
         builder.Services.AddOptions<MentalHealthTracker.Api.Core.Configuration.JwtOptions>();
         builder.Services.AddSingleton<IUserRepository, UnusedUserRepository>();

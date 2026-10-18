@@ -1,10 +1,13 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -97,6 +100,38 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
             setCookie.Contains("Max-Age=0", StringComparison.OrdinalIgnoreCase) ||
             setCookie.Contains("expires=Thu, 01 Jan 1970", StringComparison.OrdinalIgnoreCase),
             $"Set-Cookie debe expirar la cookie de sesión, pero fue: {setCookie}");
+    }
+
+    [Fact]
+    public async Task SessionCookie_WithDefaultExpiresInDays_HasMaxAgeOf604800Seconds()
+    {
+        Assert.Equal("604800", await LoginAndReadSessionMaxAgeAsync(Factory));
+    }
+
+    [Fact]
+    public async Task SessionCookie_MaxAgeFollowsJwtExpiresInDays()
+    {
+        await using var threeDays = Factory.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration((_, configuration) =>
+                configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Jwt:ExpiresInDays"] = "3",
+                })));
+
+        Assert.Equal("259200", await LoginAndReadSessionMaxAgeAsync(threeDays));
+    }
+
+    private static async Task<string> LoginAndReadSessionMaxAgeAsync(WebApplicationFactory<Program> factory)
+    {
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        using var response = await client.PostAsJsonAsync(
+            "/api/auth/test-login",
+            new { email = $"maxage-{Guid.NewGuid():N}@example.com", name = "Max Age" });
+
+        var setCookie = response.Headers.GetValues("Set-Cookie")
+            .Single(value => value.StartsWith($"{JwtService.SessionCookieName}=", StringComparison.Ordinal));
+        return Regex.Match(setCookie, @"max-age=(\d+)", RegexOptions.IgnoreCase).Groups[1].Value;
     }
 
     [Fact]
