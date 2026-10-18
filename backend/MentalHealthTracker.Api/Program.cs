@@ -1,14 +1,10 @@
-using FluentValidation;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
-using MentalHealthTracker.Api.Core.Hosting;
 using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Core.OpenApi;
 using MentalHealthTracker.Api.Core.Validation;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
-using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
-using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Api.Modules.Realtime;
 using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Infrastructure;
@@ -44,19 +40,13 @@ builder.Services.AddReverseProxyTrust();
 builder.Services.AddPersistence(builder.Configuration);
 builder.Services.AddAuthModule();
 
-builder.Services.AddSingleton<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
-builder.Services.AddSingleton<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
-builder.Services.AddSingleton<IValidator<TodayQuery>, TodayQueryValidator>();
-builder.Services.AddScoped<IDailyLogService, DailyLogService>();
-builder.Services.AddScoped<ILogEventEmitter, LogEventEmitter>();
+builder.Services.AddDailyLogModule();
+builder.Services.AddRealtimeModule();
 
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add<FluentValidationActionFilter>();
 });
-builder.Services.AddSignalR();
-builder.Services.AddSingleton<SignalRConnectionTracker>();
-builder.Services.AddHostedService<GracefulShutdownService>();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
 
@@ -217,7 +207,7 @@ app.UseRequireAuth();
 
 app.MapControllers();
 
-app.MapHub<LogsHub>("/hub/logs");
+app.MapRealtimeHubs();
 
 app.MapAuthEndpoints(app.Environment);
 
