@@ -1,6 +1,26 @@
-@MentalHealthTracker.Api_HostAddress = http://localhost:5277
+@MentalHealthTracker.Api_HostAddress = http://localhost:3000
 
-GET {{MentalHealthTracker.Api_HostAddress}}/weatherforecast/
+# Las rutas protegidas (/api/auth/me y /api/logs*) leen la sesion de la cookie httpOnly
+# `access_token`. En desarrollo no hay forma de obtenerla desde aqui (el login es Google):
+# entra en la app (http://localhost:5173), copia el valor de la cookie `access_token`
+# desde las DevTools del navegador y pegalo en la variable de abajo.
+@accessToken = <pega-aqui-la-cookie-access_token>
+
+### Estado de la API y de la base de datos (publico)
+GET {{MentalHealthTracker.Api_HostAddress}}/api/health
 Accept: application/json
 
-###
+### Usuario de la sesion (401 si no hay cookie valida)
+GET {{MentalHealthTracker.Api_HostAddress}}/api/auth/me
+Accept: application/json
+Cookie: access_token={{accessToken}}
+
+### Registros del usuario en un rango (from y to son yyyy-MM-dd; limit y offset opcionales)
+GET {{MentalHealthTracker.Api_HostAddress}}/api/logs?from=2026-09-01&to=2026-09-30&limit=100&offset=0
+Accept: application/json
+Cookie: access_token={{accessToken}}
+
+### Registro de un dia (date = el dia local del cliente, yyyy-MM-dd; 404 si no hay registro)
+GET {{MentalHealthTracker.Api_HostAddress}}/api/logs/today?date=2026-09-30
+Accept: application/json
+Cookie: access_token={{accessToken}}
