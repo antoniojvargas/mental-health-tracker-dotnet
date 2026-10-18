@@ -159,6 +159,27 @@ Los comandos se ejecutan desde la raíz del repositorio. `dotnet ef` requiere la
 | `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`). |
 | `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 70 %. |
 
+### Dependencias NuGet
+
+Las versiones de los paquetes viven en un solo sitio, `backend/Directory.Packages.props`
+(gestión central de paquetes), y cada proyecto tiene su `packages.lock.json` **versionado**
+(`RestorePackagesWithLockFile` en `backend/Directory.Build.props`) con las versiones exactas
+resueltas, directas y transitivas, y su hash de contenido. Así dos restauraciones del mismo
+commit instalan lo mismo aunque entretanto se publique otra versión de una transitiva.
+
+| Qué quieres | Comando (desde `backend/`) |
+| --- | --- |
+| Subir o cambiar un paquete | Editar la versión en `Directory.Packages.props`, ejecutar `dotnet restore MentalHealthTracker.slnx` y **commitear los `packages.lock.json` que cambien**. |
+| Restaurar sin permitir cambios (CI, builds reproducibles) | `dotnet restore MentalHealthTracker.slnx --locked-mode` |
+| Ver qué se resuelve | `dotnet list MentalHealthTracker.slnx package --include-transitive` |
+
+Con `--locked-mode`, el restore **falla** (`NU1004`) si el árbol resuelto no coincide con
+el lock: por ejemplo, si alguien cambia una versión en `Directory.Packages.props` y se olvida de
+regenerar el lock. Es lo que debe usar el CI en lugar de un `dotnet restore` a secas, que
+actualizaría los lock files en silencio y dejaría pasar la deriva. Los jobs de `ci.yml` aún
+ejecutan `dotnet restore MentalHealthTracker.slnx` sin el flag; añadírselo es el paso que
+falta para que el CI lo haga cumplir.
+
 ### Frontend
 
 Los comandos se ejecutan dentro de `frontend/`.
