@@ -138,7 +138,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["UserResponse"];
+                        "application/json": components["schemas"]["UserResponse"];
+                        "text/json": components["schemas"]["UserResponse"];
+                    };
                 };
                 /** @description Bad Request */
                 400: {
@@ -657,6 +661,13 @@ export interface components {
         };
         /** @enum {string} */
         SymptomType: "low_mood" | "hopelessness" | "fatigue" | "irritability" | "panic" | "restlessness" | "concentration" | "appetite_change";
+        UserResponse: {
+            /** Format: uuid */
+            id: string;
+            email: string | null;
+            name: string | null;
+            avatarUrl?: string | null;
+        };
     };
     responses: never;
     parameters: never;

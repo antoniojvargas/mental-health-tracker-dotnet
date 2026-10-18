@@ -104,7 +104,7 @@ public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factor
         {
             Content = JsonContent.Create(ValidLog()),
         };
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
         return request;
     }
 

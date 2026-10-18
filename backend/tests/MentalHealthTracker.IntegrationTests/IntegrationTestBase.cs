@@ -109,10 +109,10 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
             throw new InvalidOperationException("/api/auth/test-login no devolvió ninguna cookie.");
         }
 
-        var prefix = $"{JwtService.SessionCookieName}=";
+        var prefix = $"{SessionCookie.AccessTokenName}=";
         var sessionCookie = cookies.FirstOrDefault(cookie => cookie.StartsWith(prefix, StringComparison.Ordinal))
             ?? throw new InvalidOperationException(
-                $"Ninguna de las cookies devueltas es '{JwtService.SessionCookieName}'.");
+                $"Ninguna de las cookies devueltas es '{SessionCookie.AccessTokenName}'.");
 
         return sessionCookie[prefix.Length..].Split(';')[0];
     }
@@ -123,7 +123,7 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+            request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
             return base.SendAsync(request, cancellationToken);
         }
     }

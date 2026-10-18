@@ -23,7 +23,7 @@ public class GoogleOAuthClientTests
     {
         var handler = new FakeHttpMessageHandler(_ => JsonResponse("""{ "access_token": "abc123" }"""));
         using var httpClient = new HttpClient(handler);
-        var client = new GoogleOAuthClient(httpClient, Options.Create(TestGoogleOptions));
+        var client = new GoogleOAuthClient(httpClient, Options.Create(TestGoogleOptions), new FakeIdTokenValidator(_ => throw new InvalidOperationException("The id_token must not be validated")));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => client.ExchangeCodeForProfileAsync("auth-code"));
@@ -36,7 +36,7 @@ public class GoogleOAuthClientTests
     {
         var handler = new FakeHttpMessageHandler(_ => JsonResponse("""{ "id_token": "signed-token" }"""));
         using var httpClient = new HttpClient(handler);
-        var client = new GoogleOAuthClient(httpClient, Options.Create(TestGoogleOptions), PayloadWithoutSub);
+        var client = new GoogleOAuthClient(httpClient, Options.Create(TestGoogleOptions), new FakeIdTokenValidator(PayloadWithoutSub));
 
         await Assert.ThrowsAsync<UnauthorizedException>(
             () => client.ExchangeCodeForProfileAsync("auth-code"));
@@ -52,7 +52,8 @@ public class GoogleOAuthClientTests
             return JsonResponse("""{ "id_token": "signed-token" }""");
         });
         using var httpClient = new HttpClient(handler);
-        var client = new GoogleOAuthClient(httpClient, Options.Create(TestGoogleOptions), ValidPayload("123456789"));
+        var validator = new FakeIdTokenValidator(ValidPayload("123456789"));
+        var client = new GoogleOAuthClient(httpClient, Options.Create(TestGoogleOptions), validator);
 
         var profile = await client.ExchangeCodeForProfileAsync("auth-code");
 
@@ -62,6 +63,7 @@ public class GoogleOAuthClientTests
             Name: "Jane Doe",
             AvatarUrl: "http://example.com/avatar.png");
         Assert.Equal(expected, profile);
+        Assert.Equal("signed-token", Assert.Single(validator.ValidatedTokens));
 
         var body = await capturedRequest!.Content!.ReadAsStringAsync();
         Assert.Contains("code=auth-code", body);
@@ -92,6 +94,17 @@ public class GoogleOAuthClientTests
         {
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
+
+    private sealed class FakeIdTokenValidator(Func<string, Task<GoogleJsonWebSignature.Payload>> validate) : IGoogleIdTokenValidator
+    {
+        public List<string> ValidatedTokens { get; } = [];
+
+        public Task<GoogleJsonWebSignature.Payload> ValidateAsync(string idToken)
+        {
+            ValidatedTokens.Add(idToken);
+            return validate(idToken);
+        }
+    }
 
     private sealed class FakeHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {

@@ -113,7 +113,7 @@ canal de tiempo real.**
 | Capa                     | Detalle                                                                                         |
 | ------------------------ | ----------------------------------------------------------------------------------------------- |
 | Atributo `[RequireAuth]` | `LogsHub` lo declara igual que los controllers; SignalR lo propaga a los metadatos del endpoint |
-| Middleware               | `RequireAuthMiddleware` lo detecta y valida la cookie `access_token` con `JwtService`           |
+| Autenticación            | `[RequireAuth]` (política `RequireSession`) autentica la cookie `access_token` con `SessionAuthenticationHandler` |
 | Handshake                | La validación corre en el *negotiate* y en el *upgrade* a WebSocket: sin token válido la conexión se rechaza con `401` |
 
 **Motivos**
@@ -459,10 +459,11 @@ preferencia.
 
 **Por qué el consumo directo del generado no es viable hoy**
 
-1. **Falta un endpoint entero.** `GET /api/auth/me` documenta su `200` como
-   `{ "description": "OK" }`, sin schema: `AuthController` devuelve un objeto anónimo que
-   Swashbuckle no sabe describir. El tipo `User` es **inevitablemente manual**; un contrato
-   "100 % generado" lo rompería en el primer import.
+1. **El tipo `User` seguiría siendo manual.** `GET /api/auth/me` ya documenta su `200` con el
+   schema `UserResponse` (el record que devuelve `AuthController.Me`), pero Swashbuckle lo
+   emite con `email` y `name` como `string | null` y `avatarUrl` como opcional, aunque la API
+   siempre los envía. El espejo a mano declara `email: string` y `name: string`, que es lo
+   correcto; consumir el generado reintroduciría ese ruido defensivo en cada punto de uso.
 2. **El tipo generado rechaza un payload que la API sí acepta.** Swashbuckle traduce el
    `ActivityType?` de C# como `activityType?: ActivityType`, es decir opcional pero *no*
    nullable, así que envía `activityType: null` —que es como se dice "no hay actividad"— falla
@@ -751,7 +752,7 @@ un segundo login del mismo usuario devuelve la misma fila en vez de duplicarla.
 Con el `Id` del usuario, `JwtService.Sign` firma un JWT `HS256` (claims `sub` = `userId`, `email`,
 `iat`, `exp` a 7 días) y `GoogleCallback` lo envía en la cookie `access_token` (`HttpOnly`,
 `SameSite=Lax`, `Max-Age` de 7 días) antes de redirigir a `/dashboard`. A partir de ahí la
-cookie es la única credencial: la usan por igual la API HTTP (vía `RequireAuthMiddleware`) y el
+cookie es la única credencial: la usan por igual la API HTTP (vía `[RequireAuth]` y `SessionAuthenticationHandler`) y el
 hub SignalR (ver "Canal de tiempo real"), y `POST /api/auth/logout` la borra en el cliente sin
 estado en el servidor.
 
@@ -943,7 +944,7 @@ FluentValidation en lugar de zod y los grupos de SignalR en lugar de las *rooms*
 | Acceso a datos | TypeORM (entidades + repositorios) | EF Core + Npgsql (`IEntityTypeConfiguration` + repositorios) |
 | Base de datos | PostgreSQL | PostgreSQL (igual) |
 | Migraciones | scripts / migraciones de TypeORM | migraciones de EF Core aplicadas al arrancar |
-| Sesión y auth | `jsonwebtoken` + cookies | JWT HS256 propio + cookie `httpOnly` + `RequireAuthMiddleware` |
+| Sesión y auth | `jsonwebtoken` + cookies | JWT HS256 propio + cookie `httpOnly` + `SessionAuthenticationHandler` (`[RequireAuth]`) |
 | Tiempo real (servidor) | Socket.IO con *rooms* | SignalR con *groups* (+ `IHubContext`) |
 | Tiempo real (cliente) | `socket.io-client` | `@microsoft/signalr` |
 | Estado del front | Redux / Zustand / Context | Pinia |

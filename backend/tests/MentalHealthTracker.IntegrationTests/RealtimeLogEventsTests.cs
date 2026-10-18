@@ -70,7 +70,7 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
             {
                 options.Transports = HttpTransportType.LongPolling;
                 options.HttpMessageHandlerFactory = _ => Factory.Server.CreateHandler();
-                options.Headers["Cookie"] = $"{JwtService.SessionCookieName}={token}";
+                options.Headers["Cookie"] = $"{SessionCookie.AccessTokenName}={token}";
             })
             .Build();
     }
@@ -78,7 +78,7 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
     private async Task<HttpResponseMessage> PostLogAsync(string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
         request.Content = JsonContent.Create(new
         {
             logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),

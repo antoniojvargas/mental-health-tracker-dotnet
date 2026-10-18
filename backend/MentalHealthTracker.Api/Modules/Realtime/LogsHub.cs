@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using MentalHealthTracker.Api.Modules.Auth;
 using Microsoft.AspNetCore.SignalR;
 
@@ -11,7 +10,11 @@ public sealed class LogsHub(SignalRConnectionTracker connectionTracker) : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var userId = Guid.Parse(Context.User!.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        // RequireAuth rechaza antes toda conexión sin sesión válida; sin claim sería un fallo del servidor.
+        if (!Context.User.TryGetUserId(out var userId))
+        {
+            throw new InvalidOperationException("The authenticated connection has no valid user id claim.");
+        }
 
         connectionTracker.Track(Context);
 

@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.Auth.Testing;
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
@@ -48,6 +49,24 @@ public sealed class AuthModuleTests
         Assert.Empty(MappedRoutes(environmentName));
     }
 
+    // La comprobación de arranque: aunque alguien llame a MapTestAuthEndpoints directamente
+    // (saltándose el filtro de MapAuthEndpoints), fuera de Testing el arranque falla.
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Production")]
+    [InlineData("Staging")]
+    public void MapTestAuthEndpoints_OutsideTesting_ThrowsNamingTheEnvironment(string environmentName)
+    {
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environmentName });
+        var app = builder.Build();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => app.MapTestAuthEndpoints(app.Environment));
+
+        Assert.Contains("Testing", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(environmentName, exception.Message, StringComparison.Ordinal);
+        Assert.Empty(((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints));
+    }
+
     [Fact]
     public void AddAuthModule_RegistersTheJwtServiceAndCookieOptionsAsSingletonsAndTheTypedGoogleClient()
     {
@@ -55,8 +74,11 @@ public sealed class AuthModuleTests
         services.AddAuthModule();
 
         Assert.Contains(services, d => d.ServiceType == typeof(JwtService) && d.Lifetime == ServiceLifetime.Singleton);
+        Assert.Contains(services, d => d.ServiceType == typeof(SessionTokenReader) && d.Lifetime == ServiceLifetime.Singleton);
+        Assert.Contains(services, d => d.ServiceType == typeof(OAuthStateService) && d.Lifetime == ServiceLifetime.Singleton);
         Assert.Contains(services, d => d.ServiceType == typeof(AuthCookieOptions) && d.Lifetime == ServiceLifetime.Singleton);
         Assert.Contains(services, d => d.ServiceType == typeof(GoogleOAuthClient));
+        Assert.Contains(services, d => d.ServiceType == typeof(IGoogleIdTokenValidator) && d.ImplementationType == typeof(GoogleIdTokenValidator));
     }
 
     [Fact]

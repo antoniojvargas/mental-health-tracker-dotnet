@@ -5,7 +5,7 @@ namespace MentalHealthTracker.Api.Modules.Auth;
 
 public sealed class RequireAuthSecurityOperationFilter : IOperationFilter
 {
-    private const string SchemeName = JwtService.SessionCookieName;
+    private const string SchemeName = SessionCookie.AccessTokenName;
 
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {

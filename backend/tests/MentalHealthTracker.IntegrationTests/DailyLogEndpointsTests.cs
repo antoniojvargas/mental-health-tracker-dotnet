@@ -207,7 +207,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     private async Task<HttpResponseMessage> GetTodayAsync(string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs/today");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         return await Factory.CreateClient().SendAsync(request);
     }
@@ -249,7 +249,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     private async Task<HttpResponseMessage> PostLogAsync(string token, object body)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
         request.Content = JsonContent.Create(body);
 
         return await Factory.CreateClient().SendAsync(request);
@@ -260,7 +260,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"/api/logs{(query is null ? "" : $"?{query}")}");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         return await Factory.CreateClient().SendAsync(request);
     }

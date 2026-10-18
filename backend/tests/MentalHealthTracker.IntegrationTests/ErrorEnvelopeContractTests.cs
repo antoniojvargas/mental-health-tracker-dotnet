@@ -138,7 +138,7 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
 
         var (_, _, token) = await CreateAuthenticatedSessionAsync($"contract-{Guid.NewGuid():N}@example.com");
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
+        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         return await failing.CreateClient().SendAsync(request);
     }

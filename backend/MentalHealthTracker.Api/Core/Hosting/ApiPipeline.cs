@@ -20,7 +20,7 @@ public static class ApiPipeline
     //  3. RequestId y SecurityHeaders antes de cualquier respuesta, para que también las
     //     respuestas cortocircuitadas (429, 401, errores) lleven el id y las cabeceras.
     //  4. CORS antes de Routing/auth: las peticiones preflight se resuelven sin credenciales.
-    //  5. RateLimiter antes de RequireAuth: se frena la fuerza bruta y el abuso sin gastar
+    //  5. RateLimiter antes de la autenticación: se frena la fuerza bruta y el abuso sin gastar
     //     la verificación del JWT ni tocar la base de datos. Necesita Routing antes para
     //     leer los metadatos de política del endpoint.
     public static WebApplication UseApiPipeline(this WebApplication app)
@@ -37,7 +37,8 @@ public static class ApiPipeline
         app.UseApiDocumentation(app.Environment);
         app.UseRouting();
         app.UseRateLimiter();
-        app.UseRequireAuth();
+        app.UseAuthentication();
+        app.UseAuthorization();
 
         return app;
     }

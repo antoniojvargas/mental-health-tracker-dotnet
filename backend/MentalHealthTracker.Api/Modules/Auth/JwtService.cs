@@ -1,3 +1,4 @@
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -6,10 +7,9 @@ using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
 
-public sealed class JwtService
+// No sellada y con Verify virtual para que los tests puedan contar las verificaciones por petición.
+public class JwtService
 {
-    public const string SessionCookieName = "access_token";
-
     private const string Algorithm = "HS256";
 
     private const string HeaderJson = """{"alg":"HS256","typ":"JWT"}""";
@@ -52,7 +52,7 @@ public sealed class JwtService
         return $"{signingInput}.{signature}";
     }
 
-    public (Guid UserId, string Email)? Verify(string? token)
+    public virtual (Guid UserId, string Email)? Verify(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -116,27 +116,9 @@ public sealed class JwtService
         }
     }
 
-    private byte[] ComputeSignature(byte[] data)
-    {
-        using var hmac = new HMACSHA256(_key);
-        return hmac.ComputeHash(data);
-    }
+    private byte[] ComputeSignature(byte[] data) => HMACSHA256.HashData(_key, data);
 
-    private static string Encode(byte[] data) =>
-        Convert.ToBase64String(data)
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+    private static string Encode(byte[] data) => Base64Url.EncodeToString(data);
 
-    private static byte[] Decode(string value)
-    {
-        var base64 = value.Replace('-', '+').Replace('_', '/');
-        base64 = (base64.Length % 4) switch
-        {
-            2 => base64 + "==",
-            3 => base64 + "=",
-            _ => base64,
-        };
-        return Convert.FromBase64String(base64);
-    }
+    private static byte[] Decode(string value) => Base64Url.DecodeFromChars(value);
 }

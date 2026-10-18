@@ -1,14 +1,32 @@
+using MentalHealthTracker.Api.Modules.Auth.Testing;
+using Microsoft.AspNetCore.Authentication;
+
 namespace MentalHealthTracker.Api.Modules.Auth;
 
 public static class AuthModule
 {
     // Lo que el módulo de autenticación aporta al contenedor: la firma y verificación del
-    // JWT de sesión, las opciones de la cookie, y el cliente HTTP tipado que habla con
+    // JWT de sesión (con su lector que verifica una vez por petición), las opciones de la
+    // cookie, el state anti login-CSRF del flujo OAuth y el cliente HTTP tipado que habla con
     // Google. Las opciones (Jwt, GoogleOAuth, AppUrls) las registra AddAppOptions.
     public static IServiceCollection AddAuthModule(this IServiceCollection services)
     {
         services.AddSingleton<JwtService>();
+        services.AddSingleton<SessionTokenReader>();
+
+        // Esquema propio de cookie JWT y la política que aplica [RequireAuth]. No hay esquema por
+        // defecto fijado a propósito: solo se autentica en los endpoints que piden la política.
+        services.AddAuthentication()
+            .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
+                SessionAuthentication.SchemeName, configureOptions: null);
+        services.AddAuthorizationBuilder()
+            .AddPolicy(SessionAuthentication.PolicyName, policy => policy
+                .AddAuthenticationSchemes(SessionAuthentication.SchemeName)
+                .RequireAuthenticatedUser());
+
         services.AddSingleton<AuthCookieOptions>();
+        services.AddSingleton<OAuthStateService>();
+        services.AddSingleton<IGoogleIdTokenValidator, GoogleIdTokenValidator>();
         services.AddHttpClient<GoogleOAuthClient>();
 
         return services;
@@ -21,9 +39,9 @@ public static class AuthModule
         this IEndpointRouteBuilder endpoints,
         IHostEnvironment environment)
     {
-        if (environment.IsEnvironment("Testing"))
+        if (environment.IsEnvironment(TestAuthEndpoints.EnvironmentName))
         {
-            endpoints.MapTestAuthEndpoints();
+            endpoints.MapTestAuthEndpoints(environment);
         }
 
         return endpoints;

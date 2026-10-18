@@ -47,6 +47,53 @@ public sealed class JwtServiceTests
         Assert.Equal("ana@example.com", payload.RootElement.GetProperty("email").GetString());
     }
 
+    // Token firmado por la implementación anterior (HMACSHA256 por instancia y base64url manual)
+    // para este instante, usuario y secreto: la implementación actual debe producirlo byte a byte.
+    private const string TokenFromTheOriginalImplementation =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzZjJjMWE5ZS03YjRkLTRlOGEtOWM1NS0wZDZlMmIxZjRhNzMiLCJlbWFpbCI6ImFuYUBleGFtcGxlLmNvbSIsImlhdCI6MTkwNzc1NTIwMCwiZXhwIjoxOTA4MzYwMDAwfQ.AlQ8lFCYyHnNO__R3164GY95fS2UePCI5CSc38_P1G8";
+
+    [Fact]
+    public void Sign_ProducesTheSameBytesAsTheOriginalImplementation()
+    {
+        var token = CreateService().Sign(UserId, "ana@example.com");
+
+        Assert.Equal(TokenFromTheOriginalImplementation, token);
+    }
+
+    // La implementación original reconstruida en el test (HMACSHA256 por instancia, base64url
+    // a mano con TrimEnd/Replace): para muchos usuarios y correos distintos, entre ellos firmas
+    // con los caracteres '-' y '_' y los tres restos de relleno, el token debe ser idéntico.
+    [Fact]
+    public void Sign_MatchesTheHandRolledReferenceForManyInputs()
+    {
+        var service = CreateService();
+
+        for (var i = 0; i < 300; i++)
+        {
+            var userId = new Guid(i, 0, 0, [1, 2, 3, 4, 5, 6, 7, (byte)i]);
+            var email = $"user{i}@example.com";
+
+            Assert.Equal(ReferenceToken(userId, email), service.Sign(userId, email));
+        }
+    }
+
+    private string ReferenceToken(Guid userId, string email)
+    {
+        const string header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
+        var now = _clock.GetUtcNow();
+        var claims = new Dictionary<string, object>
+        {
+            ["sub"] = userId.ToString(),
+            ["email"] = email,
+            ["iat"] = now.ToUnixTimeSeconds(),
+            ["exp"] = now.AddDays(7).ToUnixTimeSeconds(),
+        };
+        var signingInput = $"{Encode(Encoding.UTF8.GetBytes(header))}.{Encode(Json(claims))}";
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(Secret));
+
+        return $"{signingInput}.{Encode(hmac.ComputeHash(Encoding.UTF8.GetBytes(signingInput)))}";
+    }
+
     [Fact]
     public void Sign_SetsIssuedAtAndExpirationFromTheClockAndExpiresInDays()
     {
