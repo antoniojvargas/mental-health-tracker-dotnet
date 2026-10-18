@@ -1,3 +1,4 @@
+using System.Net.Sockets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -45,7 +46,10 @@ public static partial class DatabaseInitializer
                 await connection.OpenAsync(cancellationToken);
                 return;
             }
-            catch (Exception exception) when (exception is NpgsqlException or TimeoutException)
+            // SocketException: con Npgsql 9.x un host que no resuelve por DNS (la base aún no
+            // existe en la red) llega sin envolver en NpgsqlException. Es el mismo caso de
+            // "la base no está lista" y debe reintentarse igual.
+            catch (Exception exception) when (exception is NpgsqlException or TimeoutException or SocketException)
             {
                 if (attempt == MaxAttempts)
                 {
