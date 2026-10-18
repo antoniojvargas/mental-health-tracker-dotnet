@@ -7,17 +7,9 @@ namespace MentalHealthTracker.Api.Core.Configuration;
 
 public static class ReverseProxyServiceCollectionExtensions
 {
-    public static IServiceCollection AddReverseProxyTrust(
-        this IServiceCollection services,
-        IConfiguration configuration)
+    // Requiere AddAppOptions: ReverseProxyOptions se enlaza y valida allí.
+    public static IServiceCollection AddReverseProxyTrust(this IServiceCollection services)
     {
-        services.AddSingleton<IValidateOptions<ReverseProxyOptions>, ReverseProxyOptionsValidator>();
-
-        services.AddOptions<ReverseProxyOptions>()
-            .Bind(configuration.GetSection(ReverseProxyOptions.SectionName))
-            .ValidateDataAnnotations()
-            .ValidateOnStart();
-
         services.AddOptions<ForwardedHeadersOptions>()
             .Configure<IOptions<ReverseProxyOptions>>((forwarded, proxy) =>
                 Apply(forwarded, proxy.Value));

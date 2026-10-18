@@ -39,29 +39,8 @@ builder.Host.ConfigureHostOptions(options =>
 
 // Add services to the container.
 
-builder.Services.AddOptions<DatabaseOptions>()
-    .Bind(builder.Configuration.GetSection(DatabaseOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddOptions<JwtOptions>()
-    .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddOptions<GoogleOAuthOptions>()
-    .Bind(builder.Configuration.GetSection(GoogleOAuthOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddSingleton<IValidateOptions<GoogleOAuthOptions>, GoogleOAuthOptionsValidator>();
-
-builder.Services.AddOptions<AppUrlsOptions>()
-    .Bind(builder.Configuration.GetSection(AppUrlsOptions.SectionName))
-    .ValidateDataAnnotations()
-    .ValidateOnStart();
-
-builder.Services.AddReverseProxyTrust(builder.Configuration);
+builder.Services.AddAppOptions(builder.Configuration);
+builder.Services.AddReverseProxyTrust();
 
 builder.Services.AddScoped<DatabaseSeeder>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
