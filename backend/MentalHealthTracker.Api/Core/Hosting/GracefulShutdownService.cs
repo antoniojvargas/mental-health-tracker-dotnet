@@ -9,7 +9,7 @@ namespace MentalHealthTracker.Api.Core.Hosting;
 // conexiones nuevas en cuanto arranca el shutdown, y tanto HostOptions como
 // KestrelServerOptions limitan la espera a 10s: si algo se queda colgado, el
 // proceso sale forzado por timeout.
-public sealed class GracefulShutdownService(
+public sealed partial class GracefulShutdownService(
     SignalRConnectionTracker signalRConnections,
     ILogger<GracefulShutdownService> logger) : IHostedService
 {
@@ -17,14 +17,18 @@ public sealed class GracefulShutdownService(
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        logger.LogInformation(
-            "Shutting down: closing {ConnectionCount} live SignalR connection(s)",
-            signalRConnections.Count);
+        LogClosingConnections(logger, signalRConnections.Count);
         signalRConnections.CloseAllConnections();
 
-        logger.LogInformation("Shutting down: closing Npgsql connection pool");
+        LogClosingPool(logger);
         NpgsqlConnection.ClearAllPools();
 
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Shutting down: closing {ConnectionCount} live SignalR connection(s)")]
+    private static partial void LogClosingConnections(ILogger logger, int connectionCount);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Shutting down: closing Npgsql connection pool")]
+    private static partial void LogClosingPool(ILogger logger);
 }

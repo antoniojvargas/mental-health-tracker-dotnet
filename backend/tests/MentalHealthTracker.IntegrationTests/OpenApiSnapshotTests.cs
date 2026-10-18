@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // que el orden de las propiedades, los espacios y los saltos de línea no cuentan.
 // Si la API cambia sin que se regenere el snapshot, el frontend se quedaría con tipos
 // que ya no son los de la API.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class OpenApiSnapshotTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {

@@ -38,3 +38,10 @@ csharp_using_directive_placement = outside_namespace:warning
 # (usa namespaces de bloque y BOM).
 [**/Migrations/*.cs]
 generated_code = true
+
+# Los tests se nombran Metodo_Condicion_Resultado (p. ej. Me_WithoutCookie_Returns401): los
+# guiones bajos son la convencion y lo que lee quien ve un fallo en el CI. Renombrar ~160
+# metodos a PascalCase puro los haria menos legibles y no cambia ningun comportamiento, asi
+# que CA1707 se desactiva solo en los proyectos de test.
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none

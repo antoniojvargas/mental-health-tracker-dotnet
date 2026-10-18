@@ -11,7 +11,7 @@ namespace MentalHealthTracker.Api.Modules.Realtime;
 // conexión tras el commit, el token de la petición se cancela, y las demás pestañas de
 // ese usuario deben enterarse igual. Por eso el token de la interfaz no se usa.
 // OperationCanceledException sí se deja pasar: es un apagado del host, no un fallo del envío.
-public sealed class LogEventEmitter(
+public sealed partial class LogEventEmitter(
     IHubContext<LogsHub> hubContext,
     ILogger<LogEventEmitter> logger) : ILogEventEmitter
 {
@@ -37,11 +37,10 @@ public sealed class LogEventEmitter(
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(
-                exception,
-                "Could not send realtime event {EventName} to user {UserId}",
-                eventName,
-                userId);
+            LogSendFailed(logger, exception, eventName, userId);
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not send realtime event {EventName} to user {UserId}")]
+    private static partial void LogSendFailed(ILogger logger, Exception exception, string eventName, Guid userId);
 }

@@ -10,7 +10,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // redirigir) y un 307 sobre un POST no aporta nada. Se fuerza HTTPS_PORT para que, si
 // alguien volviera a añadir UseHttpsRedirection, la redirección ocurriera de verdad en
 // el TestServer y este test fallara; sin ese puerto el middleware solo avisa en el log.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class HttpsRedirectionTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {

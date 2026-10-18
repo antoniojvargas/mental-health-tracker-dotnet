@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -14,7 +15,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // sobre POST /api/logs. Los límites (20 y 30) son el contrato vigente en Program.cs.
 // Cada clase de test tiene su propia instancia de CustomWebApplicationFactory, por lo que el
 // estado del rate limiter (y agotar cuotas) queda aislado a esta clase.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -106,7 +107,7 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
 
     private static object Body() => new
     {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         moodRating = 3,
         anxietyLevel = 5,
         stressLevel = 5,

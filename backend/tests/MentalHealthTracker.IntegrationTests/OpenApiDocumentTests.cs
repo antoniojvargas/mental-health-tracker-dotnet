@@ -9,7 +9,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // las reglas de FluentValidation al esquema (FluentValidationSchemaFilter,
 // FluentValidationParameterFilter y FluentValidationConstraints), que de otro modo quedan sin
 // cobertura porque los tests de integración no piden /swagger.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class OpenApiDocumentTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {

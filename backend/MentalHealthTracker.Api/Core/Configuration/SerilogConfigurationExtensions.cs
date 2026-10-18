@@ -22,8 +22,14 @@ public static class SerilogConfigurationExtensions
     {
         if (environment.IsDevelopment())
         {
+            // CA1305: el Console de Serilog formatea con la cultura del proceso si no se le da un
+            // formatProvider. Fijar InvariantCulture cambiaria la salida de la consola de un host con
+            // otra cultura (decimales, fechas), asi que se deja como esta: es solo la consola de
+            // desarrollo y el contenedor corre con cultura invariante.
+#pragma warning disable CA1305
             return configuration.WriteTo.Console(
                 outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] [{RequestId}] {SourceContext}: {Message:lj}{NewLine}{Exception}");
+#pragma warning restore CA1305
         }
 
         return configuration.WriteTo.Console(new CompactJsonFormatter());

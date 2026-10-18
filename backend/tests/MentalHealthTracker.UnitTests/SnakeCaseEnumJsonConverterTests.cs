@@ -75,10 +75,10 @@ public sealed class SnakeCaseEnumJsonConverterTests
     [Fact]
     public void TheTablesCoverEveryMemberOfEachEnum()
     {
-        Assert.Equal(Enum.GetValues<ActivityType>().Length, ActivityTypes.Count());
-        Assert.Equal(Enum.GetValues<SleepDisturbance>().Length, SleepDisturbances.Count());
-        Assert.Equal(Enum.GetValues<SocialFrequency>().Length, SocialFrequencies.Count());
-        Assert.Equal(Enum.GetValues<SymptomType>().Length, SymptomTypes.Count());
+        Assert.Equal(Enum.GetValues<ActivityType>().Length, ActivityTypes.Count);
+        Assert.Equal(Enum.GetValues<SleepDisturbance>().Length, SleepDisturbances.Count);
+        Assert.Equal(Enum.GetValues<SocialFrequency>().Length, SocialFrequencies.Count);
+        Assert.Equal(Enum.GetValues<SymptomType>().Length, SymptomTypes.Count);
     }
 
     [Theory]

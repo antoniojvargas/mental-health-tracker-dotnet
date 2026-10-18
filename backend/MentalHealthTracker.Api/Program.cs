@@ -289,7 +289,7 @@ app.MapGet("/api/health", async (
     }
     catch (Exception exception)
     {
-        logger.LogError(exception, "Database health check failed");
+        Program.LogHealthCheckFailed(logger, exception);
         return Results.Json(
             new { status = "error", db = "unreachable" },
             statusCode: StatusCodes.Status503ServiceUnavailable);
@@ -329,4 +329,8 @@ static async Task InitializeDatabaseAsync(WebApplication app)
 
 // Clase generada por los top-level statements. Se declara pública para que
 // WebApplicationFactory<Program> (tests de integración) pueda usarla como entry point.
-public partial class Program { }
+public partial class Program
+{
+    [LoggerMessage(Level = LogLevel.Error, Message = "Database health check failed")]
+    private static partial void LogHealthCheckFailed(ILogger logger, Exception exception);
+}

@@ -3,7 +3,7 @@ using MentalHealthTracker.Domain.Errors;
 
 namespace MentalHealthTracker.Api.Core.Exceptions;
 
-public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
+public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
@@ -25,15 +25,25 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logge
                 new ErrorBody("INTERNAL_ERROR", "An unexpected error occurred.", [])),
         };
 
-        logger.Log(
-            exception is AppException ? LogLevel.Information : LogLevel.Error,
-            exception,
-            "Exception handled while processing request");
+        if (exception is AppException)
+        {
+            LogHandledAppException(logger, exception);
+        }
+        else
+        {
+            LogHandledUnexpectedException(logger, exception);
+        }
 
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(new ErrorResponse(body), cancellationToken);
         return true;
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Exception handled while processing request")]
+    private static partial void LogHandledAppException(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Exception handled while processing request")]
+    private static partial void LogHandledUnexpectedException(ILogger logger, Exception exception);
 }
 
 public sealed record ErrorResponse(ErrorBody Error);

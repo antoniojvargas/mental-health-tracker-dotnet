@@ -44,7 +44,7 @@ public class SensitiveHeadersTests
     private sealed class StringSink : ILogEventSink
     {
         private readonly StringBuilder _builder = new();
-        private readonly ITextFormatter _formatter = new CompactJsonFormatter();
+        private readonly CompactJsonFormatter _formatter = new();
 
         public void Emit(LogEvent logEvent)
         {

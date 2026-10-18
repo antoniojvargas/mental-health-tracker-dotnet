@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -12,7 +13,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // A7: el aviso en tiempo real es de mejor esfuerzo. Si el hub falla al enviar, el
 // registro ya está confirmado en la base de datos, así que POST /api/logs debe seguir
 // respondiendo 201 y el dato debe poder leerse después.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class RealtimeFailureTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -26,7 +27,7 @@ public sealed class RealtimeFailureTests(CustomWebApplicationFactory factory)
         var (_, _, token) = await CreateAuthenticatedSessionAsync($"rt-{Guid.NewGuid():N}@example.com");
         var cookie = $"{JwtService.SessionCookieName}={token}";
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         using var post = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
         {

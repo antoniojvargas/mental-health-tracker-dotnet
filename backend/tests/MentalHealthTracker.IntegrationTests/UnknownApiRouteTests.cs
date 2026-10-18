@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class UnknownApiRouteTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {

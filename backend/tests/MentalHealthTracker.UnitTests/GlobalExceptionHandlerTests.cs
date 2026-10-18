@@ -110,7 +110,7 @@ public sealed class GlobalExceptionHandlerTests
     [Fact]
     public async Task GenericException_BodyIsAnEnvelopeWithASingleErrorProperty()
     {
-        var (_, _, _, body) = await HandleAsync(new Exception("boom"));
+        var (_, _, _, body) = await HandleAsync(new InvalidOperationException("boom"));
 
         using var document = JsonDocument.Parse(body);
         Assert.Equal(["error"], document.RootElement.EnumerateObject().Select(p => p.Name));

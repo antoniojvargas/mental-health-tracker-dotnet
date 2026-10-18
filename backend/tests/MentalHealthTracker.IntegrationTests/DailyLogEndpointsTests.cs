@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -11,7 +12,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -19,7 +20,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     public async Task PostLog_WhenNoExistingLog_Returns201()
     {
         var (_, token) = await CreateAuthenticatedSessionAsync();
-        var logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd");
+        var logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         var response = await PostLogAsync(token, Body());
 
@@ -113,7 +114,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Equal(1, root.GetProperty("meta").GetProperty("total").GetInt32());
         Assert.Equal(1, root.GetProperty("data").GetArrayLength());
         Assert.Equal(
-            today.AddDays(-20).ToString("yyyy-MM-dd"),
+            today.AddDays(-20).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             root.GetProperty("data")[0].GetProperty("logDate").GetString());
     }
 
@@ -135,7 +136,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Equal(3, document.RootElement.GetProperty("meta").GetProperty("total").GetInt32());
 
         var dates = data.EnumerateArray()
-            .Select(e => DateOnly.Parse(e.GetProperty("logDate").GetString()!))
+            .Select(e => DateOnly.Parse(e.GetProperty("logDate").GetString()!, CultureInfo.InvariantCulture))
             .ToArray();
         for (var i = 1; i < dates.Length; i++)
         {
@@ -179,7 +180,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         var (userA, tokenA) = await CreateAuthenticatedSessionAsync();
         var (_, tokenB) = await CreateAuthenticatedSessionAsync();
 
-        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3).ToString("yyyy-MM-dd");
+        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         Assert.NotNull(userA);
 
         var createdToday = await PostLogAsync(tokenA, Body());
@@ -211,13 +212,13 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         return await Factory.CreateClient().SendAsync(request);
     }
 
-    private async Task<int> TotalAsync(HttpResponseMessage response)
+    private static async Task<int> TotalAsync(HttpResponseMessage response)
     {
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return document.RootElement.GetProperty("meta").GetProperty("total").GetInt32();
     }
 
-    private async Task<int> CountAsync(HttpResponseMessage response)
+    private static async Task<int> CountAsync(HttpResponseMessage response)
     {
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return document.RootElement.GetProperty("data").GetArrayLength();
@@ -279,7 +280,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
 
     private static object Body(int moodRating = 3, string? notes = null, string? logDate = null) => new
     {
-        logDate = logDate ?? DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+        logDate = logDate ?? DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
         moodRating,
         anxietyLevel = 5,
         stressLevel = 5,

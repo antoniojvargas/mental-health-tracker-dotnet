@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.RegularExpressions;
@@ -16,7 +17,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // middleware, el fallback de rutas o el manejador global de excepciones. Se afirma sobre
 // respuestas de éxito y de error porque el manejador de excepciones reinicia la respuesta,
 // y un error que saliera sin cabeceras sería justo el caso que nadie mira.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -122,7 +123,7 @@ public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory fac
                     var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
                     var body = JsonContent.Create(new
                     {
-                        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+                        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                         moodRating = 9,
                         anxietyLevel = 5,
                         stressLevel = 5,
@@ -190,7 +191,7 @@ public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory fac
             throw new InvalidOperationException("boom");
 
         public Task<DailyLogResponse?> GetTodayAsync(
-            Guid userId, DateOnly? date, CancellationToken cancellationToken = default) =>
+            Guid userId, DateOnly? logDate, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("boom");
     }
 }

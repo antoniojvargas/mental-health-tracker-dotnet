@@ -10,7 +10,7 @@ namespace MentalHealthTracker.Infrastructure.Persistence;
 // (p. ej. un job previo a escalar). Aquí es una simplificación deliberada para una sola
 // instancia: la API migra la base de datos antes de empezar a escuchar, y falla en firme
 // si no puede, de modo que nunca sirve tráfico contra un esquema desactualizado.
-public static class DatabaseInitializer
+public static partial class DatabaseInitializer
 {
     private const int MaxAttempts = 10;
 
@@ -20,10 +20,10 @@ public static class DatabaseInitializer
 
     public static async Task MigrateAsync(AppDbContext dbContext, ILogger logger, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("Applying pending database migrations");
+        LogApplyingMigrations(logger);
         await WaitForDatabaseAsync(dbContext, logger, cancellationToken);
         await dbContext.Database.MigrateAsync(cancellationToken);
-        logger.LogInformation("Database migrations applied");
+        LogMigrationsApplied(logger);
     }
 
     // La base puede estar reiniciando cuando la API arranca (p. ej. un contenedor que se
@@ -49,19 +49,26 @@ public static class DatabaseInitializer
             {
                 if (attempt == MaxAttempts)
                 {
-                    logger.LogError(exception, "Database unreachable after {MaxAttempts} attempts", MaxAttempts);
+                    LogDatabaseUnreachable(logger, exception, MaxAttempts);
                     throw;
                 }
 
-                logger.LogWarning(
-                    exception,
-                    "Database not ready (attempt {Attempt}/{MaxAttempts}); retrying in {BackoffMs} ms",
-                    attempt,
-                    MaxAttempts,
-                    backoffMs);
+                LogDatabaseNotReady(logger, exception, attempt, MaxAttempts, backoffMs);
                 await Task.Delay(backoffMs, cancellationToken);
                 backoffMs = Math.Min(backoffMs * 2, MaxBackoffMs);
             }
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Applying pending database migrations")]
+    private static partial void LogApplyingMigrations(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Database migrations applied")]
+    private static partial void LogMigrationsApplied(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Database unreachable after {MaxAttempts} attempts")]
+    private static partial void LogDatabaseUnreachable(ILogger logger, Exception exception, int maxAttempts);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Database not ready (attempt {Attempt}/{MaxAttempts}); retrying in {BackoffMs} ms")]
+    private static partial void LogDatabaseNotReady(ILogger logger, Exception exception, int attempt, int maxAttempts, int backoffMs);
 }

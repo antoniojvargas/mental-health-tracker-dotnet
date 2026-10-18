@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -17,7 +18,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // tiene el cuerpo {"error":{"code","message","details":[...]}} con content-type JSON.
 // Cada caso fabrica una respuesta de error real; la forma se afirma en un único sitio
 // para que un nuevo camino de error que se salga del sobre rompa esta clase.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -98,7 +99,7 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
         var (client, _, _) = await CreateAuthenticatedSessionAsync($"contract-{Guid.NewGuid():N}@example.com");
         return await client.PostAsJsonAsync("/api/logs", new
         {
-            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             moodRating = 9,
             anxietyLevel = 5,
             stressLevel = 5,
@@ -153,7 +154,7 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
             throw new InvalidOperationException("boom");
 
         public Task<DailyLogResponse?> GetTodayAsync(
-            Guid userId, DateOnly? date, CancellationToken cancellationToken = default) =>
+            Guid userId, DateOnly? logDate, CancellationToken cancellationToken = default) =>
             throw new InvalidOperationException("boom");
     }
 }
