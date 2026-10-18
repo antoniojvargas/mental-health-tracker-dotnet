@@ -58,6 +58,20 @@ public sealed class JwtServiceTests
     }
 
     [Fact]
+    public void SessionLifetime_WithDefaultOptions_Is604800Seconds()
+    {
+        var service = new JwtService(Options.Create(new JwtOptions { Secret = "unit-test-jwt-secret-key-value" }));
+
+        Assert.Equal(604800, service.SessionLifetime.TotalSeconds);
+    }
+
+    [Fact]
+    public void SessionLifetime_FollowsExpiresInDays()
+    {
+        Assert.Equal(TimeSpan.FromDays(3), CreateService(expiresInDays: 3).SessionLifetime);
+    }
+
+    [Fact]
     public void Verify_HandBuiltValidToken_IsAccepted()
     {
         // Control: el constructor de tokens de abajo es válido, así que los null de los

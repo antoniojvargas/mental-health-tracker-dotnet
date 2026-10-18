@@ -116,7 +116,7 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | --- | --- | --- | --- | --- |
 | `Database__ConnectionString` | Backend · `Database:ConnectionString` — EF Core, healthcheck (`SELECT 1`) y migraciones | Sí | Sí (`Database__ConnectionString_FILE`) | `Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=…` |
 | `JWT_SECRET` | Backend · `Jwt:Secret` — firma y verificación del JWT (≥ 16 caracteres) | Sí | Sí (`JWT_SECRET_FILE`) | valor aleatorio (`openssl rand -base64 48`) |
-| `Jwt__ExpiresInDays` | Backend · `Jwt:ExpiresInDays` — caducidad de la cookie de sesión | No | No | `7` |
+| `Jwt__ExpiresInDays` | Backend · `Jwt:ExpiresInDays` — caducidad de la sesión: `exp` del JWT y `Max-Age` de la cookie (en días) | No | No | `7` |
 | `GoogleOAuth__ClientId` | Backend · `GoogleOAuth:ClientId` — flujo OAuth con Google | Sí | No | `xxxxx.apps.googleusercontent.com` |
 | `GOOGLE_CLIENT_SECRET` | Backend · `GoogleOAuth:ClientSecret` — intercambio de tokens con Google | Sí | Sí (`GOOGLE_CLIENT_SECRET_FILE`) | secreto de Google Cloud Console |
 | `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/api/auth/google/callback` |

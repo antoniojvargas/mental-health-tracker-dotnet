@@ -76,7 +76,7 @@ El sistema **no implementa refresh tokens ni un token CSRF explícito**. Es una 
 consciente, no un pendiente:
 
 1. **Access token de 7 días como única credencial de sesión**. El JWT se emite con
-   `SessionCookieMaxAge` de 7 días en la cookie `httpOnly`. Al expirar, el usuario
+   `Max-Age` en la cookie `httpOnly` igual a `Jwt:ExpiresInDays` (7 días por defecto). Al expirar, el usuario
    vuelve a pasar por el flujo OAuth de Google (que re-presenta la pantalla de
    consentimiento si es necesario). No hay rotación de tokens ni un segundo token de
    larga duración que renovarlo.

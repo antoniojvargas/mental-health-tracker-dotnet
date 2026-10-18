@@ -43,7 +43,7 @@ public static class TestAuthEndpoints
             httpContext.Response.Cookies.Append(
                 JwtService.SessionCookieName,
                 token,
-                cookieOptions.CreateWithMaxAge(JwtService.SessionCookieMaxAge));
+                cookieOptions.CreateWithMaxAge(jwtService.SessionLifetime));
 
             return Results.NoContent();
         });
