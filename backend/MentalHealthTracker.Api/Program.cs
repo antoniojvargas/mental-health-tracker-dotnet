@@ -42,9 +42,7 @@ builder.Services.AddAppOptions(builder.Configuration);
 builder.Services.AddReverseProxyTrust();
 
 builder.Services.AddPersistence(builder.Configuration);
-builder.Services.AddSingleton<JwtService>();
-builder.Services.AddSingleton<AuthCookieOptions>();
-builder.Services.AddHttpClient<GoogleOAuthClient>();
+builder.Services.AddAuthModule();
 
 builder.Services.AddSingleton<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>();
 builder.Services.AddSingleton<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>();
@@ -221,10 +219,7 @@ app.MapControllers();
 
 app.MapHub<LogsHub>("/hub/logs");
 
-if (app.Environment.IsEnvironment("Testing"))
-{
-    app.MapTestAuthEndpoints();
-}
+app.MapAuthEndpoints(app.Environment);
 
 // Cualquier ruta de /api sin endpoint cae aquí y sale por el manejador global con el
 // mismo sobre de error que el resto de la API, en lugar de un 404 vacío. Solo cubre
