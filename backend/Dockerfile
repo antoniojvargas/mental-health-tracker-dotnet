@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS restore
 WORKDIR /source
 
 COPY Directory.Build.props .
+COPY Directory.Packages.props .
 COPY MentalHealthTracker.slnx .
 
 COPY MentalHealthTracker.Api/MentalHealthTracker.Api.csproj MentalHealthTracker.Api/
