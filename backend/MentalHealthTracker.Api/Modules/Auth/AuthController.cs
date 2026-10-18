@@ -1,12 +1,9 @@
-using System.Security.Cryptography;
-using System.Text;
 using MentalHealthTracker.Api.Core.Configuration;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
@@ -18,30 +15,24 @@ public sealed partial class AuthController(
     IUserRepository userRepository,
     JwtService jwtService,
     AuthCookieOptions cookieOptions,
+    OAuthStateService oAuthState,
     IOptions<AppUrlsOptions> appUrls,
     ILogger<AuthController> logger) : ControllerBase
 {
     internal const string AuthRateLimitPolicy = "auth";
 
-    private static readonly TimeSpan OAuthStateCookieMaxAge = TimeSpan.FromMinutes(10);
-
     private const string LoginErrorRoute = "/login?error=auth_failed";
 
     // Inicia el flujo OAuth: el navegador navega aquí, recibe una cookie httpOnly con un
     // state aleatorio y un 302 hacia el endpoint de autorización de Google con ese mismo
-    // state. El state se compara en el callback con FixedTimeEquals; sin cookie previa la
+    // state. OAuthStateService lo compara en el callback en tiempo constante; sin cookie previa la
     // navegación de vuelta se rechaza (login CSRF). Es una navegación de página entera,
     // no un fetch: las cookies la fija el backend, así que el frontend solo enlaza a esta ruta.
     [HttpGet("google")]
     [ProducesResponseType(StatusCodes.Status302Found)]
     public IActionResult GoogleLogin()
     {
-        var state = GenerateState();
-
-        Response.Cookies.Append(
-            SessionCookie.OAuthStateName,
-            state,
-            cookieOptions.CreateWithMaxAge(OAuthStateCookieMaxAge));
+        var state = oAuthState.Issue(Response);
 
         return Redirect(googleOAuthClient.BuildAuthUrl(state));
     }
@@ -58,9 +49,9 @@ public sealed partial class AuthController(
         [FromQuery] string? code,
         CancellationToken cancellationToken)
     {
-        Response.Cookies.Delete(SessionCookie.OAuthStateName, cookieOptions.Create());
+        var stateMatches = oAuthState.Consume(HttpContext, state);
 
-        if (string.IsNullOrEmpty(code) || !StateMatches(state))
+        if (string.IsNullOrEmpty(code) || !stateMatches)
         {
             LogCallbackRejected(logger);
             return RedirectToLogin();
@@ -120,27 +111,6 @@ public sealed partial class AuthController(
     {
         Response.Cookies.Delete(SessionCookie.AccessTokenName, cookieOptions.Create());
         return NoContent();
-    }
-
-    private bool StateMatches(string? receivedState)
-    {
-        var expectedState = Request.Cookies[SessionCookie.OAuthStateName];
-        if (expectedState is null || receivedState is null ||
-            expectedState.Length != receivedState.Length)
-        {
-            return false;
-        }
-
-        return CryptographicOperations.FixedTimeEquals(
-            Encoding.UTF8.GetBytes(expectedState),
-            Encoding.UTF8.GetBytes(receivedState));
-    }
-
-    private static string GenerateState()
-    {
-        Span<byte> bytes = stackalloc byte[32];
-        RandomNumberGenerator.Fill(bytes);
-        return WebEncoders.Base64UrlEncode(bytes);
     }
 
     private RedirectResult RedirectToLogin() =>
