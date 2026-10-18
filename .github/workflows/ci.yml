@@ -209,7 +209,6 @@ jobs:
       - name: Crear .env desechable
         run: |
           cat > .env <<'EOF'
-          ConnectionStrings__Default=Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres
           Database__ConnectionString=Host=postgres;Port=5432;Database=mentalhealthtracker;Username=postgres;Password=postgres
           JWT_SECRET=e2e-only-disposable-secret-0123456789abcdef
           GoogleOAuth__ClientId=e2e-test-client.apps.googleusercontent.com
