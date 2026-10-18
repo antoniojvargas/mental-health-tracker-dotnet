@@ -80,10 +80,11 @@ public static class RateLimitingServiceCollectionExtensions
             // igual con 401 y nunca llegan a escribir.
             options.AddPolicy(DailyLogController.WriteRateLimitPolicy, httpContext =>
             {
-                var token = httpContext.Request.Cookies[SessionCookie.AccessTokenName];
+                // El lector cachea la verificación en la petición: RequireAuth reutiliza este
+                // resultado en lugar de volver a verificar el JWT.
                 var userId = httpContext.RequestServices
-                    .GetRequiredService<JwtService>()
-                    .Verify(token)?
+                    .GetRequiredService<SessionTokenReader>()
+                    .Read(httpContext)?
                     .UserId;
 
                 if (userId is null)

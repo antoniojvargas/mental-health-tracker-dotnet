@@ -55,6 +55,7 @@ public sealed class AuthModuleTests
         services.AddAuthModule();
 
         Assert.Contains(services, d => d.ServiceType == typeof(JwtService) && d.Lifetime == ServiceLifetime.Singleton);
+        Assert.Contains(services, d => d.ServiceType == typeof(SessionTokenReader) && d.Lifetime == ServiceLifetime.Singleton);
         Assert.Contains(services, d => d.ServiceType == typeof(AuthCookieOptions) && d.Lifetime == ServiceLifetime.Singleton);
         Assert.Contains(services, d => d.ServiceType == typeof(GoogleOAuthClient));
     }

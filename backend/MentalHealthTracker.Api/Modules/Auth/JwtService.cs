@@ -6,7 +6,8 @@ using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
 
-public sealed class JwtService
+// No sellada y con Verify virtual para que los tests puedan contar las verificaciones por petición.
+public class JwtService
 {
     private const string Algorithm = "HS256";
 
@@ -50,7 +51,7 @@ public sealed class JwtService
         return $"{signingInput}.{signature}";
     }
 
-    public (Guid UserId, string Email)? Verify(string? token)
+    public virtual (Guid UserId, string Email)? Verify(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {

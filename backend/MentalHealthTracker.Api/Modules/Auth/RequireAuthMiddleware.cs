@@ -3,14 +3,13 @@ using MentalHealthTracker.Domain.Errors;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
 
-public sealed class RequireAuthMiddleware(RequestDelegate next, JwtService jwtService)
+public sealed class RequireAuthMiddleware(RequestDelegate next, SessionTokenReader sessionTokenReader)
 {
     public Task InvokeAsync(HttpContext context)
     {
         if (context.GetEndpoint()?.Metadata.GetMetadata<RequireAuthAttribute>() is not null)
         {
-            var token = context.Request.Cookies[SessionCookie.AccessTokenName];
-            if (string.IsNullOrEmpty(token) || jwtService.Verify(token) is not (var userId, var email))
+            if (sessionTokenReader.Read(context) is not (var userId, var email))
             {
                 throw new UnauthorizedException("Authentication required");
             }
