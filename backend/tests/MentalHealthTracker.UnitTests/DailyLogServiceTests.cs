@@ -1,3 +1,4 @@
+using System.Globalization;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Api.Modules.Realtime;
@@ -88,8 +89,8 @@ public class DailyLogServiceTests
         SocialFrequency = SocialFrequency.Occasional,
         Symptoms = [new Symptom(SymptomType.Fatigue, 3)],
         Notes = "mejor que ayer",
-        CreatedAt = DateTimeOffset.Parse("2026-09-22T10:00:00+00:00"),
-        UpdatedAt = DateTimeOffset.Parse("2026-09-22T11:00:00+00:00"),
+        CreatedAt = DateTimeOffset.Parse("2026-09-22T10:00:00+00:00", CultureInfo.InvariantCulture),
+        UpdatedAt = DateTimeOffset.Parse("2026-09-22T11:00:00+00:00", CultureInfo.InvariantCulture),
     };
 
     private static DailyLogResponse ExpectedDto(CreateDailyLogRequest request) => new(
@@ -106,19 +107,19 @@ public class DailyLogServiceTests
         SocialFrequency: SocialFrequency.Occasional,
         Symptoms: request.Symptoms,
         Notes: "mejor que ayer",
-        CreatedAt: DateTimeOffset.Parse("2026-09-22T10:00:00+00:00").ToUniversalTime().ToString("O"),
-        UpdatedAt: DateTimeOffset.Parse("2026-09-22T11:00:00+00:00").ToUniversalTime().ToString("O"));
+        CreatedAt: DateTimeOffset.Parse("2026-09-22T10:00:00+00:00", CultureInfo.InvariantCulture).ToUniversalTime().ToString("O"),
+        UpdatedAt: DateTimeOffset.Parse("2026-09-22T11:00:00+00:00", CultureInfo.InvariantCulture).ToUniversalTime().ToString("O"));
 
     private sealed class FakeDailyLogRepository(bool created) : IDailyLogRepository
     {
         public Task<DailyLog?> FindByUserAndDateAsync(
-            Guid userId, DateOnly date, CancellationToken cancellationToken = default) =>
+            Guid userId, DateOnly logDate, CancellationToken cancellationToken = default) =>
             Task.FromResult<DailyLog?>(null);
 
         public Task<PagedResult<DailyLog>> FindByUserAndRangeAsync(
             Guid userId,
-            DateOnly from,
-            DateOnly to,
+            DateOnly fromDate,
+            DateOnly toDate,
             int limit,
             int offset,
             CancellationToken cancellationToken = default) =>

@@ -6,7 +6,7 @@ namespace MentalHealthTracker.UnitTests;
 // Colección sin paralelismo: estas pruebas leen y escriben variables de entorno, que son
 // estado del proceso entero, y otra clase de pruebas que corriera a la vez las vería.
 [CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class EnvironmentVariablesCollection
+public sealed class EnvironmentVariablesGroup
 {
     public const string Name = "Environment variables";
 }
@@ -15,7 +15,7 @@ public sealed class EnvironmentVariablesCollection
 // que se ejerce construyendo una configuración real). Al empezar se vacían las seis
 // variables que el proveedor lee, para que el entorno de quien ejecuta la suite no cuente,
 // y Dispose deja cada una como estaba.
-[Collection(EnvironmentVariablesCollection.Name)]
+[Collection(EnvironmentVariablesGroup.Name)]
 public sealed class SecretFileConfigurationProviderTests : IDisposable
 {
     private static readonly string[] Variables =

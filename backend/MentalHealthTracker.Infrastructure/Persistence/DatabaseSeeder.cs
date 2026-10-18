@@ -14,7 +14,7 @@ namespace MentalHealthTracker.Infrastructure.Persistence;
 // calidad de sueño se correlacionan con las horas dormidas (días de mal sueño = peor
 // ánimo), y la ansiedad/estrés son inversos al ánimo. Algunos días no hay actividad
 // registrada, como en los datos reales.
-public sealed class DatabaseSeeder(AppDbContext dbContext, ILogger<DatabaseSeeder> logger)
+public sealed partial class DatabaseSeeder(AppDbContext dbContext, ILogger<DatabaseSeeder> logger)
 {
     private const string DemoGoogleId = "demo-user";
 
@@ -27,7 +27,7 @@ public sealed class DatabaseSeeder(AppDbContext dbContext, ILogger<DatabaseSeede
             new GoogleProfile(DemoGoogleId, "demo@mentalhealthtracker.dev", "Demo User", null),
             cancellationToken);
 
-        logger.LogInformation("Seeding 60 daily logs for demo user {UserId}", user.Id);
+        LogSeedingStarted(logger, user.Id);
 
         var random = new Random(42);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -40,8 +40,14 @@ public sealed class DatabaseSeeder(AppDbContext dbContext, ILogger<DatabaseSeede
             await logRepository.UpsertAsync(log, cancellationToken);
         }
 
-        logger.LogInformation("Demo data seeding completed");
+        LogSeedingCompleted(logger);
     }
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Seeding 60 daily logs for demo user {UserId}")]
+    private static partial void LogSeedingStarted(ILogger logger, Guid userId);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Demo data seeding completed")]
+    private static partial void LogSeedingCompleted(ILogger logger);
 
     private static DailyLog BuildDailyLog(Guid userId, DateOnly date, int dayIndex, Random random)
     {

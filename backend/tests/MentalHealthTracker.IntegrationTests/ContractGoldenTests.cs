@@ -21,7 +21,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // Para regenerar un fixture tras un cambio de contrato INTENCIONADO:
 //   UPDATE_GOLDEN=1 dotnet test --filter ContractGoldenTests
 // y revisar el diff de Contracts/ antes de hacer commit.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed partial class ContractGoldenTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {

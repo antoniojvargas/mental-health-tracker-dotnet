@@ -33,7 +33,8 @@ test-e2e: ## Ejecuta las pruebas end-to-end con Playwright (requiere stack arrib
 	cd e2e && npx playwright test
 
 migrate: ## Aplica las migraciones de EF Core a la base de datos
-	$(DOTNET) ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api
+	$(DOTNET) tool restore
+	$(DOTNET) tool run dotnet-ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api
 
 seed: ## Puebla la base de datos con datos de ejemplo
 	$(DOTNET) run --project backend/MentalHealthTracker.Api --no-launch-profile -- --seed

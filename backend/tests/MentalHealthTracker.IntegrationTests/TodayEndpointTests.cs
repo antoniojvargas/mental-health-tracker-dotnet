@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.Json;
 using MentalHealthTracker.Api.Modules.Auth;
@@ -12,7 +13,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // GET /api/logs/today?date=yyyy-MM-dd: el día lo decide el cliente en su zona horaria.
 // Sin `date` se conserva el comportamiento anterior (día UTC del servidor). El servidor solo
 // acota la fecha a "UTC + 1 día", porque UTC+14 es la zona más adelantada.
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -29,7 +30,7 @@ public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await ReadJsonAsync(response);
-        Assert.Equal(UtcToday.AddDays(-1).ToString("yyyy-MM-dd"), body.GetProperty("logDate").GetString());
+        Assert.Equal(UtcToday.AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), body.GetProperty("logDate").GetString());
         Assert.Equal(2, body.GetProperty("moodRating").GetInt32());
     }
 
@@ -94,7 +95,7 @@ public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await ReadJsonAsync(response);
-        Assert.Equal(UtcToday.ToString("yyyy-MM-dd"), body.GetProperty("logDate").GetString());
+        Assert.Equal(UtcToday.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), body.GetProperty("logDate").GetString());
         Assert.Equal(5, body.GetProperty("moodRating").GetInt32());
     }
 

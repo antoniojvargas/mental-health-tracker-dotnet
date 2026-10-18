@@ -147,17 +147,38 @@ Las plantillas `.env.example` (desarrollo/E2E) y `.env.production.example` (prod
 
 ### Backend
 
-Los comandos se ejecutan desde la raíz del repositorio. `dotnet ef` requiere la herramienta instalada (`dotnet tool install --global dotnet-ef`); el manifiesto del repo solo fija `reportgenerator`.
+Los comandos se ejecutan desde la raíz del repositorio. `dotnet-ef` y `reportgenerator` son herramientas locales fijadas en `.config/dotnet-tools.json`: no hace falta instalar nada global, basta `dotnet tool restore` (los targets de `make` ya lo ejecutan).
 
 | Comando | Qué hace |
 | --- | --- |
 | `dotnet run --project backend/MentalHealthTracker.Api` | Arranca la API en local (requiere Postgres en `Database:ConnectionString`). |
 | `dotnet run --project backend/MentalHealthTracker.Api --no-launch-profile -- --seed` | Aplica las migraciones y carga el usuario demo con 60 días de registros. Equivale a `make seed`. |
-| `dotnet ef migrations add <Nombre> --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Crea una migración nueva en `Infrastructure/Persistence/Migrations`. |
-| `dotnet ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
+| `dotnet tool run dotnet-ef migrations add <Nombre> --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Crea una migración nueva en `Infrastructure/Persistence/Migrations`. |
+| `dotnet tool run dotnet-ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
 | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
 | `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`). |
 | `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 70 %. |
+
+### Dependencias NuGet
+
+Las versiones de los paquetes viven en un solo sitio, `backend/Directory.Packages.props`
+(gestión central de paquetes), y cada proyecto tiene su `packages.lock.json` **versionado**
+(`RestorePackagesWithLockFile` en `backend/Directory.Build.props`) con las versiones exactas
+resueltas, directas y transitivas, y su hash de contenido. Así dos restauraciones del mismo
+commit instalan lo mismo aunque entretanto se publique otra versión de una transitiva.
+
+| Qué quieres | Comando (desde `backend/`) |
+| --- | --- |
+| Subir o cambiar un paquete | Editar la versión en `Directory.Packages.props`, ejecutar `dotnet restore MentalHealthTracker.slnx` y **commitear los `packages.lock.json` que cambien**. |
+| Restaurar sin permitir cambios (CI, builds reproducibles) | `dotnet restore MentalHealthTracker.slnx --locked-mode` |
+| Ver qué se resuelve | `dotnet list MentalHealthTracker.slnx package --include-transitive` |
+
+Con `--locked-mode`, el restore **falla** (`NU1004`) si el árbol resuelto no coincide con
+el lock: por ejemplo, si alguien cambia una versión en `Directory.Packages.props` y se olvida de
+regenerar el lock. Es lo que debe usar el CI en lugar de un `dotnet restore` a secas, que
+actualizaría los lock files en silencio y dejaría pasar la deriva. Los jobs de `ci.yml` aún
+ejecutan `dotnet restore MentalHealthTracker.slnx` sin el flag; añadírselo es el paso que
+falta para que el CI lo haga cumplir.
 
 ### Frontend
 

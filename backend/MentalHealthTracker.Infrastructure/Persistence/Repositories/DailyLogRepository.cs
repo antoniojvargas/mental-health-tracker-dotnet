@@ -108,20 +108,20 @@ public sealed class DailyLogRepository(AppDbContext dbContext) : IDailyLogReposi
 
         return new UpsertedDailyLog(log, wasInserted);
     }
-    public async Task<DailyLog?> FindByUserAndDateAsync(Guid userId, DateOnly date, CancellationToken cancellationToken = default)
+    public async Task<DailyLog?> FindByUserAndDateAsync(Guid userId, DateOnly logDate, CancellationToken cancellationToken = default)
         => await dbContext.DailyLogs
-            .SingleOrDefaultAsync(log => log.UserId == userId && log.LogDate == date, cancellationToken);
+            .SingleOrDefaultAsync(log => log.UserId == userId && log.LogDate == logDate, cancellationToken);
 
     public async Task<PagedResult<DailyLog>> FindByUserAndRangeAsync(
         Guid userId,
-        DateOnly from,
-        DateOnly to,
+        DateOnly fromDate,
+        DateOnly toDate,
         int limit,
         int offset,
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.DailyLogs
-            .Where(log => log.UserId == userId && log.LogDate >= from && log.LogDate <= to);
+            .Where(log => log.UserId == userId && log.LogDate >= fromDate && log.LogDate <= toDate);
 
         var total = await query.CountAsync(cancellationToken);
 

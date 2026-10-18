@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using MentalHealthTracker.Api.Modules.Auth;
@@ -10,10 +11,12 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-[Collection(IntegrationTestCollection.Name)]
+[Collection(IntegrationTestGroup.Name)]
 public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
+    private static readonly string[] NoDisturbances = ["none"];
+
     [Fact]
     public async Task PostOwnLog_OwnConnectedClient_ReceivesLogCreated()
     {
@@ -78,13 +81,13 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={token}");
         request.Content = JsonContent.Create(new
         {
-            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
+            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             moodRating = 3,
             anxietyLevel = 5,
             stressLevel = 5,
             sleepHours = 7.5,
             sleepQuality = 4,
-            sleepDisturbances = new[] { "none" },
+            sleepDisturbances = NoDisturbances,
             activityType = "walking",
             activityMinutes = 30,
             socialFrequency = "occasional",

@@ -1,0 +1,27 @@
+<Project>
+
+  <!-- Versiones de todos los paquetes NuGet en un solo sitio: los .csproj declaran
+       <PackageReference Include="..." /> sin Version. Para subir un paquete se cambia
+       aqui, una vez, y vale para todos los proyectos que lo usan. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="coverlet.msbuild" Version="10.1.0" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="Google.Apis.Auth" Version="1.76.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="9.0.21" />
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="9.0.21" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="9.0.21" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.21" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.21" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+</Project>

@@ -14,7 +14,7 @@ namespace MentalHealthTracker.Api.Modules.Auth;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(
+public sealed partial class AuthController(
     GoogleOAuthClient googleOAuthClient,
     IUserRepository userRepository,
     JwtService jwtService,
@@ -65,7 +65,7 @@ public sealed class AuthController(
 
         if (string.IsNullOrEmpty(code) || !StateMatches(state))
         {
-            logger.LogWarning("Google OAuth callback rejected: state cookie missing or mismatch");
+            LogCallbackRejected(logger);
             return RedirectToLogin();
         }
 
@@ -84,7 +84,7 @@ public sealed class AuthController(
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Google OAuth callback failed");
+            LogCallbackFailed(logger, exception);
             return RedirectToLogin();
         }
     }
@@ -107,7 +107,7 @@ public sealed class AuthController(
         var user = await userRepository.FindByIdAsync(userId, cancellationToken);
         if (user is null)
         {
-            logger.LogWarning("Session token references user {UserId} that no longer exists", userId);
+            LogSessionUserMissing(logger, userId);
             throw new UnauthorizedException("Authentication required");
         }
 
@@ -153,6 +153,15 @@ public sealed class AuthController(
         return WebEncoders.Base64UrlEncode(bytes);
     }
 
-    private IActionResult RedirectToLogin() =>
+    private RedirectResult RedirectToLogin() =>
         Redirect($"{appUrls.Value.FrontendUrl}{LoginErrorRoute}");
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Google OAuth callback rejected: state cookie missing or mismatch")]
+    private static partial void LogCallbackRejected(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Google OAuth callback failed")]
+    private static partial void LogCallbackFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Session token references user {UserId} that no longer exists")]
+    private static partial void LogSessionUserMissing(ILogger logger, Guid userId);
 }
