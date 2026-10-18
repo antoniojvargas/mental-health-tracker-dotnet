@@ -21,7 +21,7 @@ public class DailyLogServiceTests
     {
         var emitter = new FakeLogEventEmitter();
         var repository = new FakeDailyLogRepository(created);
-        var service = new DailyLogService(repository, emitter);
+        var service = new DailyLogService(repository, emitter, TimeProvider.System);
 
         await service.UpsertAsync(UserId, ValidRequest(), CancellationToken.None);
 
@@ -34,7 +34,7 @@ public class DailyLogServiceTests
     {
         var emitter = new FakeLogEventEmitter();
         var repository = new FakeDailyLogRepository(created: true);
-        var service = new DailyLogService(repository, emitter);
+        var service = new DailyLogService(repository, emitter, TimeProvider.System);
         var request = ValidRequest();
 
         await service.UpsertAsync(UserId, request, CancellationToken.None);
@@ -49,7 +49,7 @@ public class DailyLogServiceTests
     {
         var emitter = new FakeLogEventEmitter();
         var repository = new FakeDailyLogRepository(created: false);
-        var service = new DailyLogService(repository, emitter);
+        var service = new DailyLogService(repository, emitter, TimeProvider.System);
         var request = ValidRequest();
 
         await service.UpsertAsync(UserId, request, CancellationToken.None);

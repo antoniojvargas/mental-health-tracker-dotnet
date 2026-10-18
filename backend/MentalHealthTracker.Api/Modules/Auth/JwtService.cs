@@ -18,8 +18,11 @@ public sealed class JwtService
 
     private readonly int _expiresInDays;
 
-    public JwtService(IOptions<JwtOptions> options)
+    private readonly TimeProvider _timeProvider;
+
+    public JwtService(IOptions<JwtOptions> options, TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider;
         _key = Encoding.UTF8.GetBytes(options.Value.Secret);
         _expiresInDays = options.Value.ExpiresInDays;
     }
@@ -31,7 +34,7 @@ public sealed class JwtService
 
     public string Sign(Guid userId, string email)
     {
-        var now = DateTimeOffset.UtcNow;
+        var now = _timeProvider.GetUtcNow();
         var claims = new Dictionary<string, object>
         {
             ["sub"] = userId.ToString(),
@@ -100,7 +103,7 @@ public sealed class JwtService
                 return null;
             }
 
-            if (expiresAt < DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            if (expiresAt < _timeProvider.GetUtcNow().ToUnixTimeSeconds())
             {
                 return null;
             }

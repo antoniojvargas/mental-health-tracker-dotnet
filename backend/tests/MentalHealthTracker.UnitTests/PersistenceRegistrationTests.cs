@@ -18,6 +18,7 @@ public sealed class PersistenceRegistrationTests
     private static ServiceProvider Build(IConfiguration configuration) =>
         new ServiceCollection()
             .AddLogging()
+            .AddSingleton(TimeProvider.System)
             .AddSingleton(NullLogger<DatabaseSeeder>.Instance)
             .AddPersistence(configuration)
             .BuildServiceProvider(validateScopes: true);

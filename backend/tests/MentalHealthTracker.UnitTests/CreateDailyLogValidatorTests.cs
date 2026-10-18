@@ -7,7 +7,7 @@ namespace MentalHealthTracker.UnitTests;
 
 public class CreateDailyLogValidatorTests
 {
-    private readonly CreateDailyLogValidator _validator = new();
+    private readonly CreateDailyLogValidator _validator = new(TimeProvider.System);
 
     [Theory]
     [InlineData(0, false)]
@@ -162,6 +162,21 @@ public class CreateDailyLogValidatorTests
         Assert.Contains(result.Errors, error =>
             error.PropertyName == nameof(CreateDailyLogRequest.LogDate) &&
             error.ErrorMessage == "logDate cannot be in the future.");
+    }
+
+    [Fact]
+    public void LogDate_Limit_FollowsTheInjectedClock()
+    {
+        var clock = new FixedTimeProvider(new DateTimeOffset(2030, 6, 15, 23, 59, 59, TimeSpan.Zero));
+        var validator = new CreateDailyLogValidator(clock);
+        var dayAfterTomorrow = new DateOnly(2030, 6, 17);
+
+        Assert.True(validator.Validate(ValidRequest(new DateOnly(2030, 6, 16))).IsValid);
+        Assert.False(validator.Validate(ValidRequest(dayAfterTomorrow)).IsValid);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+
+        Assert.True(validator.Validate(ValidRequest(dayAfterTomorrow)).IsValid);
     }
 
     private static CreateDailyLogRequest ValidRequest(DateOnly? logDate = null) => new(

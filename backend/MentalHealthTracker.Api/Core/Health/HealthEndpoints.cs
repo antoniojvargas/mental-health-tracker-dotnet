@@ -8,9 +8,7 @@ public static partial class HealthEndpoints
 {
     public static IServiceCollection AddApplicationUptime(this IServiceCollection services)
     {
-        // Instancia creada al registrar (no de forma perezosa) para que el uptime cuente
-        // desde el arranque y no desde la primera petición.
-        services.AddSingleton(new ApplicationUptime());
+        services.AddSingleton<ApplicationUptime>();
         return services;
     }
 
@@ -21,6 +19,10 @@ public static partial class HealthEndpoints
     // después con errores confusos. Solo un SELECT 1 real refleja la disponibilidad real.
     public static IEndpointRouteBuilder MapHealthEndpoints(this IEndpointRouteBuilder app)
     {
+        // Se resuelve ya al mapear el endpoint (arranque) y no en la primera petición, para
+        // que el uptime cuente desde el arranque del host.
+        _ = app.ServiceProvider.GetRequiredService<ApplicationUptime>();
+
         app.MapGet("/api/health", async (
             IOptions<DatabaseOptions> databaseOptions,
             ApplicationUptime applicationUptime,

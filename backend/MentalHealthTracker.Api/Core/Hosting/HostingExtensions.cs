@@ -1,5 +1,6 @@
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Core.Validation;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace MentalHealthTracker.Api.Core.Hosting;
 
@@ -19,6 +20,10 @@ public static class HostingExtensions
 
     public static IServiceCollection AddApiCore(this IServiceCollection services)
     {
+        // Único reloj de la aplicación: nadie lee el reloj del sistema directamente, así los
+        // tests pueden fijar la hora con un TimeProvider falso.
+        services.TryAddSingleton(TimeProvider.System);
+
         services.AddControllers(options =>
         {
             options.Filters.Add<FluentValidationActionFilter>();

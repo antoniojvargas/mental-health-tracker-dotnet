@@ -14,14 +14,17 @@ namespace MentalHealthTracker.Infrastructure.Persistence;
 // calidad de sueño se correlacionan con las horas dormidas (días de mal sueño = peor
 // ánimo), y la ansiedad/estrés son inversos al ánimo. Algunos días no hay actividad
 // registrada, como en los datos reales.
-public sealed partial class DatabaseSeeder(AppDbContext dbContext, ILogger<DatabaseSeeder> logger)
+public sealed partial class DatabaseSeeder(
+    AppDbContext dbContext,
+    TimeProvider timeProvider,
+    ILogger<DatabaseSeeder> logger)
 {
     private const string DemoGoogleId = "demo-user";
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var userRepository = new UserRepository(dbContext);
-        var logRepository = new DailyLogRepository(dbContext);
+        var userRepository = new UserRepository(dbContext, timeProvider);
+        var logRepository = new DailyLogRepository(dbContext, timeProvider);
 
         var user = await userRepository.UpsertByGoogleIdAsync(
             new GoogleProfile(DemoGoogleId, "demo@mentalhealthtracker.dev", "Demo User", null),
@@ -30,7 +33,7 @@ public sealed partial class DatabaseSeeder(AppDbContext dbContext, ILogger<Datab
         LogSeedingStarted(logger, user.Id);
 
         var random = new Random(42);
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
         var start = today.AddDays(-59);
 
         for (var i = 0; i < 60; i++)
