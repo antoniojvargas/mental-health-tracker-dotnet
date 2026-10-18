@@ -2,25 +2,30 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using MentalHealthTracker.Api.Core.RateLimiting;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.IntegrationTests;
 
-// Verifica las políticas de rate limiting definidas en Program.cs: "auth" (20 req/15 min
-// por IP) sobre el callback de Google OAuth, y "write" (30 req/15 min por id de usuario)
-// sobre POST /api/logs. Los límites (20 y 30) son el contrato vigente en Program.cs.
+// Verifica las políticas de rate limiting: "auth" (por IP) sobre el callback de Google
+// OAuth, y "write" (por id de usuario) sobre POST /api/logs. Los límites se leen de
+// RateLimitingOptions, la única fuente de verdad (por defecto 20 y 30 por 15 min).
 // Cada clase de test tiene su propia instancia de CustomWebApplicationFactory, por lo que el
 // estado del rate limiter (y agotar cuotas) queda aislado a esta clase.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
-    private const int AuthPermitLimit = 20;
-    private const int WritePermitLimit = 30;
+    private int AuthPermitLimit => Limits.Auth.PermitLimit;
+    private int WritePermitLimit => Limits.Write.PermitLimit;
+
+    private RateLimitingOptions Limits =>
+        Factory.Services.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
 
     private const string AuthCallbackUrl = "/api/auth/google/callback?state=x&code=y";
 
@@ -41,7 +46,7 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
         var rejected = await client.GetAsync(AuthCallbackUrl);
 
         Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
-        Assert.Equal("20", SingleHeader(rejected, "RateLimit-Limit"));
+        Assert.Equal(AuthPermitLimit.ToString(CultureInfo.InvariantCulture), SingleHeader(rejected, "RateLimit-Limit"));
         Assert.Equal("0", SingleHeader(rejected, "RateLimit-Remaining"));
         Assert.NotNull(SingleHeader(rejected, "RateLimit-Reset"));
         Assert.NotNull(SingleHeader(rejected, "Retry-After"));
@@ -67,7 +72,7 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
 
         var rejectedA = await PostLogAsync(tokenA, Body());
         Assert.Equal(HttpStatusCode.TooManyRequests, rejectedA.StatusCode);
-        Assert.Equal("30", SingleHeader(rejectedA, "RateLimit-Limit"));
+        Assert.Equal(WritePermitLimit.ToString(CultureInfo.InvariantCulture), SingleHeader(rejectedA, "RateLimit-Limit"));
         Assert.Equal("0", SingleHeader(rejectedA, "RateLimit-Remaining"));
 
         using var document = JsonDocument.Parse(await rejectedA.Content.ReadAsStringAsync());

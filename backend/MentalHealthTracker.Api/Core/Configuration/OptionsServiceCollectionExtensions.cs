@@ -1,3 +1,4 @@
+using MentalHealthTracker.Api.Core.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Core.Configuration;
@@ -40,6 +41,8 @@ public static class OptionsServiceCollectionExtensions
 
         services.AddValidatedOptions<ReverseProxyOptions>(configuration, ReverseProxyOptions.SectionName);
         services.AddSingleton<IValidateOptions<ReverseProxyOptions>, ReverseProxyOptionsValidator>();
+
+        services.AddValidatedOptions<RateLimitingOptions>(configuration, RateLimitingOptions.SectionName);
 
         return services;
     }

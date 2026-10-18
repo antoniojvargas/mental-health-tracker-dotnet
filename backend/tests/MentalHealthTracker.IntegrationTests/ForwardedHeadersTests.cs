@@ -1,4 +1,5 @@
 using System.Net;
+using MentalHealthTracker.Api.Core.RateLimiting;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -19,7 +21,7 @@ namespace MentalHealthTracker.IntegrationTests;
 public sealed class ForwardedHeadersTests(ForwardedHeadersFixture fixture)
     : IClassFixture<ForwardedHeadersFixture>
 {
-    private const int AuthPermitLimit = 20;
+    private int AuthPermitLimit => fixture.RateLimiting.Auth.PermitLimit;
     private const string AuthCallbackUrl = "/api/auth/google/callback?state=x&code=y";
 
     private static readonly string TrustedProxy = ForwardedHeadersFixture.TrustedProxy;
@@ -130,6 +132,9 @@ public sealed class ForwardedHeadersFixture : IDisposable
     }
 
     public RequestObservations Observations { get; } = new();
+
+    public RateLimitingOptions RateLimiting =>
+        _factory.Services.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
 
     public HttpClient CreateClient() =>
         _factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });

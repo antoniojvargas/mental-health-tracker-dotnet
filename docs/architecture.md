@@ -193,7 +193,8 @@ implementación en infraestructura.
 ### Rate limiting en memoria: mismo backplane pendiente que SignalR (decisión de alcance)
 
 Las políticas de rate limiting (`auth`: 20 req/15 min por IP en `GET /api/auth/google/callback`;
-`write`: 30 req/15 min por id de usuario en `POST /api/logs`) usan `AddRateLimiter` con
+`write`: 30 req/15 min por id de usuario en `POST /api/logs`; valores por defecto de
+`RateLimitingOptions`, sección `RateLimiting`, única fuente de los límites) usan `AddRateLimiter` con
 `FixedWindowRateLimiter`. El estado de la ventana (el contador de cada partición) vive
 **en memoria de la instancia**: `System.Threading.RateLimiting` no persiste contadores en
 ningún store compartido.

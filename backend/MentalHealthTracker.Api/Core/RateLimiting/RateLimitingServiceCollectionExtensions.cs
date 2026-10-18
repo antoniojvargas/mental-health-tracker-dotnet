@@ -4,6 +4,7 @@ using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.Api.Core.RateLimiting;
 
@@ -32,13 +33,10 @@ public static class RateLimitingServiceCollectionExtensions
 
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
 
-                var permitLimit = context.HttpContext.GetEndpoint()?
-                    .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName switch
-                {
-                    AuthController.AuthRateLimitPolicy => 20,
-                    DailyLogController.WriteRateLimitPolicy => 30,
-                    _ => 0,
-                };
+                var permitLimit = context.HttpContext.RequestServices
+                    .GetRequiredService<IOptions<RateLimitingOptions>>().Value
+                    .PermitLimitFor(context.HttpContext.GetEndpoint()?
+                        .Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName);
 
                 context.HttpContext.Response.Headers["RateLimit-Limit"] =
                     permitLimit.ToString(CultureInfo.InvariantCulture);
@@ -61,14 +59,19 @@ public static class RateLimitingServiceCollectionExtensions
             };
 
             options.AddPolicy(AuthController.AuthRateLimitPolicy, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
+            {
+                var limits = httpContext.RequestServices
+                    .GetRequiredService<IOptions<RateLimitingOptions>>().Value.Auth;
+
+                return RateLimitPartition.GetFixedWindowLimiter(
                     httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 20,
-                        Window = TimeSpan.FromMinutes(15),
+                        PermitLimit = limits.PermitLimit,
+                        Window = limits.Window,
                         AutoReplenishment = true,
-                    }));
+                    });
+            });
 
             // POST /api/logs (upsert de registros) se limita por id de usuario y no por IP:
             // dos pacientes detrás de la misma red (NAT de empresa, campus) no deben consumir
@@ -88,12 +91,15 @@ public static class RateLimitingServiceCollectionExtensions
                     return RateLimitPartition.GetNoLimiter((Guid?)null);
                 }
 
+                var limits = httpContext.RequestServices
+                    .GetRequiredService<IOptions<RateLimitingOptions>>().Value.Write;
+
                 return RateLimitPartition.GetFixedWindowLimiter(
                     userId,
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 30,
-                        Window = TimeSpan.FromMinutes(15),
+                        PermitLimit = limits.PermitLimit,
+                        Window = limits.Window,
                         AutoReplenishment = true,
                     });
             });

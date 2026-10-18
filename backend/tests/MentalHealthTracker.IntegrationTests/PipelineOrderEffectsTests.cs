@@ -1,8 +1,11 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using MentalHealthTracker.Api.Core.RateLimiting;
 using MentalHealthTracker.Api.Modules.Auth;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -15,7 +18,9 @@ namespace MentalHealthTracker.IntegrationTests;
 public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
-    private const int WritePermitLimit = 30;
+    private int WritePermitLimit =>
+        Factory.Services.GetRequiredService<IOptions<RateLimitingOptions>>().Value.Write.PermitLimit;
+
     private const string AuthCallbackUrl = "/api/auth/google/callback?state=x&code=y";
 
     [Fact]
@@ -126,7 +131,6 @@ public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factor
 public sealed class ForwardedClientPartitionTests(ForwardedHeadersFixture fixture)
     : IClassFixture<ForwardedHeadersFixture>
 {
-    private const int AuthPermitLimit = 20;
     private const string AuthCallbackUrl = "/api/auth/google/callback?state=x&code=y";
 
     [Fact]
@@ -135,7 +139,7 @@ public sealed class ForwardedClientPartitionTests(ForwardedHeadersFixture fixtur
         var client = fixture.CreateClient();
 
         // Más peticiones de las que admite una sola cuota, cada una de un cliente distinto.
-        for (var i = 1; i <= AuthPermitLimit + 10; i++)
+        for (var i = 1; i <= fixture.RateLimiting.Auth.PermitLimit + 10; i++)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, AuthCallbackUrl);
             request.Headers.Add(TestRemoteIpStartupFilter.HeaderName, ForwardedHeadersFixture.TrustedProxy);
