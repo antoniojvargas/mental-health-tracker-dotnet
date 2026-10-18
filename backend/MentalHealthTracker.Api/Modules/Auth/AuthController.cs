@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using MentalHealthTracker.Api.Core.Configuration;
@@ -98,8 +97,7 @@ public sealed partial class AuthController(
     [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (userIdClaim is null || !Guid.TryParse(userIdClaim, out var userId))
+        if (!User.TryGetUserId(out var userId))
         {
             throw new UnauthorizedException("Authentication required");
         }

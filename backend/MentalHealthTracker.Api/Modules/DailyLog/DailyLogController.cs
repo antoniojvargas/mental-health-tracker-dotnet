@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
@@ -15,8 +14,11 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
 {
     internal const string WriteRateLimitPolicy = "write";
 
-    private Guid UserId =>
-        Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    // RequireAuth ya rechazó con 401 toda petición sin sesión válida, así que el claim siempre
+    // está; si no lo estuviera sería un fallo del servidor (500), no del cliente.
+    private Guid UserId => User.TryGetUserId(out var userId)
+        ? userId
+        : throw new InvalidOperationException("The authenticated request has no valid user id claim.");
 
     [HttpPost]
     [EnableRateLimiting(WriteRateLimitPolicy)]
