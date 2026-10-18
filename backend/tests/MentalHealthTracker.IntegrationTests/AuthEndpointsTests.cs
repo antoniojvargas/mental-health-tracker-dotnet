@@ -69,9 +69,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
     public async Task Me_WithTamperedCookie_Returns401()
     {
         var (_, token) = await CreateAuthenticatedSessionAsync();
-        var tampered = token.Length > 0
-            ? token[..^1] + (token[^1] == 'A' ? 'B' : 'A')
-            : token;
+        var tampered = TamperSignature(token);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
         request.Headers.TryAddWithoutValidation("Cookie", $"{JwtService.SessionCookieName}={tampered}");

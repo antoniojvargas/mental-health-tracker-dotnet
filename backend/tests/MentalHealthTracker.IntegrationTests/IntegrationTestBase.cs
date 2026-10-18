@@ -90,6 +90,18 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
         return (client, user, token);
     }
 
+    // Devuelve el token con la firma alterada de forma que SEGURO deje de verificar.
+    // Se cambia el PRIMER carácter de la firma (tercer segmento): usa sus 6 bits, así que
+    // cualquier cambio altera el primer byte. Cambiar el último no vale: solo aporta 4 de
+    // sus 6 bits y ~1 de cada 16 veces el token alterado decodifica a los mismos bytes.
+    protected static string TamperSignature(string token)
+    {
+        var segments = token.Split('.');
+        var signature = segments[2];
+        segments[2] = (signature[0] == 'A' ? 'B' : 'A') + signature[1..];
+        return string.Join('.', segments);
+    }
+
     private static string ReadSessionToken(HttpResponseMessage response)
     {
         if (!response.Headers.TryGetValues("Set-Cookie", out var cookies))

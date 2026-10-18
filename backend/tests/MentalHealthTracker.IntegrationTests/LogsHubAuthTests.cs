@@ -26,9 +26,7 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
     public async Task Negotiate_WithTamperedCookie_Returns401()
     {
         var (_, token) = await CreateAuthenticatedSessionAsync();
-        var tampered = token.Length > 0
-            ? token[..^1] + (token[^1] == 'A' ? 'B' : 'A')
-            : token;
+        var tampered = TamperSignature(token);
 
         var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
