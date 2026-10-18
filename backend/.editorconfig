@@ -1,0 +1,40 @@
+# Convenciones del backend. Reflejan lo que el código ya hace: dotnet format las aplica
+# y `dotnet format --verify-no-changes` (job Lint del CI) las comprueba.
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{csproj,props,targets,json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+# Un namespace por archivo, declarado con ;
+csharp_style_namespace_declarations = file_scoped:warning
+
+# Llaves siempre, también en if/else/for/foreach/while de una sola línea
+csharp_prefer_braces = true:warning
+
+# var siempre que se pueda: tipos primitivos, tipo evidente y el resto
+csharp_style_var_for_built_in_types = true:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = true:warning
+
+# Constructores primarios cuando la clase solo inyecta dependencias. Solo sugerencia: pasar
+# de un constructor explícito a uno primario es un refactor, no formato, y no se aplica solo.
+csharp_style_prefer_primary_constructors = true:suggestion
+
+# Estilo de llaves y ubicacion de los usings (el orden de los usings no se impone: el codigo
+# actual no lo sigue de forma uniforme)
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_using_directive_placement = outside_namespace:warning
+
+# Código generado por EF Core: se regenera con `dotnet ef`, no se formatea a mano
+# (usa namespaces de bloque y BOM).
+[**/Migrations/*.cs]
+generated_code = true
