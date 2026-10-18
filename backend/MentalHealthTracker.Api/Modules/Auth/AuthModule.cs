@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Modules.Auth.Testing;
+using Microsoft.AspNetCore.Authentication;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
 
@@ -12,6 +13,17 @@ public static class AuthModule
     {
         services.AddSingleton<JwtService>();
         services.AddSingleton<SessionTokenReader>();
+
+        // Esquema propio de cookie JWT y la política que aplica [RequireAuth]. No hay esquema por
+        // defecto fijado a propósito: solo se autentica en los endpoints que piden la política.
+        services.AddAuthentication()
+            .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
+                SessionAuthentication.SchemeName, configureOptions: null);
+        services.AddAuthorizationBuilder()
+            .AddPolicy(SessionAuthentication.PolicyName, policy => policy
+                .AddAuthenticationSchemes(SessionAuthentication.SchemeName)
+                .RequireAuthenticatedUser());
+
         services.AddSingleton<AuthCookieOptions>();
         services.AddSingleton<OAuthStateService>();
         services.AddSingleton<IGoogleIdTokenValidator, GoogleIdTokenValidator>();

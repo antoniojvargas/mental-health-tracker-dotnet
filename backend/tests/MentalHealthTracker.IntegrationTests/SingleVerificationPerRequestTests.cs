@@ -10,7 +10,7 @@ using Microsoft.Extensions.Options;
 namespace MentalHealthTracker.IntegrationTests;
 
 // POST /api/logs pasa por dos consumidores de la identidad de la sesión: la partición de la
-// política de rate limiting "write" y RequireAuthMiddleware. SessionTokenReader hace que el
+// política de rate limiting "write" y SessionAuthenticationHandler. SessionTokenReader hace que el
 // JWT se verifique una sola vez y el segundo reutilice el resultado.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class SingleVerificationPerRequestTests(CustomWebApplicationFactory factory)

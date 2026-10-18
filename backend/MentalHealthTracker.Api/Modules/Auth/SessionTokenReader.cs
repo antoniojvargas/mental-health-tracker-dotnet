@@ -1,7 +1,7 @@
 namespace MentalHealthTracker.Api.Modules.Auth;
 
 // Lee y verifica el JWT de la cookie de sesión UNA sola vez por petición. El limitador de
-// escritura (que particiona por usuario) y RequireAuthMiddleware necesitan la misma
+// escritura (que particiona por usuario) y SessionAuthenticationHandler necesitan la misma
 // identidad, y verificar es una firma HMAC más un parseo de JSON: el resultado, válido o no,
 // se guarda en HttpContext.Items y el segundo consumidor lo reutiliza.
 public sealed class SessionTokenReader(JwtService jwtService)
