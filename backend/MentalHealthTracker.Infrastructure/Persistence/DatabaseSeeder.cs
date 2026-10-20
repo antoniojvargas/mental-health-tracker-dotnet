@@ -1,8 +1,8 @@
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Enums;
 using MentalHealthTracker.Domain.Models;
+using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Domain.ValueObjects;
-using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.Extensions.Logging;
 
 namespace MentalHealthTracker.Infrastructure.Persistence;
@@ -15,7 +15,8 @@ namespace MentalHealthTracker.Infrastructure.Persistence;
 // ánimo), y la ansiedad/estrés son inversos al ánimo. Algunos días no hay actividad
 // registrada, como en los datos reales.
 public sealed partial class DatabaseSeeder(
-    AppDbContext dbContext,
+    IUserRepository userRepository,
+    IDailyLogRepository logRepository,
     TimeProvider timeProvider,
     ILogger<DatabaseSeeder> logger)
 {
@@ -23,9 +24,6 @@ public sealed partial class DatabaseSeeder(
 
     public async Task SeedAsync(CancellationToken cancellationToken = default)
     {
-        var userRepository = new UserRepository(dbContext, timeProvider);
-        var logRepository = new DailyLogRepository(dbContext, timeProvider);
-
         var user = await userRepository.UpsertByGoogleIdAsync(
             new GoogleProfile(DemoGoogleId, "demo@mentalhealthtracker.dev", "Demo User", null),
             cancellationToken);

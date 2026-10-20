@@ -33,7 +33,6 @@ public static partial class DatabaseInitializer
     // MaxBackoffMs en cada espera, con un tope de MaxAttempts.
     private static async Task WaitForDatabaseAsync(AppDbContext dbContext, ILogger logger, CancellationToken cancellationToken)
     {
-        var connectionString = dbContext.Database.GetConnectionString();
         var backoffMs = InitialBackoffMs;
 
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
@@ -42,8 +41,10 @@ public static partial class DatabaseInitializer
 
             try
             {
-                await using var connection = new NpgsqlConnection(connectionString);
-                await connection.OpenAsync(cancellationToken);
+                // La conexión del propio contexto (con el NpgsqlDataSource de la aplicación): no
+                // se reconstruye una cadena, que con un data source llegaría sin contraseña.
+                await dbContext.Database.OpenConnectionAsync(cancellationToken);
+                await dbContext.Database.CloseConnectionAsync();
                 return;
             }
             // SocketException: con Npgsql 9.x un host que no resuelve por DNS (la base aún no

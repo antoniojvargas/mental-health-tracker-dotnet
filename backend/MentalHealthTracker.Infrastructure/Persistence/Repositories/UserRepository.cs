@@ -37,6 +37,8 @@ public sealed class UserRepository(AppDbContext dbContext, TimeProvider timeProv
         return user;
     }
 
+    // Solo lectura: el llamador no modifica el usuario, así que no hace falta que el contexto lo
+    // rastree. (UpsertByGoogleIdAsync sí necesita el seguimiento: modifica y guarda.)
     public async Task<User?> FindByIdAsync(Guid id, CancellationToken cancellationToken = default)
-        => await dbContext.Users.SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
+        => await dbContext.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == id, cancellationToken);
 }
