@@ -4,6 +4,7 @@ using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
+using MentalHealthTracker.Infrastructure.Logging;
 
 namespace MentalHealthTracker.Infrastructure.Persistence;
 
@@ -44,10 +45,10 @@ public sealed partial class DatabaseSeeder(
         LogSeedingCompleted(logger);
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Seeding 60 daily logs for demo user {UserId}")]
+    [LoggerMessage(EventId = InfrastructureLogEvents.DemoSeedingStarted, EventName = nameof(InfrastructureLogEvents.DemoSeedingStarted), Level = LogLevel.Information, Message = "Seeding 60 daily logs for demo user {UserId}")]
     private static partial void LogSeedingStarted(ILogger logger, Guid userId);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Demo data seeding completed")]
+    [LoggerMessage(EventId = InfrastructureLogEvents.DemoSeedingCompleted, EventName = nameof(InfrastructureLogEvents.DemoSeedingCompleted), Level = LogLevel.Information, Message = "Demo data seeding completed")]
     private static partial void LogSeedingCompleted(ILogger logger);
 
     private static DailyLog BuildDailyLog(Guid userId, DateOnly date, int dayIndex, Random random)

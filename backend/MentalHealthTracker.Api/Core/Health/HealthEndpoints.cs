@@ -1,6 +1,7 @@
 using MentalHealthTracker.Api.Core.Configuration;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using MentalHealthTracker.Api.Core.Logging;
 
 namespace MentalHealthTracker.Api.Core.Health;
 
@@ -52,6 +53,6 @@ public static partial class HealthEndpoints
         return app;
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Database health check failed")]
+    [LoggerMessage(EventId = ApiLogEvents.HealthCheckFailed, EventName = nameof(ApiLogEvents.HealthCheckFailed), Level = LogLevel.Error, Message = "Database health check failed")]
     private static partial void LogHealthCheckFailed(ILogger logger, Exception exception);
 }
