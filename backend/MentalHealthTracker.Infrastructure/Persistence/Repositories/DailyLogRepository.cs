@@ -4,6 +4,7 @@ using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using MentalHealthTracker.Domain.ValueObjects;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -65,21 +66,33 @@ public sealed class DailyLogRepository(AppDbContext dbContext, TimeProvider time
     public async Task<UpsertedDailyLog> UpsertAsync(DailyLog log, CancellationToken cancellationToken = default)
     {
         var now = timeProvider.GetUtcNow();
+        bool wasInserted;
 
         var connection = dbContext.Database.GetDbConnection();
         await using var command = connection.CreateCommand();
         command.CommandText = UpsertSql;
         AddUpsertParameters(command, log, now);
 
-        if (connection.State != System.Data.ConnectionState.Open)
+        // OpenConnectionAsync/CloseConnectionAsync llevan la cuenta de EF: si la conexión ya estaba
+        // abierta (otra operación del contexto o una transacción) no la cierran; si la abrió esta
+        // llamada, la cierra el finally. Y el comando se enlista en la transacción del contexto,
+        // para que un rollback también deshaga el upsert.
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
         {
-            await connection.OpenAsync(cancellationToken);
-        }
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        await reader.ReadAsync(cancellationToken);
+            command.Transaction = dbContext.Database.CurrentTransaction?.GetDbTransaction();
 
-        var wasInserted = reader.GetBoolean(1);
-        log.Id = reader.GetGuid(0);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+
+            wasInserted = reader.GetBoolean(1);
+            log.Id = reader.GetGuid(0);
+        }
+        finally
+        {
+            await dbContext.Database.CloseConnectionAsync();
+        }
+
         log.UpdatedAt = now;
         if (wasInserted)
         {
