@@ -128,6 +128,23 @@ public sealed class SnakeCaseEnumJsonConverterTests
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("null"));
     }
 
+    // Los mensajes forman parte del contrato de error: llegan al cliente dentro del 400.
+    [Fact]
+    public void Read_UnknownValue_HasTheExactMessage()
+    {
+        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>("\"unknown\""));
+
+        Assert.Equal("Invalid value 'unknown' for enum SleepDisturbance.", exception.Message);
+    }
+
+    [Fact]
+    public void Read_Null_HasTheExactMessage()
+    {
+        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("null"));
+
+        Assert.Equal("Invalid value for enum SymptomType: expected a string.", exception.Message);
+    }
+
     [Fact]
     public void Read_NullInsideAnObject_ThrowsJsonException()
     {

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MentalHealthTracker.Domain.Common;
 
 namespace MentalHealthTracker.Domain.Enums;
 
@@ -13,6 +14,8 @@ public sealed class SnakeCaseEnumJsonConverter : JsonConverterFactory
         return (JsonConverter)Activator.CreateInstance(converterType)!;
     }
 
+    // Lee y escribe con los mapas precalculados de SnakeCaseEnum<T>: una búsqueda en un
+    // diccionario por llamada, sin recorrer los miembros ni convertir nombres cada vez.
     private sealed class SnakeCaseEnumConverter<T> : JsonConverter<T>
         where T : struct, Enum
     {
@@ -21,23 +24,14 @@ public sealed class SnakeCaseEnumJsonConverter : JsonConverterFactory
             var token = reader.GetString()
                 ?? throw new JsonException($"Invalid value for enum {typeof(T).Name}: expected a string.");
 
-            foreach (var name in Enum.GetNames<T>())
-            {
-                if (string.Equals(
-                        JsonNamingPolicy.SnakeCaseLower.ConvertName(name),
-                        token,
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return Enum.Parse<T>(name);
-                }
-            }
-
-            throw new JsonException($"Invalid value '{token}' for enum {typeof(T).Name}.");
+            return SnakeCaseEnum<T>.TryParse(token, out var value)
+                ? value
+                : throw new JsonException($"Invalid value '{token}' for enum {typeof(T).Name}.");
         }
 
         public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
         {
-            writer.WriteStringValue(JsonNamingPolicy.SnakeCaseLower.ConvertName(value.ToString()));
+            writer.WriteStringValue(SnakeCaseEnum<T>.ToSnakeCase(value));
         }
     }
 }
