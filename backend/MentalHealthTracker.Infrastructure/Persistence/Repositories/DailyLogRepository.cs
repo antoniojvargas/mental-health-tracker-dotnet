@@ -145,6 +145,12 @@ public sealed class DailyLogRepository(AppDbContext dbContext, TimeProvider time
             .AsNoTracking()
             .SingleOrDefaultAsync(log => log.UserId == userId && log.LogDate == logDate, cancellationToken);
 
+    // La página y el total del rango salen de UNA consulta: COUNT(*) OVER() se calcula sobre el
+    // conjunto filtrado ANTES de OFFSET/LIMIT, así que cada fila de la página trae el total.
+    // Si la página llega vacía (offset fuera de rango) no hay fila que lo lleve y se pide con un
+    // COUNT de respaldo, para que el total sea el mismo en todos los casos. Con offset 0 y un
+    // límite positivo una página vacía solo puede significar rango vacío: el total es 0 sin
+    // segundo viaje.
     public async Task<PagedResult<DailyLog>> FindByUserAndRangeAsync(
         Guid userId,
         DateOnly fromDate,
@@ -153,19 +159,80 @@ public sealed class DailyLogRepository(AppDbContext dbContext, TimeProvider time
         int offset,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.DailyLogs
-            .AsNoTracking()
-            .Where(log => log.UserId == userId && log.LogDate >= fromDate && log.LogDate <= toDate);
+        var items = new List<DailyLog>();
+        var total = 0L;
 
-        var total = await query.CountAsync(cancellationToken);
+        var connection = dbContext.Database.GetDbConnection();
+        await using var command = connection.CreateCommand();
+        command.CommandText = RangePageSql;
+        command.Parameters.Add(new NpgsqlParameter("@user_id", NpgsqlDbType.Uuid) { Value = userId });
+        command.Parameters.Add(new NpgsqlParameter("@from_date", NpgsqlDbType.Date) { Value = fromDate });
+        command.Parameters.Add(new NpgsqlParameter("@to_date", NpgsqlDbType.Date) { Value = toDate });
+        command.Parameters.Add(new NpgsqlParameter("@limit", NpgsqlDbType.Integer) { Value = limit });
+        command.Parameters.Add(new NpgsqlParameter("@offset", NpgsqlDbType.Integer) { Value = offset });
 
-        var items = await query
-            .OrderBy(log => log.LogDate)
-            .Skip(offset)
-            .Take(limit)
-            .ToListAsync(cancellationToken);
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            command.Transaction = dbContext.Database.CurrentTransaction?.GetDbTransaction();
 
-        return new PagedResult<DailyLog>(items, total);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(ReadLog(reader));
+                total = reader.GetInt64(RangePageTotalColumn);
+            }
+        }
+        finally
+        {
+            await dbContext.Database.CloseConnectionAsync();
+        }
+
+        if (items.Count == 0 && (offset > 0 || limit <= 0))
+        {
+            total = await dbContext.DailyLogs
+                .AsNoTracking()
+                .CountAsync(log => log.UserId == userId && log.LogDate >= fromDate && log.LogDate <= toDate, cancellationToken);
+        }
+
+        return new PagedResult<DailyLog>(items, (int)total);
     }
 
+    // Misma proyección que la tabla, en el orden de ReadLog, más el total de la ventana al final.
+    private const string RangePageSql = """
+        SELECT id, user_id, log_date, mood_rating, anxiety_level, stress_level,
+               sleep_hours, sleep_quality, sleep_disturbances, activity_type,
+               activity_minutes, social_frequency, symptoms, notes, created_at, updated_at,
+               COUNT(*) OVER() AS total
+        FROM daily_logs
+        WHERE user_id = @user_id AND log_date >= @from_date AND log_date <= @to_date
+        ORDER BY log_date
+        OFFSET @offset LIMIT @limit;
+        """;
+
+    private const int RangePageTotalColumn = 16;
+
+    // Materializa una fila de RangePageSql aplicando la misma conversión (snake_case, text[],
+    // jsonb) que los conversores de EF, sin pasar por el seguimiento de cambios.
+    private static DailyLog ReadLog(System.Data.Common.DbDataReader reader) => new()
+    {
+        Id = reader.GetGuid(0),
+        UserId = reader.GetGuid(1),
+        LogDate = reader.GetFieldValue<DateOnly>(2),
+        MoodRating = reader.GetInt16(3),
+        AnxietyLevel = reader.GetInt16(4),
+        StressLevel = reader.GetInt16(5),
+        SleepHours = reader.GetDecimal(6),
+        SleepQuality = reader.GetInt16(7),
+        SleepDisturbances = reader.GetFieldValue<string[]>(8)
+            .Select(Converters.ParseStored<SleepDisturbance>)
+            .ToList(),
+        ActivityType = reader.IsDBNull(9) ? null : Converters.ParseStored<ActivityType>(reader.GetString(9)),
+        ActivityMinutes = reader.IsDBNull(10) ? null : reader.GetInt16(10),
+        SocialFrequency = Converters.ParseStored<SocialFrequency>(reader.GetString(11)),
+        Symptoms = (List<Symptom>)SymptomsConverter.ConvertFromProvider(reader.GetString(12))!,
+        Notes = reader.IsDBNull(13) ? null : reader.GetString(13),
+        CreatedAt = reader.GetFieldValue<DateTimeOffset>(14),
+        UpdatedAt = reader.GetFieldValue<DateTimeOffset>(15),
+    };
 }
