@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MentalHealthTracker.Domain.Common;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -11,18 +12,21 @@ internal static class Converters
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
+    // Un valor guardado que ya no existe en la enum no se degrada a un valor por defecto:
+    // lanza InvalidOperationException (como hacía el First() sobre una secuencia vacía).
+    internal static TEnum ParseStored<TEnum>(string value)
+        where TEnum : struct, Enum =>
+        SnakeCaseEnum<TEnum>.TryParse(value, out var parsed)
+            ? parsed
+            : throw new InvalidOperationException($"Stored value '{value}' is not a valid {typeof(TEnum).Name}.");
+
     internal sealed class EnumSnakeCaseConverter<TEnum> : ValueConverter<TEnum, string>
         where TEnum : struct, Enum
     {
         public EnumSnakeCaseConverter()
             : base(
-                value => JsonNamingPolicy.SnakeCaseLower.ConvertName(value.ToString() ?? string.Empty),
-                value => Enum.Parse<TEnum>(Enum
-                    .GetNames<TEnum>()
-                    .First(name => string.Equals(
-                        JsonNamingPolicy.SnakeCaseLower.ConvertName(name),
-                        value,
-                        StringComparison.OrdinalIgnoreCase))))
+                value => SnakeCaseEnum<TEnum>.ToSnakeCase(value),
+                value => ParseStored<TEnum>(value))
         {
         }
     }
@@ -42,17 +46,8 @@ internal static class Converters
     {
         public EnumListToStringArrayConverter()
             : base(
-                value => value
-                    .Select(item => JsonNamingPolicy.SnakeCaseLower.ConvertName(item.ToString() ?? string.Empty))
-                    .ToList(),
-                value => value
-                    .Select(item => Enum.Parse<TEnum>(Enum
-                        .GetNames<TEnum>()
-                        .First(name => string.Equals(
-                            JsonNamingPolicy.SnakeCaseLower.ConvertName(name),
-                            item,
-                            StringComparison.OrdinalIgnoreCase))))
-                    .ToList())
+                value => value.Select(item => SnakeCaseEnum<TEnum>.ToSnakeCase(item)).ToList(),
+                value => value.Select(item => ParseStored<TEnum>(item)).ToList())
         {
         }
     }
