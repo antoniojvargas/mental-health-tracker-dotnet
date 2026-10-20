@@ -1,0 +1,1290 @@
+[
+  {
+    "logDate": "2030-04-17",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 5,
+    "sleepHours": 6.8,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 36,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-18",
+    "moodRating": 6,
+    "anxietyLevel": 5,
+    "stressLevel": 4,
+    "sleepHours": 7.0,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 35,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": "Good day, I felt energized.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-19",
+    "moodRating": 8,
+    "anxietyLevel": 4,
+    "stressLevel": 2,
+    "sleepHours": 7.8,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 37,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": "Had trouble sleeping, too much coffee.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-20",
+    "moodRating": 8,
+    "anxietyLevel": 3,
+    "stressLevel": 4,
+    "sleepHours": 7.0,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 26,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": "A bit of anxiety in the morning.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-21",
+    "moodRating": 4,
+    "anxietyLevel": 8,
+    "stressLevel": 7,
+    "sleepHours": 6.4,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-22",
+    "moodRating": 4,
+    "anxietyLevel": 7,
+    "stressLevel": 6,
+    "sleepHours": 5.3,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "insomnia"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 72,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-23",
+    "moodRating": 5,
+    "anxietyLevel": 5,
+    "stressLevel": 7,
+    "sleepHours": 5.9,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "early_waking"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": "A work-from-home day.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-24",
+    "moodRating": 7,
+    "anxietyLevel": 4,
+    "stressLevel": 3,
+    "sleepHours": 7.1,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-25",
+    "moodRating": 7,
+    "anxietyLevel": 3,
+    "stressLevel": 5,
+    "sleepHours": 7.6,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 83,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-26",
+    "moodRating": 8,
+    "anxietyLevel": 2,
+    "stressLevel": 3,
+    "sleepHours": 7.2,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 33,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-27",
+    "moodRating": 7,
+    "anxietyLevel": 5,
+    "stressLevel": 4,
+    "sleepHours": 7.1,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 90,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-28",
+    "moodRating": 4,
+    "anxietyLevel": 6,
+    "stressLevel": 6,
+    "sleepHours": 5.7,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-29",
+    "moodRating": 6,
+    "anxietyLevel": 4,
+    "stressLevel": 5,
+    "sleepHours": 5.3,
+    "sleepQuality": 3,
+    "sleepDisturbances": [
+      "insomnia"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 27,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-04-30",
+    "moodRating": 5,
+    "anxietyLevel": 7,
+    "stressLevel": 6,
+    "sleepHours": 6.4,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 37,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-01",
+    "moodRating": 9,
+    "anxietyLevel": 1,
+    "stressLevel": 3,
+    "sleepHours": 7.1,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 61,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-02",
+    "moodRating": 7,
+    "anxietyLevel": 5,
+    "stressLevel": 4,
+    "sleepHours": 6.8,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 60,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-03",
+    "moodRating": 6,
+    "anxietyLevel": 4,
+    "stressLevel": 4,
+    "sleepHours": 7.8,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 63,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-04",
+    "moodRating": 7,
+    "anxietyLevel": 5,
+    "stressLevel": 3,
+    "sleepHours": 6.5,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 87,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-05",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 7,
+    "sleepHours": 6.5,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 37,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-06",
+    "moodRating": 4,
+    "anxietyLevel": 8,
+    "stressLevel": 8,
+    "sleepHours": 5.3,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "frequent_waking"
+    ],
+    "activityType": "cycling",
+    "activityMinutes": 88,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-07",
+    "moodRating": 5,
+    "anxietyLevel": 5,
+    "stressLevel": 7,
+    "sleepHours": 6.1,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "yoga",
+    "activityMinutes": 38,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-08",
+    "moodRating": 7,
+    "anxietyLevel": 3,
+    "stressLevel": 3,
+    "sleepHours": 6.2,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-09",
+    "moodRating": 8,
+    "anxietyLevel": 3,
+    "stressLevel": 3,
+    "sleepHours": 7.0,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "cycling",
+    "activityMinutes": 48,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-10",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 6,
+    "sleepHours": 7.2,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 56,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-11",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 5,
+    "sleepHours": 7.4,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 68,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-12",
+    "moodRating": 4,
+    "anxietyLevel": 6,
+    "stressLevel": 7,
+    "sleepHours": 5.7,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 39,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-13",
+    "moodRating": 5,
+    "anxietyLevel": 5,
+    "stressLevel": 7,
+    "sleepHours": 5.6,
+    "sleepQuality": 4,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 25,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-14",
+    "moodRating": 4,
+    "anxietyLevel": 6,
+    "stressLevel": 7,
+    "sleepHours": 6.1,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 81,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-15",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 6,
+    "sleepHours": 6.5,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 89,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-16",
+    "moodRating": 8,
+    "anxietyLevel": 3,
+    "stressLevel": 4,
+    "sleepHours": 7.6,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 81,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": "A long call with the family.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-17",
+    "moodRating": 6,
+    "anxietyLevel": 5,
+    "stressLevel": 4,
+    "sleepHours": 7.3,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 56,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-18",
+    "moodRating": 5,
+    "anxietyLevel": 7,
+    "stressLevel": 6,
+    "sleepHours": 6.8,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 38,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-19",
+    "moodRating": 7,
+    "anxietyLevel": 3,
+    "stressLevel": 3,
+    "sleepHours": 6.4,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "early_waking"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 85,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-20",
+    "moodRating": 4,
+    "anxietyLevel": 7,
+    "stressLevel": 6,
+    "sleepHours": 5.4,
+    "sleepQuality": 3,
+    "sleepDisturbances": [
+      "insomnia"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-21",
+    "moodRating": 5,
+    "anxietyLevel": 5,
+    "stressLevel": 7,
+    "sleepHours": 6.4,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 25,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-22",
+    "moodRating": 7,
+    "anxietyLevel": 5,
+    "stressLevel": 5,
+    "sleepHours": 6.6,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "cycling",
+    "activityMinutes": 77,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-23",
+    "moodRating": 9,
+    "anxietyLevel": 1,
+    "stressLevel": 3,
+    "sleepHours": 7.8,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 71,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-24",
+    "moodRating": 9,
+    "anxietyLevel": 3,
+    "stressLevel": 1,
+    "sleepHours": 7.7,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 62,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-25",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 7,
+    "sleepHours": 7.4,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-26",
+    "moodRating": 4,
+    "anxietyLevel": 7,
+    "stressLevel": 7,
+    "sleepHours": 6.8,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-27",
+    "moodRating": 5,
+    "anxietyLevel": 7,
+    "stressLevel": 6,
+    "sleepHours": 5.7,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 60,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-28",
+    "moodRating": 8,
+    "anxietyLevel": 2,
+    "stressLevel": 3,
+    "sleepHours": 6.4,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 79,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-29",
+    "moodRating": 8,
+    "anxietyLevel": 2,
+    "stressLevel": 4,
+    "sleepHours": 7.0,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 55,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-30",
+    "moodRating": 7,
+    "anxietyLevel": 4,
+    "stressLevel": 3,
+    "sleepHours": 7.2,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-05-31",
+    "moodRating": 6,
+    "anxietyLevel": 6,
+    "stressLevel": 4,
+    "sleepHours": 7.4,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 78,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-01",
+    "moodRating": 5,
+    "anxietyLevel": 6,
+    "stressLevel": 6,
+    "sleepHours": 6.8,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-02",
+    "moodRating": 7,
+    "anxietyLevel": 5,
+    "stressLevel": 3,
+    "sleepHours": 6.2,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-03",
+    "moodRating": 4,
+    "anxietyLevel": 8,
+    "stressLevel": 7,
+    "sleepHours": 6.4,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "cycling",
+    "activityMinutes": 35,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-04",
+    "moodRating": 5,
+    "anxietyLevel": 5,
+    "stressLevel": 6,
+    "sleepHours": 5.8,
+    "sleepQuality": 4,
+    "sleepDisturbances": [
+      "early_waking"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-05",
+    "moodRating": 7,
+    "anxietyLevel": 4,
+    "stressLevel": 3,
+    "sleepHours": 6.4,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": "Little focus today.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-06",
+    "moodRating": 9,
+    "anxietyLevel": 1,
+    "stressLevel": 2,
+    "sleepHours": 7.4,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 33,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-07",
+    "moodRating": 5,
+    "anxietyLevel": 5,
+    "stressLevel": 5,
+    "sleepHours": 7.1,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-08",
+    "moodRating": 6,
+    "anxietyLevel": 6,
+    "stressLevel": 5,
+    "sleepHours": 6.4,
+    "sleepQuality": 7,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "gym",
+    "activityMinutes": 27,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-09",
+    "moodRating": 5,
+    "anxietyLevel": 7,
+    "stressLevel": 7,
+    "sleepHours": 6.0,
+    "sleepQuality": 4,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 65,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 3
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": "Went for a walk after lunch.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-10",
+    "moodRating": 6,
+    "anxietyLevel": 6,
+    "stressLevel": 6,
+    "sleepHours": 6.3,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 52,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-11",
+    "moodRating": 4,
+    "anxietyLevel": 8,
+    "stressLevel": 7,
+    "sleepHours": 6.0,
+    "sleepQuality": 4,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "running",
+    "activityMinutes": 27,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-12",
+    "moodRating": 4,
+    "anxietyLevel": 8,
+    "stressLevel": 7,
+    "sleepHours": 6.0,
+    "sleepQuality": 5,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "occasional",
+    "symptoms": [
+      {
+        "type": "fatigue",
+        "severity": 2
+      },
+      {
+        "type": "low_mood",
+        "severity": 1
+      }
+    ],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-13",
+    "moodRating": 9,
+    "anxietyLevel": 1,
+    "stressLevel": 2,
+    "sleepHours": 7.2,
+    "sleepQuality": 9,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 30,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": "A long call with the family.",
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-14",
+    "moodRating": 8,
+    "anxietyLevel": 4,
+    "stressLevel": 4,
+    "sleepHours": 7.3,
+    "sleepQuality": 8,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": null,
+    "activityMinutes": null,
+    "socialFrequency": "daily",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  },
+  {
+    "logDate": "2030-06-15",
+    "moodRating": 7,
+    "anxietyLevel": 3,
+    "stressLevel": 4,
+    "sleepHours": 6.4,
+    "sleepQuality": 6,
+    "sleepDisturbances": [
+      "none"
+    ],
+    "activityType": "walking",
+    "activityMinutes": 74,
+    "socialFrequency": "frequent",
+    "symptoms": [],
+    "notes": null,
+    "createdAt": "2030-06-15T12:00:00.0000000\u002B00:00",
+    "updatedAt": "2030-06-15T12:00:00.0000000\u002B00:00"
+  }
+]
