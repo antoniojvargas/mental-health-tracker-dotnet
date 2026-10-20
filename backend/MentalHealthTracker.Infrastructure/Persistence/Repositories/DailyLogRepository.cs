@@ -142,6 +142,7 @@ public sealed class DailyLogRepository(AppDbContext dbContext, TimeProvider time
 
     public async Task<DailyLog?> FindByUserAndDateAsync(Guid userId, DateOnly logDate, CancellationToken cancellationToken = default)
         => await dbContext.DailyLogs
+            .AsNoTracking()
             .SingleOrDefaultAsync(log => log.UserId == userId && log.LogDate == logDate, cancellationToken);
 
     public async Task<PagedResult<DailyLog>> FindByUserAndRangeAsync(
@@ -153,6 +154,7 @@ public sealed class DailyLogRepository(AppDbContext dbContext, TimeProvider time
         CancellationToken cancellationToken = default)
     {
         var query = dbContext.DailyLogs
+            .AsNoTracking()
             .Where(log => log.UserId == userId && log.LogDate >= fromDate && log.LogDate <= toDate);
 
         var total = await query.CountAsync(cancellationToken);
