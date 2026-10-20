@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MentalHealthTracker.Domain.Common;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -10,6 +11,12 @@ internal static class Converters
     internal static readonly JsonSerializerOptions SnakeCaseJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+
+        // El jsonb de symptoms guarda el tipo como snake_case ("low_mood"). Antes lo daba el
+        // atributo de la enum; ahora el dominio no sabe de JSON y lo aporta esta opción. Es el
+        // convertidor de System.Text.Json con la misma política de nombres que el de la API
+        // (Infrastructure no puede referenciar Api) y sin aceptar números.
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false) },
     };
 
     // Un valor guardado que ya no existe en la enum no se degrada a un valor por defecto:

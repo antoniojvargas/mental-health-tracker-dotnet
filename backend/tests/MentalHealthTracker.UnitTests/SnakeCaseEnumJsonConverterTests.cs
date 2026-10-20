@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MentalHealthTracker.Api.Core.Serialization;
 using MentalHealthTracker.Domain.Enums;
 
 namespace MentalHealthTracker.UnitTests;
@@ -6,10 +7,15 @@ namespace MentalHealthTracker.UnitTests;
 // Pruebas de caracterización de SnakeCaseEnumJsonConverter: el contrato de las cuatro
 // enums que viajan por la API. Los strings esperados están escritos a mano (no derivados
 // del propio convertidor) para que renombrar un miembro de la enum rompa el contrato a la
-// vista. No se pasa JsonSerializerOptions: el convertidor llega por el atributo de cada enum,
-// igual que en la API.
+// vista. El convertidor ya no va en un atributo de las enums (el dominio no sabe de JSON): se
+// pasa en las opciones, igual que lo registra la API.
 public sealed class SnakeCaseEnumJsonConverterTests
 {
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        Converters = { new SnakeCaseEnumJsonConverter() },
+    };
+
     public static TheoryData<ActivityType, string> ActivityTypes => new()
     {
         { ActivityType.None, "none" },
@@ -87,15 +93,15 @@ public sealed class SnakeCaseEnumJsonConverterTests
     [InlineData("\"frequent_waking\"")]
     public void Read_IsCaseInsensitive(string json)
     {
-        Assert.Equal(SleepDisturbance.FrequentWaking, JsonSerializer.Deserialize<SleepDisturbance>(json));
+        Assert.Equal(SleepDisturbance.FrequentWaking, JsonSerializer.Deserialize<SleepDisturbance>(json, Options));
     }
 
     [Fact]
     public void Read_IsCaseInsensitiveForEveryEnum()
     {
-        Assert.Equal(SymptomType.AppetiteChange, JsonSerializer.Deserialize<SymptomType>("\"APPETITE_CHANGE\""));
-        Assert.Equal(ActivityType.Walking, JsonSerializer.Deserialize<ActivityType>("\"WALKING\""));
-        Assert.Equal(SocialFrequency.Daily, JsonSerializer.Deserialize<SocialFrequency>("\"Daily\""));
+        Assert.Equal(SymptomType.AppetiteChange, JsonSerializer.Deserialize<SymptomType>("\"APPETITE_CHANGE\"", Options));
+        Assert.Equal(ActivityType.Walking, JsonSerializer.Deserialize<ActivityType>("\"WALKING\"", Options));
+        Assert.Equal(SocialFrequency.Daily, JsonSerializer.Deserialize<SocialFrequency>("\"Daily\"", Options));
     }
 
     [Theory]
@@ -110,29 +116,29 @@ public sealed class SnakeCaseEnumJsonConverterTests
     {
         // El PascalCase de la enum y otras variantes no son equivalentes: solo cuenta el
         // snake_case, comparado sin distinguir mayúsculas.
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>(json));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>(json, Options));
     }
 
     [Fact]
     public void Read_UnknownValue_ThrowsJsonExceptionForEveryEnum()
     {
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ActivityType>("\"swimming\""));
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SocialFrequency>("\"sometimes\""));
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("\"sadness\""));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<ActivityType>("\"swimming\"", Options));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SocialFrequency>("\"sometimes\"", Options));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("\"sadness\"", Options));
     }
 
     [Fact]
     public void Read_Null_ThrowsJsonException()
     {
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>("null"));
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("null"));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>("null", Options));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("null", Options));
     }
 
     // Los mensajes forman parte del contrato de error: llegan al cliente dentro del 400.
     [Fact]
     public void Read_UnknownValue_HasTheExactMessage()
     {
-        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>("\"unknown\""));
+        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SleepDisturbance>("\"unknown\"", Options));
 
         Assert.Equal("Invalid value 'unknown' for enum SleepDisturbance.", exception.Message);
     }
@@ -140,7 +146,7 @@ public sealed class SnakeCaseEnumJsonConverterTests
     [Fact]
     public void Read_Null_HasTheExactMessage()
     {
-        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("null"));
+        var exception = Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<SymptomType>("null", Options));
 
         Assert.Equal("Invalid value for enum SymptomType: expected a string.", exception.Message);
     }
@@ -148,20 +154,20 @@ public sealed class SnakeCaseEnumJsonConverterTests
     [Fact]
     public void Read_NullInsideAnObject_ThrowsJsonException()
     {
-        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Holder>("""{"Activity":null}"""));
+        Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<Holder>("""{"Activity":null}""", Options));
     }
 
     [Fact]
     public void Read_NullForNullableEnum_YieldsNull()
     {
         // Con el tipo anulable el serializador resuelve el null sin llamar al convertidor.
-        Assert.Null(JsonSerializer.Deserialize<ActivityType?>("null"));
+        Assert.Null(JsonSerializer.Deserialize<ActivityType?>("null", Options));
     }
 
     [Fact]
     public void Write_UsesTheSameStringsInsideAnObjectAndAList()
     {
-        var json = JsonSerializer.Serialize(new Holder(ActivityType.Cycling, [SleepDisturbance.EarlyWaking]));
+        var json = JsonSerializer.Serialize(new Holder(ActivityType.Cycling, [SleepDisturbance.EarlyWaking]), Options);
 
         Assert.Equal("""{"Activity":"cycling","Sleep":["early_waking"]}""", json);
     }
@@ -169,11 +175,22 @@ public sealed class SnakeCaseEnumJsonConverterTests
     private static void AssertRoundTrip<T>(T value, string text)
         where T : struct, Enum
     {
-        var json = JsonSerializer.Serialize(value);
+        var json = JsonSerializer.Serialize(value, Options);
 
         Assert.Equal($"\"{text}\"", json);
-        Assert.Equal(value, JsonSerializer.Deserialize<T>(json));
+        Assert.Equal(value, JsonSerializer.Deserialize<T>(json, Options));
     }
 
     private sealed record Holder(ActivityType Activity, SleepDisturbance[]? Sleep = null);
+
+    // El dominio no depende de System.Text.Json: ninguna enum lleva [JsonConverter].
+    [Theory]
+    [InlineData(typeof(ActivityType))]
+    [InlineData(typeof(SleepDisturbance))]
+    [InlineData(typeof(SocialFrequency))]
+    [InlineData(typeof(SymptomType))]
+    public void DomainEnums_DoNotCarryAJsonConverterAttribute(Type enumType)
+    {
+        Assert.Empty(enumType.GetCustomAttributes(typeof(System.Text.Json.Serialization.JsonConverterAttribute), inherit: true));
+    }
 }

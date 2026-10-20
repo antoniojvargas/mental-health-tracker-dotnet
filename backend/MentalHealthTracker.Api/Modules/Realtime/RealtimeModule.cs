@@ -1,3 +1,5 @@
+using MentalHealthTracker.Api.Core.Serialization;
+
 namespace MentalHealthTracker.Api.Modules.Realtime;
 
 public static class RealtimeModule
@@ -11,7 +13,9 @@ public static class RealtimeModule
     // conexiones al apagar el host.
     public static IServiceCollection AddRealtimeModule(this IServiceCollection services)
     {
-        services.AddSignalR();
+        services.AddSignalR()
+            .AddJsonProtocol(options =>
+                options.PayloadSerializerOptions.Converters.Add(new SnakeCaseEnumJsonConverter()));
         services.AddSingleton<SignalRConnectionTracker>();
         services.AddScoped<ILogEventEmitter, LogEventEmitter>();
         services.AddHostedService<Core.Hosting.GracefulShutdownService>();

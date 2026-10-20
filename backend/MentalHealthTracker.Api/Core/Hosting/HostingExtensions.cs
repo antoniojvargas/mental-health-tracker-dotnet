@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Core.Exceptions;
+using MentalHealthTracker.Api.Core.Serialization;
 using MentalHealthTracker.Api.Core.Validation;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -25,9 +26,12 @@ public static class HostingExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.AddControllers(options =>
-        {
-            options.Filters.Add<FluentValidationActionFilter>();
-        });
+            {
+                options.Filters.Add<FluentValidationActionFilter>();
+            })
+            .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new SnakeCaseEnumJsonConverter()));
+        services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.Converters.Add(new SnakeCaseEnumJsonConverter()));
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
 

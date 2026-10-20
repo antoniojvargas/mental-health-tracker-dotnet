@@ -1,3 +1,4 @@
+using MentalHealthTracker.Domain.Common;
 using MentalHealthTracker.Domain.Enums;
 using MentalHealthTracker.Domain.ValueObjects;
 using MentalHealthTracker.Infrastructure.Persistence;
@@ -99,6 +100,23 @@ public sealed class PersistenceConvertersTests
     }
 
     // --- JsonListConverter<Symptom> ---
+
+    // El jsonb ya no depende de un atributo en la enum: el convertidor viene de SnakeCaseJsonOptions.
+    [Fact]
+    public void JsonList_Symptom_RoundTripsEverySymptomTypeWithItsSnakeCaseName()
+    {
+        var converter = new Converters.JsonListConverter<Symptom>();
+        var symptoms = Enum.GetValues<SymptomType>().Select(type => new Symptom(type, 2)).ToList();
+
+        var json = (string)converter.ConvertToProvider(symptoms)!;
+
+        foreach (var type in Enum.GetValues<SymptomType>())
+        {
+            Assert.Contains($"\"type\":\"{SnakeCaseEnum<SymptomType>.ToSnakeCase(type)}\"", json, StringComparison.Ordinal);
+        }
+
+        Assert.Equal(symptoms, (List<Symptom>)converter.ConvertFromProvider(json)!);
+    }
 
     [Fact]
     public void JsonList_Symptom_WritesTheExactJson()

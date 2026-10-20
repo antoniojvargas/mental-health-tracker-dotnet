@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using MentalHealthTracker.Api.Core.Serialization;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Domain.Models;
@@ -72,6 +73,8 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
                 options.HttpMessageHandlerFactory = _ => Factory.Server.CreateHandler();
                 options.Headers["Cookie"] = $"{SessionCookie.AccessTokenName}={token}";
             })
+            .AddJsonProtocol(options =>
+                options.PayloadSerializerOptions.Converters.Add(new SnakeCaseEnumJsonConverter()))
             .Build();
     }
 

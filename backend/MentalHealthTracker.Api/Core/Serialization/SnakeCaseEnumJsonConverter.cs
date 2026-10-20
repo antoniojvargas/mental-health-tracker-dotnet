@@ -2,7 +2,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using MentalHealthTracker.Domain.Common;
 
-namespace MentalHealthTracker.Domain.Enums;
+namespace MentalHealthTracker.Api.Core.Serialization;
+
+// Serialización de las enums del dominio como snake_case en el cable (HTTP y SignalR). El dominio
+// no sabe de JSON: este convertidor se registra en las opciones de MVC, de Http.Json y del
+// protocolo de SignalR (ver AddApiCore y AddRealtimeModule), no con un atributo en cada enum.
 
 public sealed class SnakeCaseEnumJsonConverter : JsonConverterFactory
 {
