@@ -13,6 +13,12 @@ public static class SerilogConfigurationExtensions
                 .Destructure.With(new RedactSensitiveHeadersPolicy())
                 .Enrich.FromLogContext()
                 .MinimumLevel.Is(ReadMinimumLevel())
+                // La línea de cada petición la escribe el registro de peticiones de Serilog
+                // (RequestLogging). Sin esto ASP.NET Core añade, en Information y por cada
+                // petición (incluido el sondeo de /api/health), "Request starting/finished",
+                // "Executing/Executed endpoint" o "Writing value of type...". Los avisos y
+                // errores del framework siguen saliendo.
+                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
                 .ConsoleFormatter(context.HostingEnvironment));
     }
 
