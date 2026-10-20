@@ -1,7 +1,6 @@
 using FluentValidation;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
-using MentalHealthTracker.Api.Modules.DailyLog.Validators;
 using MentalHealthTracker.Api.Modules.Realtime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
@@ -14,14 +13,13 @@ namespace MentalHealthTracker.UnitTests;
 public sealed class DailyLogAndRealtimeModuleTests
 {
     [Fact]
-    public void AddDailyLogModule_RegistersOneSingletonValidatorPerRequestAndTheScopedService()
+    public void AddDailyLogModule_RegistersTheScopedServiceAndNoValidators()
     {
         var services = new ServiceCollection().AddDailyLogModule();
 
-        AssertRegistration<IValidator<CreateDailyLogRequest>, CreateDailyLogValidator>(services, ServiceLifetime.Singleton);
-        AssertRegistration<IValidator<ListDailyLogsQuery>, ListDailyLogsQueryValidator>(services, ServiceLifetime.Singleton);
-        AssertRegistration<IValidator<TodayQuery>, TodayQueryValidator>(services, ServiceLifetime.Singleton);
         AssertRegistration<IDailyLogService, DailyLogService>(services, ServiceLifetime.Scoped);
+        Assert.DoesNotContain(services, d => d.ServiceType.IsGenericType
+            && d.ServiceType.GetGenericTypeDefinition() == typeof(IValidator<>));
     }
 
     [Fact]

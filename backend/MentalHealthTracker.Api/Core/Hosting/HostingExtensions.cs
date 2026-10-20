@@ -32,6 +32,7 @@ public static class HostingExtensions
             .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new SnakeCaseEnumJsonConverter()));
         services.ConfigureHttpJsonOptions(options =>
             options.SerializerOptions.Converters.Add(new SnakeCaseEnumJsonConverter()));
+        services.AddValidatorsFromAssembly(typeof(ValidatorRegistration).Assembly);
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
 
