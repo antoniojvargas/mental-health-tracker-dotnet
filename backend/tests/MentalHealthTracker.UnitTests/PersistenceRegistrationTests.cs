@@ -3,6 +3,7 @@ using MentalHealthTracker.Infrastructure;
 using MentalHealthTracker.Infrastructure.Persistence;
 using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -63,7 +64,7 @@ public sealed class PersistenceRegistrationTests
 
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        Assert.Equal(ConnectionString, dbContext.Database.GetConnectionString());
+        AssertPointsAtTheConfiguredDatabase(dbContext.Database.GetConnectionString());
         Assert.Equal("Npgsql.EntityFrameworkCore.PostgreSQL", dbContext.Database.ProviderName);
     }
 
@@ -78,8 +79,42 @@ public sealed class PersistenceRegistrationTests
         mutable.AddInMemoryCollection(new Dictionary<string, string?> { ["Database:ConnectionString"] = ConnectionString });
         using var scope = provider.CreateScope();
 
-        Assert.Equal(
-            ConnectionString,
+        AssertPointsAtTheConfiguredDatabase(
             scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.GetConnectionString());
+    }
+
+    // Con un NpgsqlDataSource la cadena que expone EF no incluye la contraseña.
+    private static void AssertPointsAtTheConfiguredDatabase(string? connectionString)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+
+        Assert.Equal("localhost", builder.Host);
+        Assert.Equal(5432, builder.Port);
+        Assert.Equal("persistence", builder.Database);
+        Assert.Equal("u", builder.Username);
+    }
+
+    [Fact]
+    public void ThereIsOneSharedNpgsqlDataSourceAcrossScopes()
+    {
+        using var provider = Build(ConfigurationWith(ConnectionString));
+        using var first = provider.CreateScope();
+        using var second = provider.CreateScope();
+
+        var dataSource = provider.GetRequiredService<NpgsqlDataSource>();
+
+        Assert.Same(dataSource, second.ServiceProvider.GetRequiredService<NpgsqlDataSource>());
+        Assert.Same(dataSource, first.ServiceProvider.GetRequiredService<NpgsqlDataSource>());
+    }
+
+    [Fact]
+    public void TheDataSourceIsDisposedWithTheContainer()
+    {
+        var provider = Build(ConfigurationWith(ConnectionString));
+        var dataSource = provider.GetRequiredService<NpgsqlDataSource>();
+
+        provider.Dispose();
+
+        Assert.ThrowsAny<ObjectDisposedException>(() => dataSource.CreateConnection().Open());
     }
 }

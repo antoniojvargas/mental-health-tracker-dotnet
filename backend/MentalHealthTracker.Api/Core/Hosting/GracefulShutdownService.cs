@@ -11,6 +11,7 @@ namespace MentalHealthTracker.Api.Core.Hosting;
 // proceso sale forzado por timeout.
 public sealed partial class GracefulShutdownService(
     SignalRConnectionTracker signalRConnections,
+    NpgsqlDataSource dataSource,
     ILogger<GracefulShutdownService> logger) : IHostedService
 {
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -21,7 +22,7 @@ public sealed partial class GracefulShutdownService(
         signalRConnections.CloseAllConnections();
 
         LogClosingPool(logger);
-        NpgsqlConnection.ClearAllPools();
+        dataSource.Clear();
 
         return Task.CompletedTask;
     }

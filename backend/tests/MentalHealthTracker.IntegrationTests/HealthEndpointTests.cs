@@ -1,9 +1,7 @@
 using System.Net;
 using System.Text.Json;
-using MentalHealthTracker.Api.Core.Configuration;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -28,14 +26,13 @@ public sealed class HealthEndpointTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Health_WithUnreachableDatabase_Returns503WithErrorBody()
     {
-        await using var unreachable = Factory.WithWebHostBuilder(builder =>
-            builder.ConfigureTestServices(services =>
-                services.AddSingleton<IOptions<DatabaseOptions>>(Options.Create(new DatabaseOptions
-                {
-                    ConnectionString = "Host=localhost;Port=1;Database=x;Username=x;Password=x;Timeout=2",
-                }))));
+        // Host propio (su propio NpgsqlDataSource) cuya fuente de conexiones deja de servirlas:
+        // el health check no puede abrir conexión y debe contestar 503, no propagar el error.
+        await using var unreachable = Factory.WithWebHostBuilder(_ => { });
+        var client = unreachable.CreateClient();
+        await unreachable.Services.GetRequiredService<NpgsqlDataSource>().DisposeAsync();
 
-        var response = await unreachable.CreateClient().GetAsync("/api/health");
+        var response = await client.GetAsync("/api/health");
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());

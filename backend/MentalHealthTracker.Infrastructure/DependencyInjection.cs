@@ -4,6 +4,7 @@ using MentalHealthTracker.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace MentalHealthTracker.Infrastructure;
 
@@ -20,10 +21,14 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        // La cadena se lee al crear el contexto, no al registrarlo: así lo que añadan los
-        // proveedores de configuración después (p. ej. los tests de integración) también cuenta.
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration[ConnectionStringKey]));
+        // Un único NpgsqlDataSource para toda la aplicación: EF Core, el health check y el cierre
+        // ordenado comparten su pool de conexiones. La cadena se lee al crearlo (la primera vez
+        // que alguien lo pide), no al registrarlo: así lo que añadan los proveedores de
+        // configuración después (p. ej. los tests de integración) también cuenta. El contenedor
+        // lo libera al apagar el host.
+        services.AddSingleton(_ => new NpgsqlDataSourceBuilder(configuration[ConnectionStringKey]).Build());
+        services.AddDbContext<AppDbContext>((provider, options) =>
+            options.UseNpgsql(provider.GetRequiredService<NpgsqlDataSource>()));
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IDailyLogRepository, DailyLogRepository>();

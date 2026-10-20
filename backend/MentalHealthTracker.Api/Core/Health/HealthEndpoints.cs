@@ -24,7 +24,7 @@ public static partial class HealthEndpoints
         _ = app.ServiceProvider.GetRequiredService<ApplicationUptime>();
 
         app.MapGet("/api/health", async (
-            IOptions<DatabaseOptions> databaseOptions,
+            NpgsqlDataSource dataSource,
             ApplicationUptime applicationUptime,
             ILogger<Program> logger) =>
         {
@@ -32,8 +32,7 @@ public static partial class HealthEndpoints
 
             try
             {
-                await using var connection = new NpgsqlConnection(databaseOptions.Value.ConnectionString);
-                await connection.OpenAsync();
+                await using var connection = await dataSource.OpenConnectionAsync();
                 await using var command = connection.CreateCommand();
                 command.CommandText = "SELECT 1";
                 await command.ExecuteScalarAsync();
