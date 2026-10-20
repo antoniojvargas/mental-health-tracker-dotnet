@@ -50,7 +50,7 @@ public static partial class DatabaseInitializer
             // SocketException: con Npgsql 9.x un host que no resuelve por DNS (la base aún no
             // existe en la red) llega sin envolver en NpgsqlException. Es el mismo caso de
             // "la base no está lista" y debe reintentarse igual.
-            catch (Exception exception) when (exception is NpgsqlException or TimeoutException or SocketException)
+            catch (Exception exception) when (IsDatabaseNotReady(exception))
             {
                 if (attempt == MaxAttempts)
                 {
@@ -64,6 +64,14 @@ public static partial class DatabaseInitializer
             }
         }
     }
+
+    // "La base aún no está lista": un error de Npgsql, un timeout o un fallo de socket. Al abrir la
+    // conexión a través de EF, un timeout llega envuelto en una InvalidOperationException
+    // ("likely due to a transient failure"), así que se mira también la causa; una
+    // InvalidOperationException sin esa causa no es un problema de disponibilidad y no se reintenta.
+    internal static bool IsDatabaseNotReady(Exception exception) =>
+        exception is NpgsqlException or TimeoutException or SocketException
+        || (exception is InvalidOperationException { InnerException: { } inner } && IsDatabaseNotReady(inner));
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Applying pending database migrations")]
     private static partial void LogApplyingMigrations(ILogger logger);
