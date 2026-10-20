@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using FluentValidation;
 using FluentValidation.Internal;
+using MentalHealthTracker.Api.Core.Validation;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -27,7 +28,7 @@ public sealed class FluentValidationSchemaFilter(IServiceProvider serviceProvide
 
         AddNonNullableRequired(context.Type, openApiSchema, properties);
 
-        var validator = ResolveValidator(context.Type);
+        var validator = ValidatorResolver.Resolve(serviceProvider, context.Type);
         if (validator is null || validator is not IEnumerable<IValidationRule> rules)
         {
             return;
@@ -88,7 +89,4 @@ public sealed class FluentValidationSchemaFilter(IServiceProvider serviceProvide
 
     private static string ToOpenApiName(string propertyName) =>
         JsonNamingPolicy.CamelCase.ConvertName(propertyName);
-
-    private IValidator? ResolveValidator(Type type) =>
-        serviceProvider.GetService(typeof(IValidator<>).MakeGenericType(type)) as IValidator;
 }

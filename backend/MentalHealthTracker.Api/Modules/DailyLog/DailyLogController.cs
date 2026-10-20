@@ -1,3 +1,4 @@
+using MentalHealthTracker.Api.Core.Errors;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
@@ -24,10 +25,7 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
     [EnableRateLimiting(WriteRateLimitPolicy)]
     [ProducesResponseType(typeof(DailyLogResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(DailyLogResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesStandardErrors]
     public async Task<IActionResult> Upsert(
         CreateDailyLogRequest request,
         CancellationToken cancellationToken)
@@ -41,10 +39,7 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
 
     [HttpGet]
     [ProducesResponseType(typeof(DailyLogListResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesStandardErrors]
     public async Task<IActionResult> List(
         [FromQuery] ListDailyLogsQuery query,
         CancellationToken cancellationToken)
@@ -56,11 +51,7 @@ public sealed class DailyLogController(IDailyLogService dailyLogService) : Contr
 
     [HttpGet("today")]
     [ProducesResponseType(typeof(DailyLogResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesStandardErrors(NotFound = true)]
     public async Task<IActionResult> GetToday(
         [FromQuery] TodayQuery query,
         CancellationToken cancellationToken)

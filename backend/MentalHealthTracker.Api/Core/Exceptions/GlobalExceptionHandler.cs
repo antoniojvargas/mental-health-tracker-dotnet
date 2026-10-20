@@ -10,6 +10,19 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
         Exception exception,
         CancellationToken cancellationToken)
     {
+        // El cliente ya no está (cerró la conexión o abortó la petición): no hay a quién escribirle
+        // un cuerpo y no es un error del servidor. Se anota en Debug y se termina.
+        if (exception is OperationCanceledException && httpContext.RequestAborted.IsCancellationRequested)
+        {
+            LogRequestAborted(logger);
+            if (!httpContext.Response.HasStarted)
+            {
+                httpContext.Response.StatusCode = StatusCodeForAbortedRequest;
+            }
+
+            return true;
+        }
+
         var (statusCode, body) = exception switch
         {
             AppException appException => (
@@ -25,9 +38,12 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
                 new ErrorBody(ErrorCodes.InternalError, "An unexpected error occurred.", [])),
         };
 
-        if (exception is AppException)
+        // Un AppException es un resultado esperado de la API (validación, 401, 404...): Information,
+        // con el código como propiedad estructurada y sin volcar la traza. Solo lo inesperado
+        // lleva la excepción entera (con su stack) en nivel Error.
+        if (exception is AppException appError)
         {
-            LogHandledAppException(logger, exception);
+            LogHandledAppException(logger, appError.Code, appError.StatusCode, appError.Message);
         }
         else
         {
@@ -39,11 +55,18 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
         return true;
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Exception handled while processing request")]
-    private static partial void LogHandledAppException(ILogger logger, Exception exception);
+    // 499 (el que usa nginx para "el cliente cerró la conexión"): sin él la petición abortada
+    // figuraría como un 200 en los registros de acceso y las métricas.
+    private const int StatusCodeForAbortedRequest = 499;
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Exception handled while processing request")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "Request rejected with {ErrorCode} ({StatusCode}): {ErrorMessage}")]
+    private static partial void LogHandledAppException(ILogger logger, string errorCode, int statusCode, string errorMessage);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception while processing request")]
     private static partial void LogHandledUnexpectedException(ILogger logger, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Request aborted by the client")]
+    private static partial void LogRequestAborted(ILogger logger);
 }
 
 public sealed record ErrorResponse(ErrorBody Error);

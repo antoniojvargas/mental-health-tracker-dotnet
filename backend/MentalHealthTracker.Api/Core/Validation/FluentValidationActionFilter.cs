@@ -15,8 +15,7 @@ public sealed class FluentValidationActionFilter(IServiceProvider serviceProvide
                 continue;
             }
 
-            var validatorType = typeof(IValidator<>).MakeGenericType(instance.GetType());
-            if (serviceProvider.GetService(validatorType) is not IValidator validator)
+            if (ValidatorResolver.Resolve(serviceProvider, instance.GetType()) is not { } validator)
             {
                 continue;
             }

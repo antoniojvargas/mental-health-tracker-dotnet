@@ -2,6 +2,7 @@ using System.Text.Json;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Domain.Errors;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -117,7 +118,7 @@ public sealed class GlobalExceptionHandlerTests
     }
 
     [Fact]
-    public async Task AppException_IsLoggedAsInformation()
+    public async Task AppException_IsLoggedAsInformationWithoutAStackTrace()
     {
         var logger = new CapturingLogger();
 
@@ -125,11 +126,25 @@ public sealed class GlobalExceptionHandlerTests
 
         var entry = Assert.Single(logger.Entries);
         Assert.Equal(LogLevel.Information, entry.Level);
-        Assert.IsType<NotFoundException>(entry.Exception);
+        Assert.Null(entry.Exception);
     }
 
     [Fact]
-    public async Task GenericException_IsLoggedAsError()
+    public async Task AppException_LogsItsCodeStatusAndMessageAsStructuredProperties()
+    {
+        var logger = new CapturingLogger();
+
+        await HandleAsync(new NotFoundException("Route /api/x does not exist"), logger);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal("NOT_FOUND", entry.Properties["ErrorCode"]);
+        Assert.Equal(404, entry.Properties["StatusCode"]);
+        Assert.Equal("Route /api/x does not exist", entry.Properties["ErrorMessage"]);
+        Assert.Equal("Request rejected with NOT_FOUND (404): Route /api/x does not exist", entry.Message);
+    }
+
+    [Fact]
+    public async Task GenericException_IsLoggedAsErrorWithItsStackTrace()
     {
         var logger = new CapturingLogger();
 
@@ -140,7 +155,85 @@ public sealed class GlobalExceptionHandlerTests
         Assert.IsType<InvalidOperationException>(entry.Exception);
     }
 
-    private sealed record Entry(LogLevel Level, Exception? Exception);
+    [Fact]
+    public async Task OperationCanceled_WhenTheRequestWasAborted_IsLoggedAsDebugAndWritesNoBody()
+    {
+        var logger = new CapturingLogger();
+        using var aborted = new CancellationTokenSource();
+        var context = NewContext(aborted.Token);
+        await aborted.CancelAsync();
+        var handler = new GlobalExceptionHandler(logger);
+
+        var handled = await handler.TryHandleAsync(context, new OperationCanceledException(aborted.Token), CancellationToken.None);
+
+        Assert.True(handled);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Debug, entry.Level);
+        Assert.Null(entry.Exception);
+        Assert.Equal(0, context.Response.Body.Length);
+        Assert.Null(context.Response.ContentType);
+        Assert.Equal(499, context.Response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TaskCanceled_WhenTheRequestWasAborted_IsTreatedTheSameWay()
+    {
+        var logger = new CapturingLogger();
+        using var aborted = new CancellationTokenSource();
+        var context = NewContext(aborted.Token);
+        await aborted.CancelAsync();
+
+        await new GlobalExceptionHandler(logger).TryHandleAsync(context, new TaskCanceledException(), CancellationToken.None);
+
+        Assert.Equal(LogLevel.Debug, Assert.Single(logger.Entries).Level);
+        Assert.Equal(0, context.Response.Body.Length);
+    }
+
+    [Fact]
+    public async Task OperationCanceled_WhenTheRequestWasNotAborted_IsAnUnexpectedError()
+    {
+        var logger = new CapturingLogger();
+        var context = NewContext(CancellationToken.None);
+
+        var handled = await new GlobalExceptionHandler(logger).TryHandleAsync(
+            context, new OperationCanceledException("internal timeout"), CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(500, context.Response.StatusCode);
+        context.Response.Body.Position = 0;
+        Assert.Contains("INTERNAL_ERROR", await new StreamReader(context.Response.Body).ReadToEndAsync());
+        Assert.Equal(LogLevel.Error, Assert.Single(logger.Entries).Level);
+    }
+
+    [Fact]
+    public async Task OperationCanceled_WhenTheResponseAlreadyStarted_DoesNotTouchTheStatus()
+    {
+        var logger = new CapturingLogger();
+        using var aborted = new CancellationTokenSource();
+        var context = NewContext(aborted.Token);
+        context.Features.Set<IHttpResponseFeature>(new StartedResponseFeature());
+        await aborted.CancelAsync();
+
+        var handled = await new GlobalExceptionHandler(logger).TryHandleAsync(
+            context, new OperationCanceledException(aborted.Token), CancellationToken.None);
+
+        Assert.True(handled);
+        Assert.Equal(200, context.Response.StatusCode);
+    }
+
+    private static DefaultHttpContext NewContext(CancellationToken requestAborted)
+    {
+        var context = new DefaultHttpContext { RequestAborted = requestAborted };
+        context.Response.Body = new MemoryStream();
+        return context;
+    }
+
+    private sealed class StartedResponseFeature : HttpResponseFeature
+    {
+        public override bool HasStarted => true;
+    }
+
+    private sealed record Entry(LogLevel Level, string Message, Exception? Exception, Dictionary<string, object?> Properties);
 
     private sealed class CapturingLogger : ILogger<GlobalExceptionHandler>
     {
@@ -152,7 +245,12 @@ public sealed class GlobalExceptionHandlerTests
 
         public void Log<TState>(
             LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
-            Entries.Add(new Entry(logLevel, exception));
+            Func<TState, Exception?, string> formatter)
+        {
+            var properties = state is IEnumerable<KeyValuePair<string, object?>> pairs
+                ? pairs.ToDictionary(pair => pair.Key, pair => pair.Value)
+                : [];
+            Entries.Add(new Entry(logLevel, formatter(state, exception), exception, properties));
+        }
     }
 }

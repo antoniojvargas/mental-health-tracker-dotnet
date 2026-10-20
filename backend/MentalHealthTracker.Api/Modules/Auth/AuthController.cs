@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Api.Core.Errors;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Domain.Errors;
 using MentalHealthTracker.Domain.Repositories;
@@ -40,10 +41,7 @@ public sealed partial class AuthController(
     [HttpGet(AuthRoutes.GoogleCallbackPath)]
     [EnableRateLimiting(AuthRateLimitPolicy)]
     [ProducesResponseType(StatusCodes.Status302Found)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesStandardErrors]
     public async Task<IActionResult> GoogleCallback(
         [FromQuery] string? state,
         [FromQuery] string? code,
@@ -80,10 +78,7 @@ public sealed partial class AuthController(
     [HttpGet("me")]
     [RequireAuth]
     [ProducesResponseType(typeof(UserResponse), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesStandardErrors]
     public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         if (!User.TryGetUserId(out var userId))
@@ -103,10 +98,7 @@ public sealed partial class AuthController(
 
     [HttpPost("logout")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status401Unauthorized)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status429TooManyRequests)]
-    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status500InternalServerError)]
+    [ProducesStandardErrors]
     public IActionResult Logout()
     {
         Response.Cookies.Delete(SessionCookie.AccessTokenName, cookieOptions.Create());
