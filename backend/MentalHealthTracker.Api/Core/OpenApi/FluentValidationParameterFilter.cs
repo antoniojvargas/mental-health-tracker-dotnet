@@ -1,5 +1,6 @@
 using FluentValidation;
 using FluentValidation.Internal;
+using MentalHealthTracker.Api.Core.Validation;
 using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -22,7 +23,7 @@ public sealed class FluentValidationParameterFilter(IServiceProvider serviceProv
             return;
         }
 
-        var validator = ResolveValidator(declaringType);
+        var validator = ValidatorResolver.Resolve(serviceProvider, declaringType);
         if (validator is null)
         {
             return;
@@ -41,7 +42,4 @@ public sealed class FluentValidationParameterFilter(IServiceProvider serviceProv
             }
         }
     }
-
-    private IValidator? ResolveValidator(Type type) =>
-        serviceProvider.GetService(typeof(IValidator<>).MakeGenericType(type)) as IValidator;
 }
