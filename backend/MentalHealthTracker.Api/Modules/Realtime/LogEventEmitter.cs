@@ -1,5 +1,6 @@
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using Microsoft.AspNetCore.SignalR;
+using MentalHealthTracker.Api.Core.Logging;
 
 namespace MentalHealthTracker.Api.Modules.Realtime;
 
@@ -41,6 +42,6 @@ public sealed partial class LogEventEmitter(
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Could not send realtime event {EventName} to user {UserId}")]
+    [LoggerMessage(EventId = ApiLogEvents.RealtimeSendFailed, EventName = nameof(ApiLogEvents.RealtimeSendFailed), Level = LogLevel.Warning, Message = "Could not send realtime event {EventName} to user {UserId}")]
     private static partial void LogSendFailed(ILogger logger, Exception exception, string eventName, Guid userId);
 }

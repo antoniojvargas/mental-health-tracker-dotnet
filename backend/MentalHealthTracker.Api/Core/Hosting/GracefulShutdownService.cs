@@ -1,5 +1,6 @@
 using MentalHealthTracker.Api.Modules.Realtime;
 using Npgsql;
+using MentalHealthTracker.Api.Core.Logging;
 
 namespace MentalHealthTracker.Api.Core.Hosting;
 
@@ -27,9 +28,9 @@ public sealed partial class GracefulShutdownService(
         return Task.CompletedTask;
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Shutting down: closing {ConnectionCount} live SignalR connection(s)")]
+    [LoggerMessage(EventId = ApiLogEvents.ShutdownClosingConnections, EventName = nameof(ApiLogEvents.ShutdownClosingConnections), Level = LogLevel.Information, Message = "Shutting down: closing {ConnectionCount} live SignalR connection(s)")]
     private static partial void LogClosingConnections(ILogger logger, int connectionCount);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Shutting down: closing Npgsql connection pool")]
+    [LoggerMessage(EventId = ApiLogEvents.ShutdownClosingPool, EventName = nameof(ApiLogEvents.ShutdownClosingPool), Level = LogLevel.Information, Message = "Shutting down: closing Npgsql connection pool")]
     private static partial void LogClosingPool(ILogger logger);
 }

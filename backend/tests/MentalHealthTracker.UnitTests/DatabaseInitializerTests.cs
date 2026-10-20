@@ -33,6 +33,7 @@ public sealed class DatabaseInitializerTests
         var retry = Assert.Single(logger.Entries, e => e.Level == LogLevel.Warning);
         Assert.Contains("Database not ready (attempt 1/10)", retry.Message);
         Assert.NotNull(retry.Exception);
+        Assert.Equal((2003, "DatabaseNotReady"), (retry.EventId.Id, retry.EventId.Name));
     }
 
     // Una base que no contesta (timeout al conectar) también es "todavía no está lista": EF
@@ -76,7 +77,7 @@ public sealed class DatabaseInitializerTests
         Assert.Equal(expected, DatabaseInitializer.IsDatabaseNotReady(exception));
     }
 
-    private sealed record Entry(LogLevel Level, string Message, Exception? Exception);
+    private sealed record Entry(LogLevel Level, string Message, Exception? Exception, EventId EventId);
 
     private sealed class CapturingLogger : ILogger
     {
@@ -96,7 +97,7 @@ public sealed class DatabaseInitializerTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            Entries.Add(new Entry(logLevel, formatter(state, exception), exception));
+            Entries.Add(new Entry(logLevel, formatter(state, exception), exception, eventId));
             if (logLevel == LogLevel.Warning)
             {
                 OnWarning?.Invoke();

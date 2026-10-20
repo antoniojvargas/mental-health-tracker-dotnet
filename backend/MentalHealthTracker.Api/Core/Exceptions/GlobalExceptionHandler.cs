@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Diagnostics;
 using MentalHealthTracker.Domain.Errors;
+using MentalHealthTracker.Api.Core.Logging;
 
 namespace MentalHealthTracker.Api.Core.Exceptions;
 
@@ -59,13 +60,13 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
     // figuraría como un 200 en los registros de acceso y las métricas.
     private const int StatusCodeForAbortedRequest = 499;
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Request rejected with {ErrorCode} ({StatusCode}): {ErrorMessage}")]
+    [LoggerMessage(EventId = ApiLogEvents.RequestRejected, EventName = nameof(ApiLogEvents.RequestRejected), Level = LogLevel.Information, Message = "Request rejected with {ErrorCode} ({StatusCode}): {ErrorMessage}")]
     private static partial void LogHandledAppException(ILogger logger, string errorCode, int statusCode, string errorMessage);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Unhandled exception while processing request")]
+    [LoggerMessage(EventId = ApiLogEvents.UnhandledException, EventName = nameof(ApiLogEvents.UnhandledException), Level = LogLevel.Error, Message = "Unhandled exception while processing request")]
     private static partial void LogHandledUnexpectedException(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Debug, Message = "Request aborted by the client")]
+    [LoggerMessage(EventId = ApiLogEvents.RequestAborted, EventName = nameof(ApiLogEvents.RequestAborted), Level = LogLevel.Debug, Message = "Request aborted by the client")]
     private static partial void LogRequestAborted(ILogger logger);
 }
 

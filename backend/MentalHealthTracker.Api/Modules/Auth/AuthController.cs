@@ -6,6 +6,7 @@ using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
+using MentalHealthTracker.Api.Core.Logging;
 
 namespace MentalHealthTracker.Api.Modules.Auth;
 
@@ -108,12 +109,12 @@ public sealed partial class AuthController(
     private RedirectResult RedirectToLogin() =>
         Redirect($"{appUrls.Value.FrontendUrl}{LoginErrorRoute}");
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Google OAuth callback rejected: state cookie missing or mismatch")]
+    [LoggerMessage(EventId = ApiLogEvents.GoogleCallbackRejected, EventName = nameof(ApiLogEvents.GoogleCallbackRejected), Level = LogLevel.Warning, Message = "Google OAuth callback rejected: state cookie missing or mismatch")]
     private static partial void LogCallbackRejected(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Google OAuth callback failed")]
+    [LoggerMessage(EventId = ApiLogEvents.GoogleCallbackFailed, EventName = nameof(ApiLogEvents.GoogleCallbackFailed), Level = LogLevel.Error, Message = "Google OAuth callback failed")]
     private static partial void LogCallbackFailed(ILogger logger, Exception exception);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Session token references user {UserId} that no longer exists")]
+    [LoggerMessage(EventId = ApiLogEvents.SessionUserMissing, EventName = nameof(ApiLogEvents.SessionUserMissing), Level = LogLevel.Warning, Message = "Session token references user {UserId} that no longer exists")]
     private static partial void LogSessionUserMissing(ILogger logger, Guid userId);
 }

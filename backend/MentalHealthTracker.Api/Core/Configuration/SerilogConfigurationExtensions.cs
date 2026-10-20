@@ -12,9 +12,25 @@ public static class SerilogConfigurationExtensions
             configuration
                 .Destructure.With(new RedactSensitiveHeadersPolicy())
                 .Enrich.FromLogContext()
+                .EnrichWithApplication(context.HostingEnvironment)
                 .MinimumLevel.Is(ReadMinimumLevel())
+                // La línea de cada petición la escribe el registro de peticiones de Serilog
+                // (RequestLogging). Sin esto ASP.NET Core añade, en Information y por cada
+                // petición (incluido el sondeo de /api/health), "Request starting/finished",
+                // "Executing/Executed endpoint" o "Writing value of type...". Los avisos y
+                // errores del framework siguen saliendo.
+                .MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
                 .ConsoleFormatter(context.HostingEnvironment));
     }
+
+    // Application y Environment van en todos los eventos (también los del arranque, antes de la
+    // primera petición): permiten filtrar cuando varias apps o entornos vuelcan al mismo destino.
+    internal static LoggerConfiguration EnrichWithApplication(
+        this LoggerConfiguration configuration,
+        IHostEnvironment environment) =>
+        configuration
+            .Enrich.WithProperty("Application", environment.ApplicationName)
+            .Enrich.WithProperty("Environment", environment.EnvironmentName);
 
     private static LoggerConfiguration ConsoleFormatter(
         this LoggerConfiguration configuration,

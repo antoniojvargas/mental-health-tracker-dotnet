@@ -1,4 +1,5 @@
 using MentalHealthTracker.Api.Core.Configuration;
+using MentalHealthTracker.Api.Core.Logging;
 using MentalHealthTracker.Api.Core.Middleware;
 using MentalHealthTracker.Api.Core.OpenApi;
 using MentalHealthTracker.Api.Modules.Auth;
@@ -15,6 +16,8 @@ public static class ApiPipeline
     //     cupo (se bloquearían entre sí) y el límite por IP de /api/auth dejaría de frenar
     //     a quien abusa. Solo se activa tras un proxy declarado (ReverseProxy:KnownProxies
     //     / KnownNetworks), porque confiar en esas cabeceras sin proxy permite falsificar la IP.
+    //     Justo detrás va el registro de peticiones: al ir fuera del manejador de excepciones anota
+    //     el status definitivo de cada respuesta, y al terminar lee la IP ya resuelta.
     //  2. ExceptionHandler envuelve todo lo que viene después, de modo que cualquier fallo
     //     (rate limiter y auth incluidos) sale con el sobre de error y sin filtrar trazas.
     //  3. RequestId y SecurityHeaders antes de cualquier respuesta, para que también las
@@ -29,6 +32,8 @@ public static class ApiPipeline
         {
             app.UseForwardedHeaders();
         }
+
+        app.UseRequestLogging();
 
         app.UseExceptionHandler();
         app.UseRequestId();

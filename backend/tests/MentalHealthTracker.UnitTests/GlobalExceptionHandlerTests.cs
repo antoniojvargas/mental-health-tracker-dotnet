@@ -144,6 +144,20 @@ public sealed class GlobalExceptionHandlerTests
     }
 
     [Fact]
+    public async Task TheEmittedLogsCarryTheirStableEventIds()
+    {
+        var appLogger = new CapturingLogger();
+        await HandleAsync(new NotFoundException("nope"), appLogger);
+        var unexpectedLogger = new CapturingLogger();
+        await HandleAsync(new InvalidOperationException("boom"), unexpectedLogger);
+
+        var rejected = Assert.Single(appLogger.Entries).EventId;
+        var unhandled = Assert.Single(unexpectedLogger.Entries).EventId;
+        Assert.Equal((1101, "RequestRejected"), (rejected.Id, rejected.Name));
+        Assert.Equal((1102, "UnhandledException"), (unhandled.Id, unhandled.Name));
+    }
+
+    [Fact]
     public async Task GenericException_IsLoggedAsErrorWithItsStackTrace()
     {
         var logger = new CapturingLogger();
@@ -233,7 +247,7 @@ public sealed class GlobalExceptionHandlerTests
         public override bool HasStarted => true;
     }
 
-    private sealed record Entry(LogLevel Level, string Message, Exception? Exception, Dictionary<string, object?> Properties);
+    private sealed record Entry(LogLevel Level, string Message, Exception? Exception, Dictionary<string, object?> Properties, EventId EventId);
 
     private sealed class CapturingLogger : ILogger<GlobalExceptionHandler>
     {
@@ -250,7 +264,7 @@ public sealed class GlobalExceptionHandlerTests
             var properties = state is IEnumerable<KeyValuePair<string, object?>> pairs
                 ? pairs.ToDictionary(pair => pair.Key, pair => pair.Value)
                 : [];
-            Entries.Add(new Entry(logLevel, formatter(state, exception), exception, properties));
+            Entries.Add(new Entry(logLevel, formatter(state, exception), exception, properties, eventId));
         }
     }
 }

@@ -2,6 +2,7 @@ using System.Net.Sockets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
+using MentalHealthTracker.Infrastructure.Logging;
 
 namespace MentalHealthTracker.Infrastructure.Persistence;
 
@@ -73,15 +74,15 @@ public static partial class DatabaseInitializer
         exception is NpgsqlException or TimeoutException or SocketException
         || (exception is InvalidOperationException { InnerException: { } inner } && IsDatabaseNotReady(inner));
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Applying pending database migrations")]
+    [LoggerMessage(EventId = InfrastructureLogEvents.MigrationsApplying, EventName = nameof(InfrastructureLogEvents.MigrationsApplying), Level = LogLevel.Information, Message = "Applying pending database migrations")]
     private static partial void LogApplyingMigrations(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Database migrations applied")]
+    [LoggerMessage(EventId = InfrastructureLogEvents.MigrationsApplied, EventName = nameof(InfrastructureLogEvents.MigrationsApplied), Level = LogLevel.Information, Message = "Database migrations applied")]
     private static partial void LogMigrationsApplied(ILogger logger);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Database unreachable after {MaxAttempts} attempts")]
+    [LoggerMessage(EventId = InfrastructureLogEvents.DatabaseUnreachable, EventName = nameof(InfrastructureLogEvents.DatabaseUnreachable), Level = LogLevel.Error, Message = "Database unreachable after {MaxAttempts} attempts")]
     private static partial void LogDatabaseUnreachable(ILogger logger, Exception exception, int maxAttempts);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Database not ready (attempt {Attempt}/{MaxAttempts}); retrying in {BackoffMs} ms")]
+    [LoggerMessage(EventId = InfrastructureLogEvents.DatabaseNotReady, EventName = nameof(InfrastructureLogEvents.DatabaseNotReady), Level = LogLevel.Warning, Message = "Database not ready (attempt {Attempt}/{MaxAttempts}); retrying in {BackoffMs} ms")]
     private static partial void LogDatabaseNotReady(ILogger logger, Exception exception, int attempt, int maxAttempts, int backoffMs);
 }
