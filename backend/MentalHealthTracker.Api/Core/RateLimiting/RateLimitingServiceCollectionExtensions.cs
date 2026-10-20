@@ -3,6 +3,7 @@ using System.Threading.RateLimiting;
 using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
+using MentalHealthTracker.Domain.Errors;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
@@ -54,7 +55,7 @@ public static class RateLimitingServiceCollectionExtensions
                 }
 
                 await context.HttpContext.Response.WriteAsJsonAsync(
-                    new ErrorResponse(new ErrorBody("RATE_LIMITED", "Too many requests. Please try again later.", [])),
+                    new ErrorResponse(new ErrorBody(ErrorCodes.RateLimited, "Too many requests. Please try again later.", [])),
                     cancellationToken);
             };
 

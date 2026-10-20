@@ -22,7 +22,7 @@ public sealed partial class GlobalExceptionHandler(ILogger<GlobalExceptionHandle
                         .ToArray())),
             _ => (
                 StatusCodes.Status500InternalServerError,
-                new ErrorBody("INTERNAL_ERROR", "An unexpected error occurred.", [])),
+                new ErrorBody(ErrorCodes.InternalError, "An unexpected error occurred.", [])),
         };
 
         if (exception is AppException)
