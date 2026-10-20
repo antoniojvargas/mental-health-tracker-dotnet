@@ -4,10 +4,8 @@ public class ValidationException : AppException
 {
     public const int DefaultStatusCode = 400;
 
-    public const string ErrorCode = "VALIDATION_ERROR";
-
     public ValidationException(string message, IReadOnlyDictionary<string, string>? details = null)
-        : base(ErrorCode, DefaultStatusCode, message, details)
+        : base(ErrorCodes.ValidationError, DefaultStatusCode, message, details)
     {
     }
 }

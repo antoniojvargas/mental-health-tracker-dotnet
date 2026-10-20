@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using MentalHealthTracker.Domain.Common;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
@@ -9,20 +11,29 @@ internal static class Converters
     internal static readonly JsonSerializerOptions SnakeCaseJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+
+        // El jsonb de symptoms guarda el tipo como snake_case ("low_mood"). Antes lo daba el
+        // atributo de la enum; ahora el dominio no sabe de JSON y lo aporta esta opción. Es el
+        // convertidor de System.Text.Json con la misma política de nombres que el de la API
+        // (Infrastructure no puede referenciar Api) y sin aceptar números.
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower, allowIntegerValues: false) },
     };
+
+    // Un valor guardado que ya no existe en la enum no se degrada a un valor por defecto:
+    // lanza InvalidOperationException (como hacía el First() sobre una secuencia vacía).
+    internal static TEnum ParseStored<TEnum>(string value)
+        where TEnum : struct, Enum =>
+        SnakeCaseEnum<TEnum>.TryParse(value, out var parsed)
+            ? parsed
+            : throw new InvalidOperationException($"Stored value '{value}' is not a valid {typeof(TEnum).Name}.");
 
     internal sealed class EnumSnakeCaseConverter<TEnum> : ValueConverter<TEnum, string>
         where TEnum : struct, Enum
     {
         public EnumSnakeCaseConverter()
             : base(
-                value => JsonNamingPolicy.SnakeCaseLower.ConvertName(value.ToString() ?? string.Empty),
-                value => Enum.Parse<TEnum>(Enum
-                    .GetNames<TEnum>()
-                    .First(name => string.Equals(
-                        JsonNamingPolicy.SnakeCaseLower.ConvertName(name),
-                        value,
-                        StringComparison.OrdinalIgnoreCase))))
+                value => SnakeCaseEnum<TEnum>.ToSnakeCase(value),
+                value => ParseStored<TEnum>(value))
         {
         }
     }
@@ -42,17 +53,8 @@ internal static class Converters
     {
         public EnumListToStringArrayConverter()
             : base(
-                value => value
-                    .Select(item => JsonNamingPolicy.SnakeCaseLower.ConvertName(item.ToString() ?? string.Empty))
-                    .ToList(),
-                value => value
-                    .Select(item => Enum.Parse<TEnum>(Enum
-                        .GetNames<TEnum>()
-                        .First(name => string.Equals(
-                            JsonNamingPolicy.SnakeCaseLower.ConvertName(name),
-                            item,
-                            StringComparison.OrdinalIgnoreCase))))
-                    .ToList())
+                value => value.Select(item => SnakeCaseEnum<TEnum>.ToSnakeCase(item)).ToList(),
+                value => value.Select(item => ParseStored<TEnum>(item)).ToList())
         {
         }
     }
