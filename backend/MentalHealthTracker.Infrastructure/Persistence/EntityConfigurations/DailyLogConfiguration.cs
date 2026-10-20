@@ -53,7 +53,10 @@ public sealed class DailyLogConfiguration : IEntityTypeConfiguration<DailyLog>
         builder.Property(log => log.CreatedAt).HasColumnName("created_at");
         builder.Property(log => log.UpdatedAt).HasColumnName("updated_at");
 
-        builder.HasIndex(log => log.UserId);
+        // Un único índice sobre user_id: el compuesto (user_id, log_date) es único (un registro por
+        // usuario y día) y, al empezar por user_id, también sirve las búsquedas solo por usuario y
+        // la FK/cascada. Un índice aparte solo sobre user_id sería redundante y encarecería cada
+        // escritura.
         builder.HasIndex(log => new { log.UserId, log.LogDate }).IsUnique();
 
         builder.HasOne<User>()
