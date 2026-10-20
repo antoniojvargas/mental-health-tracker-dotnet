@@ -1,15 +1,19 @@
-using MentalHealthTracker.Api.Core.Configuration;
-using Microsoft.Extensions.Options;
-using Npgsql;
 using MentalHealthTracker.Api.Core.Logging;
 
 namespace MentalHealthTracker.Api.Core.Health;
 
 public static partial class HealthEndpoints
 {
-    public static IServiceCollection AddApplicationUptime(this IServiceCollection services)
+    // Tiempo máximo que el health check espera a la base de datos. Un orquestador que sondea tiene
+    // su propio timeout: si la base se cuelga y el endpoint no contesta, el sondeo expira sin
+    // respuesta; con este tope contesta el mismo 503 de siempre.
+    public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(2);
+
+    public static IServiceCollection AddApplicationHealth(this IServiceCollection services)
     {
         services.AddSingleton<ApplicationUptime>();
+        services.AddSingleton<IDatabaseProbe, NpgsqlDatabaseProbe>(provider =>
+            new NpgsqlDatabaseProbe(provider.GetRequiredService<Npgsql.NpgsqlDataSource>()));
         return services;
     }
 
@@ -25,18 +29,25 @@ public static partial class HealthEndpoints
         _ = app.ServiceProvider.GetRequiredService<ApplicationUptime>();
 
         app.MapGet("/api/health", async (
-            NpgsqlDataSource dataSource,
+            IDatabaseProbe databaseProbe,
             ApplicationUptime applicationUptime,
-            ILogger<Program> logger) =>
+            ILogger<Program> logger,
+            CancellationToken requestAborted) =>
         {
             var uptime = applicationUptime.Elapsed;
 
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
+            timeout.CancelAfter(ProbeTimeout);
+
             try
             {
-                await using var connection = await dataSource.OpenConnectionAsync();
-                await using var command = connection.CreateCommand();
-                command.CommandText = "SELECT 1";
-                await command.ExecuteScalarAsync();
+                await databaseProbe.ProbeAsync(timeout.Token);
+            }
+            // Si quien cancela es el cliente (cerró la conexión) no hay a quién contestar ni
+            // es un fallo de la base: la excepción sube al manejador global, que lo anota en Debug.
+            catch (OperationCanceledException) when (requestAborted.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception exception)
             {
