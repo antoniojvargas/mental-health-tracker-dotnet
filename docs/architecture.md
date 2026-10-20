@@ -807,6 +807,30 @@ autenticación (`app.UseRequestId()` en `Program.cs`). Por cada petición:
   Google, que no reenvía el `X-Request-Id`. Si se añadieran llamadas entre servicios, habría
   que propagar la cabecera explícitamente para no cortar la traza.
 
+### Propiedades estructuradas por las que filtrar
+
+En producción cada línea sale como JSON compacto (`CompactJsonFormatter`) y las propiedades son
+campos consultables; en Development la consola solo muestra `RequestId`. Estas son las
+propiedades con las que se puede filtrar:
+
+| Propiedad | Dónde aparece | Origen |
+|-----------|---------------|--------|
+| `Application` | Todos los eventos, también los del arranque | `IHostEnvironment.ApplicationName` (`MentalHealthTracker.Api`) vía `Enrich.WithProperty` |
+| `Environment` | Todos los eventos | `IHostEnvironment.EnvironmentName` (`Development`, `Production`…) |
+| `SourceContext` | Todos los eventos | Categoría del `ILogger<T>` (clase que registra) |
+| `EventId` / `EventName` | Logs de `[LoggerMessage]` | Catálogo estable: Api 1xxx, Infrastructure 2xxx (`ApiLogEvents`, `InfrastructureLogEvents`); un test fija los ids |
+| `RequestId` | Todo lo emitido dentro de una petición | `RequestIdMiddleware` (`LogContext`); coincide con la cabecera `X-Request-Id` |
+| `RequestMethod`, `RequestPath`, `StatusCode`, `Elapsed` | La línea única de cada petición (`SourceContext` = `Serilog.AspNetCore.RequestLoggingMiddleware`) | Registro de peticiones de Serilog; el path va sin query string y `/api/health` no se registra |
+| `ClientIp` | La línea de petición | `Connection.RemoteIpAddress`, ya resuelta por `ForwardedHeaders` tras un proxy de confianza |
+| `ErrorCode`, `StatusCode`, `ErrorMessage` | Errores de negocio (`AppException`) del manejador global | `GlobalExceptionHandler`, nivel Information y sin traza |
+| `Attempt`, `MaxAttempts`, `BackoffMs` | Reintentos de arranque (`DatabaseNotReady`, 2003) | `DatabaseInitializer` |
+
+Ejemplos: `EventId.Id = 1201` son los fallos del health check; `StatusCode >= 500` con
+`SourceContext = 'Serilog.AspNetCore.RequestLoggingMiddleware'` son las peticiones fallidas; y
+`RequestId = '<valor>'` reconstruye una petición entera. `Application` y `Environment` se
+añaden en `SerilogConfigurationExtensions.EnrichWithApplication`, sin paquetes adicionales
+(`Enrich.WithProperty`, no `Serilog.Enrichers.Environment`).
+
 ### Redacción de cookies y cabeceras de autorización
 
 `RedactSensitiveHeadersPolicy` (`Core/Configuration`) es un `IDestructuringPolicy` de Serilog
