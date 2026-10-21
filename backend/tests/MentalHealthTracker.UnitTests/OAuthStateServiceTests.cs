@@ -129,4 +129,42 @@ public sealed class OAuthStateServiceTests
 
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }
+
+    // Un state de otra cookie con el mismo valor no vale: solo cuenta la cookie del propio flujo.
+    [Fact]
+    public void Consume_IgnoresCookiesOtherThanTheOAuthStateOne()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = $"{SessionCookie.AccessTokenName}=abc123";
+
+        Assert.False(CreateService().Consume(context, "abc123"));
+    }
+
+    // Misma longitud en caracteres pero distinto contenido (y distinta longitud en bytes UTF-8).
+    [Theory]
+    [InlineData("aé", "ab")]
+    [InlineData("ab", "aé")]
+    [InlineData("日本", "日木")]
+    public void Matches_WithNonAsciiValuesOfTheSameLength_ComparesTheirBytes(string expected, string received)
+    {
+        Assert.False(OAuthStateService.Matches(expected, received));
+    }
+
+    [Fact]
+    public void Matches_WithEqualNonAsciiValues_ReturnsTrue()
+    {
+        Assert.True(OAuthStateService.Matches("日本-é", "日本-é"));
+    }
+
+    [Fact]
+    public void Issue_ThenConsume_RoundTripsThroughTheCookie()
+    {
+        var service = CreateService();
+        var issued = new DefaultHttpContext();
+        var state = service.Issue(issued.Response);
+
+        var callback = ContextWithStateCookie(state);
+
+        Assert.True(service.Consume(callback, state));
+    }
 }

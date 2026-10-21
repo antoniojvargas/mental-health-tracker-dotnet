@@ -3,9 +3,6 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using MentalHealthTracker.Api.Core.RateLimiting;
-using MentalHealthTracker.Api.Modules.Auth;
-using MentalHealthTracker.Domain.Models;
-using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -15,9 +12,9 @@ namespace MentalHealthTracker.IntegrationTests;
 // Verifica las políticas de rate limiting: "auth" (por IP) sobre el callback de Google
 // OAuth, y "write" (por id de usuario) sobre POST /api/logs. Los límites se leen de
 // RateLimitingOptions, la única fuente de verdad (por defecto 20 y 30 por 15 min).
-// Cada clase de test tiene su propia instancia de CustomWebApplicationFactory, por lo que el
-// estado del rate limiter (y agotar cuotas) queda aislado a esta clase.
-[Collection(IntegrationTestGroup.Name)]
+// Esta clase mantiene su propia CustomWebApplicationFactory (IClassFixture, en la colección
+// aislada) en lugar de la compartida, para que agotar cuotas no afecte a otros tests y viceversa.
+[Collection(IntegrationTestGroup.IsolatedName)]
 public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {
@@ -60,17 +57,17 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task WritePolicy_ExhaustingOneUserQuota_DoesNotAffectAnotherUser()
     {
-        var (_, tokenA) = await CreateAuthenticatedSessionAsync();
-        var (_, tokenB) = await CreateAuthenticatedSessionAsync();
+        var (_, tokenA) = await CreateSessionTokenAsync();
+        var (_, tokenB) = await CreateSessionTokenAsync();
 
         for (var i = 0; i < WritePermitLimit; i++)
         {
-            var response = await PostLogAsync(tokenA, Body());
+            var response = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().Build());
             Assert.True(response.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK,
                 $"El usuario A debería escribir dentro de su cuota, recibió {response.StatusCode}");
         }
 
-        var rejectedA = await PostLogAsync(tokenA, Body());
+        var rejectedA = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().Build());
         Assert.Equal(HttpStatusCode.TooManyRequests, rejectedA.StatusCode);
         Assert.Equal(WritePermitLimit.ToString(CultureInfo.InvariantCulture), SingleHeader(rejectedA, "RateLimit-Limit"));
         Assert.Equal("0", SingleHeader(rejectedA, "RateLimit-Remaining"));
@@ -78,7 +75,7 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
         using var document = JsonDocument.Parse(await rejectedA.Content.ReadAsStringAsync());
         Assert.Equal("RATE_LIMITED", document.RootElement.GetProperty("error").GetProperty("code").GetString());
 
-        var responseB = await PostLogAsync(tokenB, Body());
+        var responseB = await PostLogAsync(tokenB, new CreateDailyLogRequestBuilder().Build());
         Assert.Equal(HttpStatusCode.Created, responseB.StatusCode);
     }
 
@@ -87,42 +84,4 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
         Assert.True(response.Headers.TryGetValues(name, out var values), $"Falta la cabecera {name}");
         return Assert.Single(values!);
     }
-
-    private async Task<HttpResponseMessage> PostLogAsync(string token, object body)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonContent.Create(body);
-
-        return await Factory.CreateClient().SendAsync(request);
-    }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
-    }
-
-    private static object Body() => new
-    {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating = 3,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7.5,
-        sleepQuality = 4,
-        sleepDisturbances = new[] { "none" },
-        activityType = "walking",
-        activityMinutes = 30,
-        socialFrequency = "occasional",
-        symptoms = new[] { new { type = "fatigue", severity = 3 } },
-        notes = (string?)null,
-    };
 }

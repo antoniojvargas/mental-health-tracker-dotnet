@@ -98,7 +98,7 @@ jobs:
 
       - name: Umbral de cobertura
         working-directory: ${{ github.workspace }}
-        run: ./scripts/check-coverage.sh 70
+        run: ./scripts/check-coverage.sh 77.8
 
   frontend-test:
     name: Frontend tests (Node)

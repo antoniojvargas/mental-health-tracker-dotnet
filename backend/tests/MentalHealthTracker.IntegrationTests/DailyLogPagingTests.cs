@@ -16,7 +16,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // se pide con un COUNT de respaldo: meta.total debe ser el mismo en todos los casos.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class DailyLogPagingTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const int SeededDays = 25;
 

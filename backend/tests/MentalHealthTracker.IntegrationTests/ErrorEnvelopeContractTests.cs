@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -20,7 +19,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // para que un nuevo camino de error que se salga del sobre rompa esta clase.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Theory]
     [InlineData("me-deleted-user", HttpStatusCode.Unauthorized, "UNAUTHORIZED")]
@@ -97,18 +96,10 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
     private async Task<HttpResponseMessage> InvalidPostAsync()
     {
         var (client, _, _) = await CreateAuthenticatedSessionAsync($"contract-{Guid.NewGuid():N}@example.com");
-        return await client.PostAsJsonAsync("/api/logs", new
-        {
-            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            moodRating = 9,
-            anxietyLevel = 5,
-            stressLevel = 5,
-            sleepHours = 7,
-            sleepQuality = 4,
-            sleepDisturbances = Array.Empty<string>(),
-            socialFrequency = "none",
-            symptoms = Array.Empty<object>(),
-        });
+        return await client.PostAsJsonAsync(
+            "/api/logs",
+            new CreateDailyLogRequestBuilder().WithMoodRating(9).Build(),
+            AppJsonOptions);
     }
 
     // El limitador es estado del host: un host nuevo (WithWebHostBuilder) evita agotar
@@ -137,10 +128,7 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
                 services.AddScoped<IDailyLogService, ThrowingDailyLogService>()));
 
         var (_, _, token) = await CreateAuthenticatedSessionAsync($"contract-{Guid.NewGuid():N}@example.com");
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await failing.CreateClient().SendAsync(request);
+        return await failing.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/logs", token);
     }
 
     private sealed class ThrowingDailyLogService : IDailyLogService

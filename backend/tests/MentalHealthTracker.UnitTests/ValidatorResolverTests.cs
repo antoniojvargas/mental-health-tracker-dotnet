@@ -69,6 +69,50 @@ public sealed class ValidatorResolverTests
         Assert.NotNull(ValidatorResolver.Resolve(withValidator, typeof(ResolverModelB)));
         Assert.Null(ValidatorResolver.Resolve(without, typeof(ResolverModelB)));
     }
+
+    [Fact]
+    public void Resolve_ReturnsTheSameInstanceForASingleton()
+    {
+        using var provider = new ServiceCollection()
+            .AddSingleton<IValidator<ResolverModelA>, ResolverModelAValidator>()
+            .BuildServiceProvider();
+
+        Assert.Same(
+            ValidatorResolver.Resolve(provider, typeof(ResolverModelA)),
+            ValidatorResolver.Resolve(provider, typeof(ResolverModelA)));
+    }
+
+    [Fact]
+    public void Resolve_ReturnsANewInstanceForATransient()
+    {
+        using var provider = new ServiceCollection()
+            .AddTransient<IValidator<ResolverModelA>, ResolverModelAValidator>()
+            .BuildServiceProvider();
+
+        Assert.NotSame(
+            ValidatorResolver.Resolve(provider, typeof(ResolverModelA)),
+            ValidatorResolver.Resolve(provider, typeof(ResolverModelA)));
+    }
+
+    [Fact]
+    public void Resolve_ASingletonValidatorWorksThroughTheResolvedInterface()
+    {
+        using var provider = new ServiceCollection()
+            .AddSingleton<IValidator<ResolverModelA>, ResolverModelAValidator>()
+            .BuildServiceProvider();
+
+        var validator = ValidatorResolver.Resolve(provider, typeof(ResolverModelA));
+
+        Assert.True(validator!.Validate(new ValidationContext<ResolverModelA>(new ResolverModelA("x"))).IsValid);
+    }
+
+    [Fact]
+    public void ValidatorTypeFor_DistinctModelsGetDistinctTypes()
+    {
+        Assert.NotEqual(
+            ValidatorResolver.ValidatorTypeFor(typeof(ResolverModelA)),
+            ValidatorResolver.ValidatorTypeFor(typeof(ResolverModelB)));
+    }
 }
 
 public sealed record ResolverModelA(string Name);

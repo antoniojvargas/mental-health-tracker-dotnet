@@ -12,7 +12,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // el TestServer y este test fallara; sin ese puerto el middleware solo avisa en el log.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class HttpsRedirectionTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task Health_OverHttp_RespondsOkWithoutRedirect()

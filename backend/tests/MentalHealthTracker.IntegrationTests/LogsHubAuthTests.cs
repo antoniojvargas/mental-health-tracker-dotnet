@@ -1,14 +1,10 @@
 using System.Net;
-using MentalHealthTracker.Api.Modules.Auth;
-using MentalHealthTracker.Domain.Models;
-using MentalHealthTracker.Domain.Repositories;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task Negotiate_WithoutCookie_Returns401()
@@ -25,15 +21,14 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Negotiate_WithTamperedCookie_Returns401()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
         var tampered = TamperSignature(token);
 
-        var client = Factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
-        request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={tampered}");
-
-        var response = await client.SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/hub/logs/negotiate?negotiateVersion=1",
+            tampered,
+            new StringContent("", System.Text.Encoding.UTF8, "text/plain"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -41,28 +36,14 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Negotiate_WithValidCookie_Returns200()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
 
-        var client = Factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
-        request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        var response = await client.SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/hub/logs/negotiate?negotiateVersion=1",
+            token,
+            new StringContent("", System.Text.Encoding.UTF8, "text/plain"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
     }
 }

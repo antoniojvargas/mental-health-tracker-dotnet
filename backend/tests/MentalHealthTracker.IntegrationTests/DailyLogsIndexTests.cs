@@ -9,7 +9,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // búsquedas por usuario y la FK; un índice aparte solo sobre user_id sería redundante.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class DailyLogsIndexTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task DailyLogs_HasOnlyThePrimaryKeyAndTheUniqueCompositeIndex()

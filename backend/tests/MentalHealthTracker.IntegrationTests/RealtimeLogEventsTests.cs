@@ -4,8 +4,6 @@ using System.Net.Http.Json;
 using MentalHealthTracker.Api.Core.Serialization;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
-using MentalHealthTracker.Domain.Models;
-using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,14 +12,14 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static readonly string[] NoDisturbances = ["none"];
 
     [Fact]
     public async Task PostOwnLog_OwnConnectedClient_ReceivesLogCreated()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
         var received = new TaskCompletionSource<DailyLogResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -40,8 +38,8 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task PostOwnLog_OtherUsersClient_ReceivesNothing()
     {
-        var (_, ownerToken) = await CreateAuthenticatedSessionAsync();
-        var (_, otherToken) = await CreateAuthenticatedSessionAsync();
+        var (_, ownerToken) = await CreateSessionTokenAsync();
+        var (_, otherToken) = await CreateSessionTokenAsync();
 
         var ownerReceived = new TaskCompletionSource<DailyLogResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -80,37 +78,10 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> PostLogAsync(string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonContent.Create(new
-        {
-            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            moodRating = 3,
-            anxietyLevel = 5,
-            stressLevel = 5,
-            sleepHours = 7.5,
-            sleepQuality = 4,
-            sleepDisturbances = NoDisturbances,
-            activityType = "walking",
-            activityMinutes = 30,
-            socialFrequency = "occasional",
-            symptoms = new[] { new { type = "fatigue", severity = 3 } },
-            notes = "mejor que ayer",
-        });
-
-        return await Factory.CreateClient().SendAsync(request);
-    }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
+        return await Factory.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/api/logs",
+            token,
+            JsonBody(new CreateDailyLogRequestBuilder().WithNotes("mejor que ayer").Build()));
     }
 }

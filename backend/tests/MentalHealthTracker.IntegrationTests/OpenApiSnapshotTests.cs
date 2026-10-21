@@ -16,7 +16,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // que ya no son los de la API.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class OpenApiSnapshotTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const string RegenerateHelp = """
         Para regenerar el snapshot tras un cambio de API INTENCIONADO:

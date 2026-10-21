@@ -2,10 +2,8 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Enums;
-using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,15 +12,15 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task PostLog_WhenNoExistingLog_Returns201()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
         var logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        var response = await PostLogAsync(token, Body());
+        var response = await PostLogAsync(token, new CreateDailyLogRequestBuilder().Build());
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -36,12 +34,12 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task PostLog_WhenLogAlreadyExistsForDate_Returns200AndUpdatesInsteadOfDuplicating()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
 
-        var first = await PostLogAsync(token, Body());
+        var first = await PostLogAsync(token, new CreateDailyLogRequestBuilder().Build());
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-        var updated = await PostLogAsync(token, Body(moodRating: 2, notes: "updated"));
+        var updated = await PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(2).WithNotes("updated").Build());
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
 
         using var document = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
@@ -59,10 +57,10 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task PostLog_ConcurrentPostsForSameDate_BothSucceed_OneRowExactly_OneCreated()
     {
-        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var (user, token) = await CreateSessionTokenAsync();
         var logDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var tasks = new[] { PostLogAsync(token, Body(moodRating: 3)), PostLogAsync(token, Body(moodRating: 4)) };
+        var tasks = new[] { PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(3).Build()), PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(4).Build()) };
         var results = await Task.WhenAll(tasks);
 
         Assert.All(results, r => Assert.True(r.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK));
@@ -80,9 +78,9 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task PostLog_WhenBodyIsInvalid_Returns400WithFieldDetail()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
 
-        var response = await PostLogAsync(token, Body(moodRating: 9));
+        var response = await PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(9).Build());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -97,7 +95,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task GetLogs_WhenRangeProvided_ReturnsOnlyLogsWithinRange()
     {
-        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var (user, token) = await CreateSessionTokenAsync();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         await SeedLogAsync(user.Id, today.AddDays(-30), 1);
         await SeedLogAsync(user.Id, today.AddDays(-20), 2);
@@ -121,7 +119,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task GetLogs_ReturnsLogsOrderedAscendingByDate()
     {
-        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var (user, token) = await CreateSessionTokenAsync();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         await SeedLogAsync(user.Id, today, 5);
         await SeedLogAsync(user.Id, today.AddDays(-5), 1);
@@ -147,7 +145,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task GetLogs_WhenLimitAndOffsetProvided_PaginatesAndKeepsMetaTotalConsistent()
     {
-        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var (user, token) = await CreateSessionTokenAsync();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         for (var i = 0; i < 5; i++)
         {
@@ -177,14 +175,14 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Logs_AreIsolatedPerUser()
     {
-        var (userA, tokenA) = await CreateAuthenticatedSessionAsync();
-        var (_, tokenB) = await CreateAuthenticatedSessionAsync();
+        var (userA, tokenA) = await CreateSessionTokenAsync();
+        var (_, tokenB) = await CreateSessionTokenAsync();
 
-        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3);
         Assert.NotNull(userA);
 
-        var createdToday = await PostLogAsync(tokenA, Body());
-        var createdPast = await PostLogAsync(tokenA, Body(moodRating: 4, logDate: threeDaysAgo));
+        var createdToday = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().Build());
+        var createdPast = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().WithMoodRating(4).WithLogDate(threeDaysAgo).Build());
         Assert.Equal(HttpStatusCode.Created, createdToday.StatusCode);
         Assert.Equal(HttpStatusCode.Created, createdPast.StatusCode);
 
@@ -206,10 +204,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> GetTodayAsync(string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs/today");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await Factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/logs/today", token);
     }
 
     private static async Task<int> TotalAsync(HttpResponseMessage response)
@@ -246,51 +241,11 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         });
     }
 
-    private async Task<HttpResponseMessage> PostLogAsync(string token, object body)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonContent.Create(body);
-
-        return await Factory.CreateClient().SendAsync(request);
-    }
-
     private async Task<HttpResponseMessage> GetLogsAsync(string token, string? query = null)
     {
-        using var request = new HttpRequestMessage(
+        return await Factory.CreateClient().SendAuthenticatedAsync(
             HttpMethod.Get,
-            $"/api/logs{(query is null ? "" : $"?{query}")}");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await Factory.CreateClient().SendAsync(request);
+            $"/api/logs{(query is null ? "" : $"?{query}")}",
+            token);
     }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
-    }
-
-    private static object Body(int moodRating = 3, string? notes = null, string? logDate = null) => new
-    {
-        logDate = logDate ?? DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7.5,
-        sleepQuality = 4,
-        sleepDisturbances = new[] { "none" },
-        activityType = "walking",
-        activityMinutes = 30,
-        socialFrequency = "occasional",
-        symptoms = new[] { new { type = "fatigue", severity = 3 } },
-        notes,
-    };
 }

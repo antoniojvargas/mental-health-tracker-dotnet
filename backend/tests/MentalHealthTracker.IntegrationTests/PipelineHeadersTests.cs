@@ -19,7 +19,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // y un error que saliera sin cabeceras sería justo el caso que nadie mira.
 [Collection(IntegrationTestGroup.Name)]
 public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const string StrictCsp =
         "default-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";
@@ -121,18 +121,7 @@ public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory fac
             case "400-validation":
                 {
                     var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
-                    var body = JsonContent.Create(new
-                    {
-                        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                        moodRating = 9,
-                        anxietyLevel = 5,
-                        stressLevel = 5,
-                        sleepHours = 7,
-                        sleepQuality = 4,
-                        sleepDisturbances = Array.Empty<string>(),
-                        socialFrequency = "none",
-                        symptoms = Array.Empty<object>(),
-                    });
+                    var body = JsonBody(new CreateDailyLogRequestBuilder().WithMoodRating(9).Build());
                     return await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, body, requestId);
                 }
 
@@ -161,7 +150,7 @@ public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory fac
         using var request = new HttpRequestMessage(method, path) { Content = content };
         if (token is not null)
         {
-            request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+            request.Headers.AddSessionCookie(token);
         }
 
         if (requestId is not null)

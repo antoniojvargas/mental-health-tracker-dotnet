@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // JWT se verifique una sola vez y el segundo reutilice el resultado.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class SingleVerificationPerRequestTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task PostLogs_WithValidSession_VerifiesTheTokenOnce()
@@ -52,31 +52,16 @@ public sealed class SingleVerificationPerRequestTests(CustomWebApplicationFactor
                     provider.GetRequiredService<TimeProvider>(),
                     counter))));
 
-    private static async Task<HttpResponseMessage> PostLogAsync(
+    private async Task<HttpResponseMessage> PostLogAsync(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> host,
         string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
-        {
-            Content = JsonContent.Create(ValidLog()),
-        };
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await host.CreateClient().SendAsync(request);
+        return await host.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/api/logs",
+            token,
+            JsonBody(new CreateDailyLogRequestBuilder().Build()));
     }
-
-    private static object ValidLog() => new
-    {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating = 5,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7,
-        sleepQuality = 4,
-        sleepDisturbances = Array.Empty<string>(),
-        socialFrequency = "none",
-        symptoms = Array.Empty<object>(),
-    };
 
     private sealed class VerificationCounter
     {

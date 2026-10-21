@@ -12,7 +12,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // helper cambia el primer carácter, que altera los bytes pase lo que pase.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class TamperedTokenTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const int Samples = 500;
 

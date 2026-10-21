@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
-using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Enums;
 using MentalHealthTracker.Domain.Models;
@@ -15,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // acota la fecha a "UTC + 1 día", porque UTC+14 es la zona más adelantada.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static DateOnly UtcToday => DateOnly.FromDateTime(DateTime.UtcNow);
 
@@ -127,12 +126,10 @@ public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> GetTodayAsync(string token, string? query = null)
     {
-        using var request = new HttpRequestMessage(
+        return await Factory.CreateClient().SendAuthenticatedAsync(
             HttpMethod.Get,
-            $"/api/logs/today{(query is null ? "" : $"?{query}")}");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await Factory.CreateClient().SendAsync(request);
+            $"/api/logs/today{(query is null ? "" : $"?{query}")}",
+            token);
     }
 
     private static async Task<JsonElement> ReadJsonAsync(HttpResponseMessage response)

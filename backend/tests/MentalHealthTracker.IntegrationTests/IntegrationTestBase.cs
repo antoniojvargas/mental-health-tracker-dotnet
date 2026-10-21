@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
@@ -8,6 +10,7 @@ using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -25,10 +28,10 @@ namespace MentalHealthTracker.IntegrationTests;
 // siguiente la vacía igual al arrancar. Así una prueba que falle a la mitad, o que ni
 // llegue a DisposeAsync, no puede arrastrar basura a la siguiente.
 //
-// Al heredar de esta clase hay que escribir la lista de bases como
-// `: IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>`, con la
-// clase base primero. Al revés no compila: con constructor primario, C# no acepta que una
-// interfaz preceda a una clase base con argumentos y falla con CS1003.
+// La factory llega por constructor: la comparte toda la colección IntegrationTestGroup.Name
+// (ICollectionFixture, un arranque y una migración por ejecución) o, en la colección
+// aislada, la trae la propia clase como IClassFixture. Se hereda con
+// `: IntegrationTestBase(factory)`.
 public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) : IAsyncLifetime
 {
     protected CustomWebApplicationFactory Factory { get; } = factory;
@@ -90,6 +93,40 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
         return (client, user, token);
     }
 
+    // Las opciones de JSON de la propia API (las de MVC: camelCase y enums en snake_case). Se
+    // resuelven de la factory para que las peticiones de test viajen exactamente como las
+    // serializa y deserializa la aplicación, y no con las opciones por defecto de System.Text.Json.
+    protected JsonSerializerOptions AppJsonOptions =>
+        Factory.Services.GetRequiredService<IOptions<Microsoft.AspNetCore.Mvc.JsonOptions>>().Value.JsonSerializerOptions;
+
+    protected JsonContent JsonBody(CreateDailyLogRequest request) =>
+        JsonContent.Create(request, options: AppJsonOptions);
+
+    // POST /api/logs con la cookie de sesión del token. Se construye el cuerpo con
+    // CreateDailyLogRequestBuilder para declarar solo lo que cada prueba quiere variar.
+    protected async Task<HttpResponseMessage> PostLogAsync(string token, CreateDailyLogRequest request)
+    {
+        return await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Post, "/api/logs", token, JsonBody(request));
+    }
+
+    // Sesión creada sin pasar por HTTP: inserta el usuario con el repositorio y firma el token con
+    // JwtService, ambos del contenedor de la propia factory. Es más barata que el login por
+    // /api/auth/test-login y devuelve solo el usuario y el token (sin HttpClient), que es lo que
+    // necesitan las pruebas que montan su propio cliente, su cabecera Cookie o el handshake de
+    // SignalR. Cada llamada crea un usuario nuevo con GoogleId y email únicos.
+    protected async Task<(User User, string Token)> CreateSessionTokenAsync()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
+
+        var email = $"e2e-{Guid.NewGuid():N}@example.com";
+        var user = await repository.UpsertByGoogleIdAsync(
+            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
+
+        return (user, jwtService.Sign(user.Id, user.Email));
+    }
+
     // Devuelve el token con la firma alterada de forma que SEGURO deje de verificar.
     // Se cambia el PRIMER carácter de la firma (tercer segmento): usa sus 6 bits, así que
     // cualquier cambio altera el primer byte. Cambiar el último no vale: solo aporta 4 de
@@ -123,7 +160,7 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+            request.Headers.AddSessionCookie(token);
             return base.SendAsync(request, cancellationToken);
         }
     }

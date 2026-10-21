@@ -16,7 +16,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // Serilog que guarda los eventos en memoria.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class RequestLoggingTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const string RequestLogSource = "Serilog.AspNetCore.RequestLoggingMiddleware";
 
@@ -27,7 +27,7 @@ public sealed class RequestLoggingTests(CustomWebApplicationFactory factory)
         var sink = new CollectingSink();
         await using var host = HostWith(sink);
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+        request.Headers.AddSessionCookie(token);
         request.Headers.TryAddWithoutValidation("X-Request-Id", "trace-ok-1");
 
         using var response = await host.CreateClient().SendAsync(request);
@@ -77,10 +77,7 @@ public sealed class RequestLoggingTests(CustomWebApplicationFactory factory)
         var sink = new CollectingSink();
         await using var host = HostWith(sink, services =>
             services.AddScoped<IDailyLogService, FailingDailyLogService>());
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        using var response = await host.CreateClient().SendAsync(request);
+        using var response = await host.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/logs", token);
 
         Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
         var entry = Assert.Single(sink.RequestLogs);
