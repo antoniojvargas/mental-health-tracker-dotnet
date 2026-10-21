@@ -158,7 +158,7 @@ Los comandos se ejecutan desde la raíz del repositorio. `dotnet-ef` y `reportge
 | `dotnet tool run dotnet-ef migrations add <Nombre> --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Crea una migración nueva en `Infrastructure/Persistence/Migrations`. |
 | `dotnet tool run dotnet-ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
 | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
-| `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`). |
+| `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`, o la cadena de Npgsql de otra base en `TEST_DATABASE_URL`). |
 | `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 70 %. |
 
 ### Dependencias NuGet

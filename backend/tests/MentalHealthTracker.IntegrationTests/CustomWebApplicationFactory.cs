@@ -5,7 +5,8 @@ using Microsoft.Extensions.Configuration;
 namespace MentalHealthTracker.IntegrationTests;
 
 // Fabrica de la API completa (WebApplicationFactory<Program>) con configuración propia
-// de test: apunta a postgres-test (docker-compose.test.yml, puerto 5433) y provee los
+// de test: apunta a postgres-test (docker-compose.test.yml, puerto 5433, o la cadena de
+// TEST_DATABASE_URL si está definida) y provee los
 // secretos ficticios que el entry point valida al arrancar (Jwt:Secret, GoogleOAuth:*,
 // AppUrls:FrontendUrl). Sin estos valores ValidateOnStart de Program.cs abortaría el boot.
 // El entorno se fija a "Testing", que es lo que habilita MapTestAuthEndpoints en
@@ -15,6 +16,18 @@ namespace MentalHealthTracker.IntegrationTests;
 // espera a que postgres-test acepte conexiones con backoff exponencial.
 public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    public const string DatabaseUrlVariable = "TEST_DATABASE_URL";
+
+    public const string DefaultConnectionString = "Host=localhost;Port=5433;Database=mht_test;Username=mht_test;Password=mht_test";
+
+    // Cadena de conexión de Npgsql (no una URL postgres://) de la base de test. Se lee de
+    // TEST_DATABASE_URL para apuntar a otra instancia (otro puerto, una base de CI); sin ella,
+    // o si está vacía, la del compose de test.
+    public static string ConnectionString { get; } = Resolve(Environment.GetEnvironmentVariable(DatabaseUrlVariable));
+
+    internal static string Resolve(string? fromEnvironment) =>
+        string.IsNullOrWhiteSpace(fromEnvironment) ? DefaultConnectionString : fromEnvironment;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -23,7 +36,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Database:ConnectionString"] = "Host=localhost;Port=5433;Database=mht_test;Username=mht_test;Password=mht_test",
+                ["Database:ConnectionString"] = ConnectionString,
                 ["Jwt:Secret"] = "integration-test-jwt-secret-key-value",
                 ["Jwt:ExpiresInDays"] = "7",
                 ["GoogleOAuth:ClientId"] = "integration-test-client.apps.googleusercontent.com",

@@ -416,7 +416,8 @@ máquina, no una omisión.
    así que el estado no se hereda ni entre pruebas ni entre ejecuciones.
 3. **Mantener ambas vías cuesta más de lo que ahorra.** Pedir compose como opción local
    rápida y Testcontainers como vía principal obliga a que la connection string deje de ser
-   una constante en `CustomWebApplicationFactory` (hoy fija `localhost:5433`) y pase a
+   una constante en `CustomWebApplicationFactory` (hoy `localhost:5433` por defecto, sobreescribible
+   con `TEST_DATABASE_URL`) y pase a
    inyectarse, con un valor por defecto para el compose y otro asignado dinámicamente por
    el puerto mapeado del contenedor. Eso son dos rutas de configuración para la misma base
    de datos y, por tanto, dos maneras de que los tests apunten a la instancia equivocada.
