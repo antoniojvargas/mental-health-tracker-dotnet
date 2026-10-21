@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import Modal from '../ui/Modal.vue'
 import Button from '../ui/Button.vue'
 import Skeleton from '../ui/Skeleton.vue'
@@ -10,13 +10,13 @@ import {
   ACTIVITY_TYPE_OPTIONS,
   SLEEP_DISTURBANCE_OPTIONS,
   SOCIAL_FREQUENCY_OPTIONS,
-  createDefaultSymptoms,
 } from './daily-log-options'
-import { fromDailyLog, toCreateDailyLogInput } from './daily-log-mapper'
+import { toCreateDailyLogInput } from './daily-log-mapper'
 import type { DailyLogForm } from '../../types/daily-log-form'
-import { create as createLog, today as getToday } from '../../services/logs.api'
+import { create as createLog } from '../../services/logs.api'
 import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'
+import { useDailyLogForm } from '../../composables/useDailyLogForm'
 import { useToast } from '../../composables/useToast'
 import type { DailyLog } from '../../types/daily-log'
 
@@ -42,113 +42,30 @@ const emit = defineEmits<{
   (e: 'saved', log: DailyLog): void
 }>()
 
-const steps = ['Mood', 'Sleep', 'Activity and social life', 'Symptoms'] as const
-type StepIndex = 0 | 1 | 2 | 3
-const currentStep = ref<StepIndex>(0)
 const isSubmitting = ref(false)
-const isLoading = ref(false)
-/** Mensaje si no se pudo traer el registro de hoy, o `null` si no hubo fallo. */
-const loadError = ref<string | null>(null)
 const { success, error: toastError } = useToast()
-
-const form = reactive<DailyLogForm>({
-  mood: null,
-  anxiety: 5,
-  stress: 5,
-  sleepQuality: 3,
-  sleepHours: 7,
-  sleepDisturbances: [],
-  activityType: 'none',
-  activityMinutes: 0,
-  socialFrequency: 'none',
-  symptoms: createDefaultSymptoms(),
-  notes: '',
-})
-
-const progress = computed(() => ((currentStep.value + 1) / steps.length) * 100)
-
-const canGoNext = computed(() => {
-  switch (currentStep.value) {
-    case 0: // Mood
-      return form.mood != null
-    default:
-      return true
-  }
-})
-
-const isLastStep = computed(() => currentStep.value === steps.length - 1)
-
-/**
- * El formulario se puede avanzar y guardar solo cuando la carga de hoy terminó
- * bien. Mientras carga o si falló, esos botones ni se pintan: no hay sobre qué
- * actuar y evitan guardar un registro a medias con los valores por defecto.
- */
-const isReady = computed(() => !isLoading.value && !loadError.value)
-
-function loadToday() {
-  isLoading.value = true
-  loadError.value = null
-  getToday(todayIso())
-    .then((log: DailyLog | null) => {
-      if (log) {
-        fillFromLog(log)
-      } else {
-        resetForm()
-      }
-    })
-    .catch((thrown: unknown) => {
-      // No se pudo leer el registro de hoy: en vez del formulario se muestra el
-      // aviso con reintento, así que nadie edita sobre datos que no llegaron.
-      loadError.value = describeError(thrown)
-      resetForm()
-    })
-    .finally(() => {
-      isLoading.value = false
-    })
-}
-
-function fillFromLog(log: DailyLog) {
-  Object.assign(form, fromDailyLog(log))
-  currentStep.value = 0
-}
+const {
+  form,
+  steps,
+  currentStep,
+  progress,
+  canGoNext,
+  isLastStep,
+  isLoading,
+  loadError,
+  isReady,
+  next,
+  back,
+  reset: resetForm,
+  loadToday,
+} = useDailyLogForm()
 
 watch(
   () => props.open,
   (open) => {
-    if (open) {
-      currentStep.value = 0
-      loadToday()
-    }
+    if (open) loadToday()
   },
 )
-
-function next() {
-  if (!canGoNext.value) return
-  if (currentStep.value < steps.length - 1) {
-    currentStep.value = (currentStep.value + 1) as StepIndex
-  }
-}
-
-function back() {
-  if (currentStep.value > 0) {
-    currentStep.value = (currentStep.value - 1) as StepIndex
-  }
-}
-
-function resetForm() {
-  form.mood = null
-  form.anxiety = 5
-  form.stress = 5
-  form.sleepQuality = 3
-  form.sleepHours = 7
-  form.sleepDisturbances = []
-  form.activityType = 'none'
-  form.activityMinutes = 0
-  form.socialFrequency = 'none'
-  form.symptoms = createDefaultSymptoms()
-  form.notes = ''
-  currentStep.value = 0
-}
 
 async function handleSubmit() {
   if (isSubmitting.value) return
