@@ -6,7 +6,8 @@ const built: { id: number }[] = []
 const withUrl = vi.fn()
 const withAutomaticReconnect = vi.fn()
 const build = vi.fn()
-const start = vi.fn()
+const start = vi.fn().mockResolvedValue(undefined)
+const stop = vi.fn()
 let builderCreated = 0
 
 vi.mock('@microsoft/signalr', () => {
@@ -27,7 +28,7 @@ vi.mock('@microsoft/signalr', () => {
 
     build() {
       build()
-      const connection = { id: built.length + 1, start }
+      const connection = { id: built.length + 1, start, stop }
       built.push(connection)
       return connection
     }
@@ -49,6 +50,7 @@ describe('hub-client', () => {
     withAutomaticReconnect.mockClear()
     build.mockClear()
     start.mockClear()
+    stop.mockClear()
   })
 
   it('importar el módulo no crea ninguna conexión', async () => {
@@ -103,5 +105,72 @@ describe('hub-client', () => {
 
     expect(second).not.toBe(first)
     expect(build).toHaveBeenCalledTimes(2)
+  })
+
+  describe('conteo de consumidores', () => {
+    it('un solo consumidor: acquire arranca la conexión y release la detiene', async () => {
+      const { acquireLogHub, releaseLogHub } = await loadModule()
+
+      const { connection: hub } = acquireLogHub()
+
+      expect(hub).toBe(built[0])
+      expect(start).toHaveBeenCalledTimes(1)
+      expect(stop).not.toHaveBeenCalled()
+
+      releaseLogHub()
+
+      expect(stop).toHaveBeenCalledTimes(1)
+    })
+
+    it('dos consumidores: arranca con el primero y se detiene solo con el último', async () => {
+      const { acquireLogHub, releaseLogHub } = await loadModule()
+
+      const first = acquireLogHub()
+      const second = acquireLogHub()
+
+      expect(second.connection).toBe(first.connection)
+      expect(second.started).toBe(first.started)
+      expect(build).toHaveBeenCalledTimes(1)
+      expect(start).toHaveBeenCalledTimes(1)
+
+      releaseLogHub()
+      expect(stop).not.toHaveBeenCalled()
+
+      releaseLogHub()
+      expect(stop).toHaveBeenCalledTimes(1)
+    })
+
+    it('si start() falla, started se rechaza y no se reintenta', async () => {
+      start.mockRejectedValueOnce(new Error('servidor caído'))
+      const { acquireLogHub } = await loadModule()
+
+      const { started } = acquireLogHub()
+
+      await expect(started).rejects.toThrow('servidor caído')
+      expect(start).toHaveBeenCalledTimes(1)
+    })
+
+    it('tras detenerse, un consumidor nuevo vuelve a arrancarla', async () => {
+      const { acquireLogHub, releaseLogHub } = await loadModule()
+
+      acquireLogHub()
+      releaseLogHub()
+      acquireLogHub()
+
+      expect(start).toHaveBeenCalledTimes(2)
+    })
+
+    it('soltar de más no detiene ni descuenta a los consumidores vivos', async () => {
+      const { acquireLogHub, releaseLogHub } = await loadModule()
+
+      releaseLogHub()
+      expect(stop).not.toHaveBeenCalled()
+
+      acquireLogHub()
+      releaseLogHub()
+      releaseLogHub()
+
+      expect(stop).toHaveBeenCalledTimes(1)
+    })
   })
 })

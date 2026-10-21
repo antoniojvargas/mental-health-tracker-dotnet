@@ -20,13 +20,13 @@ public sealed partial class LogEventEmitter(
         Guid userId,
         DailyLogResponse log,
         CancellationToken cancellationToken = default) =>
-        SendAsync("log:created", userId, log);
+        SendAsync(LogHubEvents.LogCreated, userId, log);
 
     public Task EmitLogUpdatedAsync(
         Guid userId,
         DailyLogResponse log,
         CancellationToken cancellationToken = default) =>
-        SendAsync("log:updated", userId, log);
+        SendAsync(LogHubEvents.LogUpdated, userId, log);
 
     private async Task SendAsync(string eventName, Guid userId, DailyLogResponse log)
     {
