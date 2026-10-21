@@ -1,8 +1,5 @@
 using System.Net;
 using MentalHealthTracker.Api.Modules.Auth;
-using MentalHealthTracker.Domain.Models;
-using MentalHealthTracker.Domain.Repositories;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -25,7 +22,7 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Negotiate_WithTamperedCookie_Returns401()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
         var tampered = TamperSignature(token);
 
         var client = Factory.CreateClient();
@@ -41,7 +38,7 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Negotiate_WithValidCookie_Returns200()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
 
         var client = Factory.CreateClient();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
@@ -51,18 +48,5 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
     }
 }

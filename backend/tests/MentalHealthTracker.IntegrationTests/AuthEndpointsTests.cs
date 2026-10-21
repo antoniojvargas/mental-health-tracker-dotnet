@@ -3,8 +3,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MentalHealthTracker.Api.Modules.Auth;
-using MentalHealthTracker.Domain.Models;
-using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Configuration;
@@ -51,7 +49,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Me_WithValidCookie_ReturnsUser()
     {
-        var (user, token) = await CreateAuthenticatedSessionAsync();
+        var (user, token) = await CreateSessionTokenAsync();
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
         request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
@@ -71,7 +69,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Me_WithTamperedCookie_Returns401()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
         var tampered = TamperSignature(token);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
@@ -85,7 +83,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task Logout_ClearsSessionCookie()
     {
-        var (_, token) = await CreateAuthenticatedSessionAsync();
+        var (_, token) = await CreateSessionTokenAsync();
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
         request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
@@ -157,18 +155,5 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         Assert.Equal("select_account", query["prompt"]);
         Assert.Equal("integration-test-client.apps.googleusercontent.com", query["client_id"]);
         Assert.Equal("http://localhost:5173/api/auth/google/callback", query["redirect_uri"]);
-    }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
     }
 }

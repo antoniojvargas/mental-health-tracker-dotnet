@@ -90,6 +90,24 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
         return (client, user, token);
     }
 
+    // Sesión creada sin pasar por HTTP: inserta el usuario con el repositorio y firma el token con
+    // JwtService, ambos del contenedor de la propia factory. Es más barata que el login por
+    // /api/auth/test-login y devuelve solo el usuario y el token (sin HttpClient), que es lo que
+    // necesitan las pruebas que montan su propio cliente, su cabecera Cookie o el handshake de
+    // SignalR. Cada llamada crea un usuario nuevo con GoogleId y email únicos.
+    protected async Task<(User User, string Token)> CreateSessionTokenAsync()
+    {
+        await using var scope = Factory.Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
+
+        var email = $"e2e-{Guid.NewGuid():N}@example.com";
+        var user = await repository.UpsertByGoogleIdAsync(
+            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
+
+        return (user, jwtService.Sign(user.Id, user.Email));
+    }
+
     // Devuelve el token con la firma alterada de forma que SEGURO deje de verificar.
     // Se cambia el PRIMER carácter de la firma (tercer segmento): usa sus 6 bits, así que
     // cualquier cambio altera el primer byte. Cambiar el último no vale: solo aporta 4 de

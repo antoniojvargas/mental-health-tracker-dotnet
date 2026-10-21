@@ -4,8 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using MentalHealthTracker.Api.Core.RateLimiting;
 using MentalHealthTracker.Api.Modules.Auth;
-using MentalHealthTracker.Domain.Models;
-using MentalHealthTracker.Domain.Repositories;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -60,8 +58,8 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
     [Fact]
     public async Task WritePolicy_ExhaustingOneUserQuota_DoesNotAffectAnotherUser()
     {
-        var (_, tokenA) = await CreateAuthenticatedSessionAsync();
-        var (_, tokenB) = await CreateAuthenticatedSessionAsync();
+        var (_, tokenA) = await CreateSessionTokenAsync();
+        var (_, tokenB) = await CreateSessionTokenAsync();
 
         for (var i = 0; i < WritePermitLimit; i++)
         {
@@ -95,19 +93,6 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
         request.Content = JsonContent.Create(body);
 
         return await Factory.CreateClient().SendAsync(request);
-    }
-
-    private async Task<(Domain.Entities.User User, string Token)> CreateAuthenticatedSessionAsync()
-    {
-        await using var scope = Factory.Services.CreateAsyncScope();
-        var repository = scope.ServiceProvider.GetRequiredService<IUserRepository>();
-        var jwtService = scope.ServiceProvider.GetRequiredService<JwtService>();
-
-        var email = $"e2e-{Guid.NewGuid():N}@example.com";
-        var user = await repository.UpsertByGoogleIdAsync(
-            new GoogleProfile($"e2e-{Guid.NewGuid():N}", email, "Integration Test User", null));
-
-        return (user, jwtService.Sign(user.Id, user.Email));
     }
 
     private static object Body() => new
