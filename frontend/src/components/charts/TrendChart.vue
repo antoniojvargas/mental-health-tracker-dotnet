@@ -11,6 +11,7 @@ import type { ChartData, ChartOptions } from 'chart.js'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 
+import { palette } from '../../theme/palette'
 import type { DailyLog } from '../../types/daily-log'
 import { parseIsoDate } from '../../utils/date'
 import { getMetric } from './metrics'
@@ -33,13 +34,13 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
  * eje desaparece y la rejilla conserva el punteado.
  */
 
-const GRID_COLOR = '#EAE0CB'
+const GRID_COLOR = palette.paper[200]
 // ink-400 y no ink-300: el gris claro anterior se quedaba en 2.7:1 sobre el papel
 // y las etiquetas de los ejes no llegaban al 3:1 que pide el texto de gráficos.
-const TICK_COLOR = '#5D726D'
+const TICK_COLOR = palette.ink[400]
 const TICK_FONT = { family: '"IBM Plex Mono", monospace', size: 12 }
-const TOOLTIP_BG = '#2B3A3A'
-const TOOLTIP_TEXT = '#FBF8F2'
+const TOOLTIP_BG = palette.ink[700]
+const TOOLTIP_TEXT = palette.paper[50]
 
 /**
  * Etiquetas del eje X: el ISO crudo ("2026-10-05") ocupa casi todo el ancho de

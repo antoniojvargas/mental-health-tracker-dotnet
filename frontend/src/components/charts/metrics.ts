@@ -1,3 +1,4 @@
+import { palette } from '../../theme/palette'
 import type { DailyLog } from '../../types/daily-log'
 
 export interface MetricDef {
@@ -18,7 +19,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'mood',
     label: 'Mood',
-    color: '#7C9473',
+    color: palette.meadow[500],
     axis: 'scale',
     format: (l) => l.moodRating,
     describe: (v) => scaleLabel(v, ['very low', 'low', 'neutral', 'good', 'very good']),
@@ -26,7 +27,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'anxiety',
     label: 'Anxiety',
-    color: '#6F94A6',
+    color: palette.clearsky[500],
     axis: 'scale',
     format: (l) => l.anxietyLevel,
     describe: (v) => `${v}/10`,
@@ -34,7 +35,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'stress',
     label: 'Stress',
-    color: '#C97C5D',
+    color: palette.ember[500],
     axis: 'scale',
     format: (l) => l.stressLevel,
     describe: (v) => `${v}/10`,
@@ -42,7 +43,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'sleepHours',
     label: 'Hours of sleep',
-    color: '#465F6C',
+    color: palette.clearsky[700],
     axis: 'hours',
     format: (l) => l.sleepHours,
     describe: (v) => `${v} h`,
@@ -50,7 +51,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'sleepQuality',
     label: 'Sleep quality',
-    color: '#A3BE95',
+    color: palette.meadow[300],
     axis: 'scale',
     format: (l) => l.sleepQuality,
     describe: (v) => scaleLabel(v, ['very poor', 'poor', 'fair', 'good', 'very good']),
@@ -58,7 +59,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'activityMinutes',
     label: 'Activity minutes',
-    color: '#63775B',
+    color: palette.meadow[600],
     axis: 'hours',
     format: (l) => l.activityMinutes ?? 0,
     describe: (v) => `${v} min`,
@@ -66,7 +67,7 @@ export const METRICS: MetricDef[] = [
   {
     key: 'symptomLoad',
     label: 'Symptom load',
-    color: '#33453F',
+    color: palette.ink[600],
     axis: 'scale',
     format: (l) =>
       l.symptoms.length
