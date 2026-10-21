@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 
 /**
  * Campo deslizante para valores numéricos con valor actual anunciado a lectores
@@ -46,9 +46,10 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: number): void
 }>()
 
-const inputId = computed(
-  () => props.id ?? `slider-${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`,
-)
+// `useId` da un id único y estable por instancia (también entre servidor y cliente), así que dos
+// sliders en pantalla nunca comparten el que enlaza su etiqueta con su input.
+const generatedId = `slider-${useId()}`
+const inputId = computed(() => props.id ?? generatedId)
 
 function onInput(e: Event) {
   const target = e.target as HTMLInputElement | null
