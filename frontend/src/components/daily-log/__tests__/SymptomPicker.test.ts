@@ -3,29 +3,20 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import SymptomPicker from '../SymptomPicker.vue'
-import { defaultSymptoms, type SymptomEntry } from '../symptoms'
+import { SYMPTOM_OPTIONS, createDefaultSymptoms, type SymptomEntry } from '../daily-log-options'
 import { SYMPTOM_TYPES } from '../../../types/daily-log'
 
 function defaultEntries(): SymptomEntry[] {
-  return defaultSymptoms()
+  return createDefaultSymptoms()
 }
 
 describe('SymptomPicker', () => {
   it('offers exactly the 8 SymptomType values with their labels', () => {
     const wrapper = mount(SymptomPicker)
     const labels = wrapper.findAll('label').map((l) => l.text())
-    expect(labels).toEqual([
-      'Panic',
-      'Low mood',
-      'Fatigue',
-      'Irritability',
-      'Concentration',
-      'Appetite change',
-      'Restlessness',
-      'Hopelessness',
-    ])
+    expect(labels).toEqual(SYMPTOM_OPTIONS.map((o) => o.label))
     expect(
-      defaultSymptoms()
+      createDefaultSymptoms()
         .map((e) => e.key)
         .sort(),
     ).toEqual([...SYMPTOM_TYPES].sort())

@@ -6,7 +6,13 @@ import Skeleton from '../ui/Skeleton.vue'
 import MoodScale from './MoodScale.vue'
 import SliderField from './SliderField.vue'
 import SymptomPicker from './SymptomPicker.vue'
-import { defaultSymptoms, type SymptomEntry } from './symptoms'
+import {
+  ACTIVITY_TYPE_OPTIONS,
+  SLEEP_DISTURBANCE_OPTIONS,
+  SOCIAL_FREQUENCY_OPTIONS,
+  createDefaultSymptoms,
+  type SymptomEntry,
+} from './daily-log-options'
 import { create as createLog, today as getToday } from '../../services/logs.api'
 import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'
@@ -50,32 +56,6 @@ const isLoading = ref(false)
 const loadError = ref<string | null>(null)
 const { success, error: toastError } = useToast()
 
-const sleepDisturbanceOptions = [
-  { key: 'insomnia', label: 'Trouble falling asleep' },
-  { key: 'frequent_waking', label: 'Waking up during the night' },
-  { key: 'early_waking', label: 'Waking up too early' },
-  { key: 'nightmares', label: 'Nightmares' },
-] as const satisfies readonly { key: SleepDisturbance; label: string }[]
-
-const activityTypeOptions = [
-  { key: 'none', label: 'None' },
-  { key: 'walking', label: 'Walk' },
-  { key: 'running', label: 'Run' },
-  { key: 'gym', label: 'Gym' },
-  { key: 'yoga', label: 'Yoga/Stretching' },
-  { key: 'cycling', label: 'Cycling' },
-  { key: 'sports', label: 'Sports' },
-  { key: 'other', label: 'Other' },
-] as const satisfies readonly { key: ActivityType; label: string }[]
-
-const socialFrequencyOptions = [
-  { key: 'none', label: 'None' },
-  { key: 'rare', label: 'Once' },
-  { key: 'occasional', label: 'A few times' },
-  { key: 'frequent', label: 'Several times' },
-  { key: 'daily', label: 'Daily' },
-] as const
-
 const form = reactive<DailyLogForm>({
   mood: null,
   anxiety: 5,
@@ -86,7 +66,7 @@ const form = reactive<DailyLogForm>({
   activityType: 'none',
   activityMinutes: 0,
   socialFrequency: 'none',
-  symptoms: defaultSymptoms(),
+  symptoms: createDefaultSymptoms(),
   notes: '',
 })
 
@@ -156,7 +136,7 @@ function fillFromLog(log: DailyLog) {
   form.activityType = log.activityType ?? 'none'
   form.activityMinutes = log.activityMinutes ?? 0
   form.socialFrequency = log.socialFrequency
-  form.symptoms = defaultSymptoms().map((d) => {
+  form.symptoms = createDefaultSymptoms().map((d) => {
     const found = (log.symptoms || []).find((s) => s.type === d.key)
     return found ? { ...d, active: true, severity: Math.min(5, Math.max(1, found.severity)) } : d
   })
@@ -197,7 +177,7 @@ function resetForm() {
   form.activityType = 'none'
   form.activityMinutes = 0
   form.socialFrequency = 'none'
-  form.symptoms = defaultSymptoms()
+  form.symptoms = createDefaultSymptoms()
   form.notes = ''
   currentStep.value = 0
 }
@@ -342,7 +322,7 @@ function close() {
               </legend>
               <div class="grid gap-2 sm:grid-cols-2">
                 <label
-                  v-for="opt in sleepDisturbanceOptions"
+                  v-for="opt in SLEEP_DISTURBANCE_OPTIONS"
                   :key="opt.key"
                   class="flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-transparent px-2 py-2 hover:bg-ink-50"
                 >
@@ -370,7 +350,7 @@ function close() {
                 v-model="form.activityType"
                 class="min-h-11 rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
               >
-                <option v-for="opt in activityTypeOptions" :key="opt.key" :value="opt.key">
+                <option v-for="opt in ACTIVITY_TYPE_OPTIONS" :key="opt.key" :value="opt.key">
                   {{ opt.label }}
                 </option>
               </select>
@@ -395,7 +375,7 @@ function close() {
                 v-model="form.socialFrequency"
                 class="min-h-11 rounded-lg border border-ink-200 bg-paper-50 px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clearsky-500"
               >
-                <option v-for="opt in socialFrequencyOptions" :key="opt.key" :value="opt.key">
+                <option v-for="opt in SOCIAL_FREQUENCY_OPTIONS" :key="opt.key" :value="opt.key">
                   {{ opt.label }}
                 </option>
               </select>

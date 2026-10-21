@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { defaultSymptoms, type SymptomEntry } from './symptoms'
+import { createDefaultSymptoms, type SymptomEntry } from './daily-log-options'
 
 /**
  * Selector de síntomas para registro diario.
@@ -18,7 +18,7 @@ const props = withDefaults(
     ariaLabel?: string
   }>(),
   {
-    modelValue: defaultSymptoms,
+    modelValue: createDefaultSymptoms,
     disabled: false,
     ariaLabel: 'Symptom picker',
   },
