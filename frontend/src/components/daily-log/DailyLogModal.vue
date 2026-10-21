@@ -12,7 +12,8 @@ import {
   SOCIAL_FREQUENCY_OPTIONS,
   createDefaultSymptoms,
 } from './daily-log-options'
-import { fromDailyLog, toCreateDailyLogInput, type DailyLogForm } from './daily-log-mapper'
+import { fromDailyLog, toCreateDailyLogInput } from './daily-log-mapper'
+import type { DailyLogForm } from '../../types/daily-log-form'
 import { create as createLog, today as getToday } from '../../services/logs.api'
 import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import SymptomPicker from '../SymptomPicker.vue'
-import { SYMPTOM_OPTIONS, createDefaultSymptoms, type SymptomEntry } from '../daily-log-options'
+import { SYMPTOM_OPTIONS, createDefaultSymptoms } from '../daily-log-options'
+import type { SymptomEntry } from '../../../types/daily-log-form'
 import { SYMPTOM_TYPES } from '../../../types/daily-log'
 
 function defaultEntries(): SymptomEntry[] {

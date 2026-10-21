@@ -7,29 +7,9 @@
  * especificación del formulario sin pérdida (daily-log-mapper.test.ts).
  */
 
-import type {
-  ActivityType,
-  CreateDailyLogInput,
-  DailyLog,
-  IsoDate,
-  SleepDisturbance,
-  SocialFrequency,
-} from '../../types/daily-log'
-import { createDefaultSymptoms, type SymptomEntry } from './daily-log-options'
-
-export interface DailyLogForm {
-  mood: number | null
-  anxiety: number
-  stress: number
-  sleepQuality: number
-  sleepHours: number
-  sleepDisturbances: SleepDisturbance[]
-  activityType: ActivityType
-  activityMinutes: number
-  socialFrequency: SocialFrequency
-  symptoms: SymptomEntry[]
-  notes: string
-}
+import type { CreateDailyLogInput, DailyLog, IsoDate } from '../../types/daily-log'
+import type { DailyLogForm } from '../../types/daily-log-form'
+import { createDefaultSymptoms } from './daily-log-options'
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))

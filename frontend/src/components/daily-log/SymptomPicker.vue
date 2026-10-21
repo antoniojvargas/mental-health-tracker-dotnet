@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { createDefaultSymptoms, type SymptomEntry } from './daily-log-options'
+import { createDefaultSymptoms } from './daily-log-options'
+import type { SymptomEntry } from '../../types/daily-log-form'
 
 /**
  * Selector de síntomas para registro diario.

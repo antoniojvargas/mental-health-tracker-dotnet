@@ -14,6 +14,7 @@ import type {
   SocialFrequency,
   SymptomType,
 } from '../../types/daily-log'
+import type { SymptomEntry } from '../../types/daily-log-form'
 
 export interface Option<T extends string> {
   /** Valor del enum: es la clave estable y lo que viaja a la API. */
@@ -73,18 +74,6 @@ export const ACTIVITY_TYPE_OPTIONS = toOptions(ACTIVITY_TYPE_LABELS)
 export const SOCIAL_FREQUENCY_OPTIONS = toOptions(SOCIAL_FREQUENCY_LABELS)
 
 export const SYMPTOM_OPTIONS = toOptions(SYMPTOM_LABELS)
-
-/** Un síntoma del formulario: la opción más su estado de activación y severidad. */
-export interface SymptomEntry {
-  /** Valor del enum SymptomType: es la clave estable y lo que viaja a la API. */
-  key: SymptomType
-  /** Etiqueta legible. */
-  label: string
-  /** Activo. */
-  active: boolean
-  /** Severidad 1-5 cuando está activo. */
-  severity: number
-}
 
 /** Una entrada inactiva por cada SymptomType, en el orden en que se muestran. */
 export function createDefaultSymptoms(): SymptomEntry[] {
