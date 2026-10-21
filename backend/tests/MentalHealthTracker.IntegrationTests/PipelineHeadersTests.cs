@@ -150,7 +150,7 @@ public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory fac
         using var request = new HttpRequestMessage(method, path) { Content = content };
         if (token is not null)
         {
-            request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+            request.Headers.AddSessionCookie(token);
         }
 
         if (requestId is not null)

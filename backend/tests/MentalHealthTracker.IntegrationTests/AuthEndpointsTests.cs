@@ -51,10 +51,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
     {
         var (user, token) = await CreateSessionTokenAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        var response = await Factory.CreateClient().SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/auth/me", token);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -72,10 +69,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
         var (_, token) = await CreateSessionTokenAsync();
         var tampered = TamperSignature(token);
 
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={tampered}");
-
-        var response = await Factory.CreateClient().SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/auth/me", tampered);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -85,10 +79,7 @@ public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
     {
         var (_, token) = await CreateSessionTokenAsync();
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        var response = await Factory.CreateClient().SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Post, "/api/auth/logout", token);
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
 

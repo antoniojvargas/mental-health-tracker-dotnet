@@ -290,7 +290,7 @@ public sealed partial class ContractGoldenTests(CustomWebApplicationFactory fact
         using var request = new HttpRequestMessage(method, path) { Content = content };
         if (token is not null)
         {
-            request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+            request.Headers.AddSessionCookie(token);
         }
 
         return await factory.CreateClient().SendAsync(request);

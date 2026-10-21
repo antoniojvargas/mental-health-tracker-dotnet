@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -129,10 +128,7 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
                 services.AddScoped<IDailyLogService, ThrowingDailyLogService>()));
 
         var (_, _, token) = await CreateAuthenticatedSessionAsync($"contract-{Guid.NewGuid():N}@example.com");
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await failing.CreateClient().SendAsync(request);
+        return await failing.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/logs", token);
     }
 
     private sealed class ThrowingDailyLogService : IDailyLogService

@@ -78,10 +78,10 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> PostLogAsync(string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonBody(new CreateDailyLogRequestBuilder().WithNotes("mejor que ayer").Build());
-
-        return await Factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/api/logs",
+            token,
+            JsonBody(new CreateDailyLogRequestBuilder().WithNotes("mejor que ayer").Build()));
     }
 }

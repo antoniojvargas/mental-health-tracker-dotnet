@@ -106,11 +106,7 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
     // CreateDailyLogRequestBuilder para declarar solo lo que cada prueba quiere variar.
     protected async Task<HttpResponseMessage> PostLogAsync(string token, CreateDailyLogRequest request)
     {
-        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        message.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        message.Content = JsonBody(request);
-
-        return await Factory.CreateClient().SendAsync(message);
+        return await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Post, "/api/logs", token, JsonBody(request));
     }
 
     // Sesión creada sin pasar por HTTP: inserta el usuario con el repositorio y firma el token con
@@ -164,7 +160,7 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+            request.Headers.AddSessionCookie(token);
             return base.SendAsync(request, cancellationToken);
         }
     }

@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Enums;
 using MentalHealthTracker.Domain.Repositories;
@@ -205,10 +204,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> GetTodayAsync(string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs/today");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await Factory.CreateClient().SendAsync(request);
+        return await Factory.CreateClient().SendAuthenticatedAsync(HttpMethod.Get, "/api/logs/today", token);
     }
 
     private static async Task<int> TotalAsync(HttpResponseMessage response)
@@ -247,11 +243,9 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
 
     private async Task<HttpResponseMessage> GetLogsAsync(string token, string? query = null)
     {
-        using var request = new HttpRequestMessage(
+        return await Factory.CreateClient().SendAuthenticatedAsync(
             HttpMethod.Get,
-            $"/api/logs{(query is null ? "" : $"?{query}")}");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await Factory.CreateClient().SendAsync(request);
+            $"/api/logs{(query is null ? "" : $"?{query}")}",
+            token);
     }
 }

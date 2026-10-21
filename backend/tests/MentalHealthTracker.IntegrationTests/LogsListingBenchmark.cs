@@ -33,7 +33,7 @@ public sealed class LogsListingBenchmark(CustomWebApplicationFactory factory)
         var (_, user, token) = await CreateAuthenticatedSessionAsync($"bench-{Guid.NewGuid():N}@example.com");
         await SeedThirtyDaysAsync(user.Id);
         using var client = Factory.CreateClient();
-        client.DefaultRequestHeaders.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+        client.DefaultRequestHeaders.AddSessionCookie(token);
 
         // Comprobación de que lo que se mide devuelve datos: 30 registros.
         using (var probe = await client.GetAsync("/api/logs"))

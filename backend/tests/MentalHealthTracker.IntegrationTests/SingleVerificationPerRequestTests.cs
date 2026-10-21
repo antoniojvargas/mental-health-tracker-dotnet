@@ -56,13 +56,11 @@ public sealed class SingleVerificationPerRequestTests(CustomWebApplicationFactor
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> host,
         string token)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
-        {
-            Content = JsonBody(new CreateDailyLogRequestBuilder().Build()),
-        };
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        return await host.CreateClient().SendAsync(request);
+        return await host.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/api/logs",
+            token,
+            JsonBody(new CreateDailyLogRequestBuilder().Build()));
     }
 
     private sealed class VerificationCounter

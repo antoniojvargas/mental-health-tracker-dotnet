@@ -5,7 +5,6 @@ using System.Text.Json;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.Realtime;
 
 namespace MentalHealthTracker.IntegrationTests;
@@ -25,22 +24,21 @@ public sealed class RealtimeFailureTests(CustomWebApplicationFactory factory)
                 services.AddSingleton<IHubContext<LogsHub>, ThrowingHubContext>()));
 
         var (_, _, token) = await CreateAuthenticatedSessionAsync($"rt-{Guid.NewGuid():N}@example.com");
-        var cookie = $"{SessionCookie.AccessTokenName}={token}";
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        using var post = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
-        {
-            Content = JsonBody(new CreateDailyLogRequestBuilder().Build()),
-        };
-        post.Headers.TryAddWithoutValidation("Cookie", cookie);
-        var created = await failing.CreateClient().SendAsync(post);
+        var created = await failing.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/api/logs",
+            token,
+            JsonBody(new CreateDailyLogRequestBuilder().Build()));
 
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
-        using var list = new HttpRequestMessage(HttpMethod.Get, $"/api/logs?from={today}&to={today}");
-        list.Headers.TryAddWithoutValidation("Cookie", cookie);
-        var listed = await failing.CreateClient().SendAsync(list);
+        var listed = await failing.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Get,
+            $"/api/logs?from={today}&to={today}",
+            token);
 
         Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
         using var body = JsonDocument.Parse(await listed.Content.ReadAsStringAsync());

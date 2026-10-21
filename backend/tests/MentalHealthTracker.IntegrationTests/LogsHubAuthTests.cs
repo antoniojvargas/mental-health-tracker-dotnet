@@ -1,5 +1,4 @@
 using System.Net;
-using MentalHealthTracker.Api.Modules.Auth;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -25,12 +24,11 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
         var (_, token) = await CreateSessionTokenAsync();
         var tampered = TamperSignature(token);
 
-        var client = Factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
-        request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={tampered}");
-
-        var response = await client.SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/hub/logs/negotiate?negotiateVersion=1",
+            tampered,
+            new StringContent("", System.Text.Encoding.UTF8, "text/plain"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -40,12 +38,11 @@ public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
     {
         var (_, token) = await CreateSessionTokenAsync();
 
-        var client = Factory.CreateClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/hub/logs/negotiate?negotiateVersion=1");
-        request.Content = new StringContent("", System.Text.Encoding.UTF8, "text/plain");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-
-        var response = await client.SendAsync(request);
+        var response = await Factory.CreateClient().SendAuthenticatedAsync(
+            HttpMethod.Post,
+            "/hub/logs/negotiate?negotiateVersion=1",
+            token,
+            new StringContent("", System.Text.Encoding.UTF8, "text/plain"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
