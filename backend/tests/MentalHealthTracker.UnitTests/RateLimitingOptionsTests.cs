@@ -78,4 +78,45 @@ public sealed class RateLimitingOptionsTests
     {
         Assert.Equal(expected, new RateLimitingOptions().PermitLimitFor(policyName));
     }
+
+    [Fact]
+    public void PermitLimitFor_ReturnsTheConfiguredLimitsNotTheDefaults()
+    {
+        var settings = ValidSettings();
+        settings["RateLimiting:Auth:PermitLimit"] = "5";
+        settings["RateLimiting:Write:PermitLimit"] = "7";
+        using var provider = Build(settings);
+
+        var options = provider.GetRequiredService<IOptions<RateLimitingOptions>>().Value;
+
+        Assert.Equal(5, options.PermitLimitFor("auth"));
+        Assert.Equal(7, options.PermitLimitFor("write"));
+    }
+
+    [Fact]
+    public void PermitLimitFor_IsCaseSensitiveLikeThePolicyNames()
+    {
+        Assert.Equal(0, new RateLimitingOptions().PermitLimitFor("AUTH"));
+    }
+
+    [Fact]
+    public void BothPoliciesInvalid_ReportEveryFailure()
+    {
+        var settings = ValidSettings();
+        settings["RateLimiting:Auth:PermitLimit"] = "0";
+        settings["RateLimiting:Write:WindowMinutes"] = "0";
+        using var provider = Build(settings);
+
+        var exception = Assert.Throws<OptionsValidationException>(() =>
+            provider.GetRequiredService<IOptions<RateLimitingOptions>>().Value);
+
+        Assert.Contains(exception.Failures, f => f.Contains("PermitLimit", StringComparison.Ordinal));
+        Assert.Contains(exception.Failures, f => f.Contains("WindowMinutes", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Window_IsTheConfiguredMinutes()
+    {
+        Assert.Equal(TimeSpan.FromMinutes(42), new RateLimitPolicyOptions { PermitLimit = 1, WindowMinutes = 42 }.Window);
+    }
 }

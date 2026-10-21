@@ -64,6 +64,57 @@ public sealed class SessionTokenReaderTests
         Assert.Equal(2, _jwt.VerifyCalls);
     }
 
+    [Fact]
+    public void Read_IgnoresAValidTokenInAnotherCookie()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers.Cookie = $"other_cookie={_jwt.Sign(UserId, "ana@example.com")}";
+
+        Assert.Null(Reader.Read(context));
+    }
+
+    [Fact]
+    public void Read_ATokenWithATamperedSignature_ReturnsNull()
+    {
+        var token = _jwt.Sign(UserId, "ana@example.com");
+        var segments = token.Split('.');
+        segments[2] = (segments[2][0] == 'A' ? 'B' : 'A') + segments[2][1..];
+
+        Assert.Null(Reader.Read(ContextWithCookie(string.Join('.', segments))));
+    }
+
+    [Fact]
+    public void Read_ATokenSignedWithAnotherSecret_ReturnsNull()
+    {
+        var other = new JwtService(
+            Options.Create(new JwtOptions { Secret = "another-unit-test-secret-key-value" }),
+            TimeProvider.System);
+
+        Assert.Null(Reader.Read(ContextWithCookie(other.Sign(UserId, "ana@example.com"))));
+    }
+
+    [Fact]
+    public void Read_AnExpiredToken_ReturnsNull()
+    {
+        var clock = new FixedTimeProvider();
+        var jwt = new JwtService(Options.Create(new JwtOptions { Secret = "unit-test-jwt-secret-key-value", ExpiresInDays = 7 }), clock);
+        var token = jwt.Sign(UserId, "ana@example.com");
+        clock.Advance(TimeSpan.FromDays(8));
+
+        Assert.Null(new SessionTokenReader(jwt).Read(ContextWithCookie(token)));
+    }
+
+    [Fact]
+    public void Read_ReturnsTheCachedSessionEvenIfTheCookieChangesAfterwards()
+    {
+        var reader = Reader;
+        var context = ContextWithCookie(_jwt.Sign(UserId, "ana@example.com"));
+        var first = reader.Read(context);
+
+        context.Request.Headers.Cookie = $"{SessionCookie.AccessTokenName}=garbage";
+
+        Assert.Equal(first, reader.Read(context));
+    }
     private sealed class CountingJwtService(IOptions<JwtOptions> options) : JwtService(options, TimeProvider.System)
     {
         public int VerifyCalls { get; private set; }
