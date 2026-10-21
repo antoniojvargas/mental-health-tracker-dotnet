@@ -21,6 +21,7 @@ import { LOGS_HUB_PATH } from './hub-events'
 
 let connection: HubConnection | null = null
 let consumers = 0
+let started: Promise<void> = Promise.resolve()
 
 /**
  * Devuelve la conexión al hub, creándola la primera vez.
@@ -44,15 +45,16 @@ export function getLogHubConnection(): HubConnection {
  * Pide la conexión como consumidor: la arranca el primero y las demás peticiones la
  * comparten ya en marcha. Cada `acquireLogHub` debe emparejarse con un `releaseLogHub`.
  *
- * El arranque no se reintenta por consumidor: si el `start()` del primero falla, la conexión
- * queda detenida igual que antes, con uno o con varios consumidores.
+ * Devuelve la conexión y `started`, la promesa del arranque compartido: se rechaza si el
+ * `start()` falla (servidor caído, sesión caducada) y quien la use decide qué hacer con el
+ * error. Aquí no se reintenta: la conexión queda detenida, con uno o con varios consumidores.
  */
-export function acquireLogHub(): HubConnection {
-  const hub = getLogHubConnection()
+export function acquireLogHub(): { connection: HubConnection; started: Promise<void> } {
+  const connection = getLogHubConnection()
   consumers += 1
-  if (consumers === 1) void hub.start()
+  if (consumers === 1) started = connection.start()
 
-  return hub
+  return { connection, started }
 }
 
 /**

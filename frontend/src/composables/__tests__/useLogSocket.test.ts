@@ -76,7 +76,10 @@ function handlerFor(event: string): ConnectionHandler {
 
 describe('useLogSocket', () => {
   beforeEach(() => {
-    vi.mocked(acquireLogHub).mockReturnValue(connection as never)
+    vi.mocked(acquireLogHub).mockReturnValue({
+      connection: connection as never,
+      started: Promise.resolve(),
+    })
     vi.mocked(acquireLogHub).mockClear()
     vi.mocked(releaseLogHub).mockClear()
     connection.on.mockClear()
@@ -184,5 +187,34 @@ describe('useLogSocket', () => {
     const log = makeLog('2026-08-03')
     secondHandler(log)
     expect(second).toHaveBeenCalledWith(log)
+  })
+
+  it('si el arranque falla lo registra con console.warn, sin reintentar ni dejar un rechazo sin manejar', async () => {
+    const failure = new Error('servidor caído')
+    vi.mocked(acquireLogHub).mockReturnValue({
+      connection: connection as never,
+      started: Promise.reject(failure),
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    mountSocket(vi.fn())
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn).toHaveBeenCalledWith(expect.any(String), failure)
+    expect(acquireLogHub).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+
+  it('si el arranque va bien no escribe ningún aviso', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    mountSocket(vi.fn())
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

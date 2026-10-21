@@ -9,7 +9,8 @@
  *
  * No se reintenta el arranque inicial a mano: si `start()` falla —servidor
  * caído, sesión caducada—, la conexión se queda detenida y la reconexión
- * automática del hub no aplica hasta que haya una conexión viva.
+ * automática del hub no aplica hasta que haya una conexión viva. El rechazo se
+ * captura y se registra con `console.warn` para que no quede sin manejar.
  *
  * El aviso en tiempo real es de mejor esfuerzo: los eventos emitidos mientras la
  * conexión estaba caída no se reenvían. Por eso, cuando el hub se reconecta solo,
@@ -35,7 +36,7 @@ export function useLogSocket(onLog: (log: DailyLog) => void, onReconnected?: () 
     mounted = true
     // acquireLogHub arranca la conexión si es la primera; start() es asíncrono, así que los
     // manejadores quedan registrados antes de que llegue ningún evento.
-    const hub = acquireLogHub()
+    const { connection: hub, started } = acquireLogHub()
     connection = hub
     if (onReconnected) {
       hub.onreconnected(() => {
@@ -44,6 +45,11 @@ export function useLogSocket(onLog: (log: DailyLog) => void, onReconnected?: () 
     }
     hub.on(LOG_HUB_EVENTS.created, handleLog)
     hub.on(LOG_HUB_EVENTS.updated, handleLog)
+    // Sin reintento: si el arranque falla la conexión queda detenida. Se captura el rechazo
+    // para que no salga como unhandled rejection; la API sigue siendo la fuente de verdad.
+    started.catch((error: unknown) => {
+      console.warn('No se pudo arrancar la conexión en tiempo real', error)
+    })
   })
 
   onUnmounted(() => {

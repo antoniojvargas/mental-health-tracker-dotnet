@@ -6,7 +6,7 @@ const built: { id: number }[] = []
 const withUrl = vi.fn()
 const withAutomaticReconnect = vi.fn()
 const build = vi.fn()
-const start = vi.fn()
+const start = vi.fn().mockResolvedValue(undefined)
 const stop = vi.fn()
 let builderCreated = 0
 
@@ -111,7 +111,7 @@ describe('hub-client', () => {
     it('un solo consumidor: acquire arranca la conexión y release la detiene', async () => {
       const { acquireLogHub, releaseLogHub } = await loadModule()
 
-      const hub = acquireLogHub()
+      const { connection: hub } = acquireLogHub()
 
       expect(hub).toBe(built[0])
       expect(start).toHaveBeenCalledTimes(1)
@@ -128,7 +128,8 @@ describe('hub-client', () => {
       const first = acquireLogHub()
       const second = acquireLogHub()
 
-      expect(second).toBe(first)
+      expect(second.connection).toBe(first.connection)
+      expect(second.started).toBe(first.started)
       expect(build).toHaveBeenCalledTimes(1)
       expect(start).toHaveBeenCalledTimes(1)
 
@@ -137,6 +138,16 @@ describe('hub-client', () => {
 
       releaseLogHub()
       expect(stop).toHaveBeenCalledTimes(1)
+    })
+
+    it('si start() falla, started se rechaza y no se reintenta', async () => {
+      start.mockRejectedValueOnce(new Error('servidor caído'))
+      const { acquireLogHub } = await loadModule()
+
+      const { started } = acquireLogHub()
+
+      await expect(started).rejects.toThrow('servidor caído')
+      expect(start).toHaveBeenCalledTimes(1)
     })
 
     it('tras detenerse, un consumidor nuevo vuelve a arrancarla', async () => {
