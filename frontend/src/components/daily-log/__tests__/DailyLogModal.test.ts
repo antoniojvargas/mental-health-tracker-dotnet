@@ -25,16 +25,7 @@ vi.mock('../../../composables/useToast', () => ({
 
 import { ApiError } from '../../../services/api-client'
 import * as logsApi from '../../../services/logs.api'
-import {
-  ACTIVITY_TYPES,
-  SLEEP_DISTURBANCES,
-  SOCIAL_FREQUENCIES,
-  SYMPTOM_TYPES,
-  type ActivityType,
-  type DailyLog,
-  type SleepDisturbance,
-  type SymptomType,
-} from '../../../types/daily-log'
+import { SOCIAL_FREQUENCIES, type DailyLog } from '../../../types/daily-log'
 
 function makeLog(): DailyLog {
   return {
@@ -352,12 +343,9 @@ describe('DailyLogModal', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Ida y vuelta: abrir el modal con un registro y guardar sin tocar nada debe enviar a
-// `create` exactamente los mismos campos que el registro (A5 del Apéndice de MEJORAS.md).
-//
-// Es la especificación del formulario sin pérdida: ya no queda ningún `it.fails`. Si un
-// cambio vuelve a perder datos, el caso correspondiente falla. No se debe borrar un caso
-// para "arreglar" la suite.
+// Ida y vuelta a través del componente: abrir el modal con un registro y guardar sin tocar nada
+// debe enviar a `create` exactamente los mismos campos que el registro (A5 del Apéndice de
+// MEJORAS.md). La especificación completa, caso por caso, está en daily-log-mapper.test.ts.
 // ---------------------------------------------------------------------------
 describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
   const ROUND_TRIP_KEYS = [
@@ -422,16 +410,35 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
     document.body.innerHTML = ''
   })
 
+  // Los casos por valor de cada enum (payload que se reenvía) viven en daily-log-mapper.test.ts, donde
+  // se prueban sin montar el componente. Aquí queda lo que solo el modal puede comprobar: que el
+  // formulario que pinta se corresponde con el registro y que guardar envía el mapeo.
   it('un registro base sin enums especiales vuelve igual', async () => {
     await saveUntouchedAndCompare(makeLog())
   })
 
+  it('un registro con todos los campos rellenos vuelve igual al guardarlo sin tocar nada', async () => {
+    await saveUntouchedAndCompare({
+      ...makeLog(),
+      moodRating: 4,
+      anxietyLevel: 7,
+      stressLevel: 2,
+      sleepHours: 6.5,
+      sleepQuality: 2,
+      sleepDisturbances: ['insomnia', 'early_waking'],
+      activityType: 'cycling',
+      activityMinutes: 45,
+      socialFrequency: 'daily',
+      symptoms: [
+        { type: 'panic', severity: 5 },
+        { type: 'low_mood', severity: 2 },
+      ],
+      notes: 'una nota',
+    })
+  })
+
   describe('SocialFrequency', () => {
     for (const value of SOCIAL_FREQUENCIES) {
-      it(`${value}: el payload conserva el valor`, async () => {
-        await saveUntouchedAndCompare({ ...makeLog(), socialFrequency: value })
-      })
-
       it(`${value}: el select muestra una opción seleccionada`, async () => {
         await openWith({ ...makeLog(), socialFrequency: value })
         clickNext()
@@ -445,65 +452,5 @@ describe('DailyLogModal · ida y vuelta sin pérdida (A5)', () => {
         expect(select.value).toBe(value)
       })
     }
-  })
-
-  describe('ActivityType', () => {
-    for (const value of ACTIVITY_TYPES) {
-      it(`${value}: el payload conserva tipo y minutos`, async () => {
-        await saveUntouchedAndCompare({
-          ...makeLog(),
-          activityType: value as ActivityType,
-          activityMinutes: value === 'none' ? null : 30,
-        })
-      })
-    }
-
-    // `null` y `none` significan lo mismo para el usuario; el select solo conoce `none`.
-    it('sin actividad (null): se reenvía como none y sin minutos', async () => {
-      await openWith({ ...makeLog(), activityType: null, activityMinutes: null })
-      clickSaveNow()
-      await settle()
-
-      const sent = vi.mocked(logsApi.create).mock.calls[0][0]
-      expect(sent.activityType).toBe('none')
-      expect(sent.activityMinutes).toBeNull()
-    })
-  })
-
-  describe('SleepDisturbance', () => {
-    // `none` no es una alteración: la ausencia se representa con la lista vacía (caso base).
-    const disturbances = SLEEP_DISTURBANCES.filter(
-      (value): value is Exclude<SleepDisturbance, 'none'> => value !== 'none',
-    )
-
-    for (const value of disturbances) {
-      // `early_waking` vuelve como `frequent_waking`. A5.
-      it(`${value}: el payload conserva la alteración`, async () => {
-        await saveUntouchedAndCompare({ ...makeLog(), sleepDisturbances: [value] })
-      })
-    }
-
-    // Varias a la vez. Falla por `early_waking`. A5.
-    it('todas juntas: el payload conserva la lista completa', async () => {
-      await saveUntouchedAndCompare({ ...makeLog(), sleepDisturbances: disturbances })
-    })
-  })
-
-  describe('SymptomType', () => {
-    SYMPTOM_TYPES.forEach((type: SymptomType) => {
-      it(`${type}: conserva tipo y severidad`, async () => {
-        await saveUntouchedAndCompare({
-          ...makeLog(),
-          symptoms: [{ type, severity: 4 }],
-        })
-      })
-    })
-
-    it('todos juntos: conserva cada tipo con su severidad', async () => {
-      await saveUntouchedAndCompare({
-        ...makeLog(),
-        symptoms: SYMPTOM_TYPES.map((type, index) => ({ type, severity: (index % 5) + 1 })),
-      })
-    })
   })
 })

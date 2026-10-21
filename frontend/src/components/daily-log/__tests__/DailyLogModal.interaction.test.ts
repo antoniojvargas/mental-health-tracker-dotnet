@@ -11,7 +11,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h, nextTick, ref } from 'vue'
-import DailyLogModal, { type DailyLogForm } from '../DailyLogModal.vue'
+import DailyLogModal from '../DailyLogModal.vue'
+import type { DailyLogForm } from '../daily-log-mapper'
 import { SYMPTOM_OPTIONS } from '../daily-log-options'
 
 const toastSuccess = vi.fn()

@@ -11,19 +11,13 @@ import {
   SLEEP_DISTURBANCE_OPTIONS,
   SOCIAL_FREQUENCY_OPTIONS,
   createDefaultSymptoms,
-  type SymptomEntry,
 } from './daily-log-options'
+import { fromDailyLog, toCreateDailyLogInput, type DailyLogForm } from './daily-log-mapper'
 import { create as createLog, today as getToday } from '../../services/logs.api'
 import { todayIso } from '../../utils/date'
 import { describeError } from '../../services/error-messages'
 import { useToast } from '../../composables/useToast'
-import type {
-  CreateDailyLogInput,
-  ActivityType,
-  SocialFrequency,
-  SleepDisturbance,
-  DailyLog,
-} from '../../types/daily-log'
+import type { DailyLog } from '../../types/daily-log'
 
 /**
  * Modal multipaso para registrar un Daily Log.
@@ -70,20 +64,6 @@ const form = reactive<DailyLogForm>({
   notes: '',
 })
 
-export interface DailyLogForm {
-  mood: number | null
-  anxiety: number
-  stress: number
-  sleepQuality: number
-  sleepHours: number
-  sleepDisturbances: SleepDisturbance[]
-  activityType: ActivityType
-  activityMinutes: number
-  socialFrequency: SocialFrequency
-  symptoms: SymptomEntry[]
-  notes: string
-}
-
 const progress = computed(() => ((currentStep.value + 1) / steps.length) * 100)
 
 const canGoNext = computed(() => {
@@ -127,20 +107,7 @@ function loadToday() {
 }
 
 function fillFromLog(log: DailyLog) {
-  form.mood = log.moodRating
-  form.anxiety = log.anxietyLevel
-  form.stress = log.stressLevel
-  form.sleepQuality = log.sleepQuality
-  form.sleepHours = log.sleepHours
-  form.sleepDisturbances = (log.sleepDisturbances || []).filter((d) => d !== 'none')
-  form.activityType = log.activityType ?? 'none'
-  form.activityMinutes = log.activityMinutes ?? 0
-  form.socialFrequency = log.socialFrequency
-  form.symptoms = createDefaultSymptoms().map((d) => {
-    const found = (log.symptoms || []).find((s) => s.type === d.key)
-    return found ? { ...d, active: true, severity: Math.min(5, Math.max(1, found.severity)) } : d
-  })
-  form.notes = log.notes ?? ''
+  Object.assign(form, fromDailyLog(log))
   currentStep.value = 0
 }
 
@@ -182,35 +149,11 @@ function resetForm() {
   currentStep.value = 0
 }
 
-function buildPayload(): CreateDailyLogInput {
-  const activeSymptoms = form.symptoms
-    .filter((s) => s.active)
-    .map((s) => ({ type: s.key, severity: Math.min(5, Math.max(1, s.severity)) }))
-
-  return {
-    logDate: todayIso(),
-    moodRating: form.mood ?? 3,
-    anxietyLevel: Math.min(10, Math.max(1, form.anxiety)),
-    stressLevel: Math.min(10, Math.max(1, form.stress)),
-    sleepHours: Math.min(24, Math.max(0, form.sleepHours)),
-    sleepQuality: Math.min(5, Math.max(1, form.sleepQuality)),
-    sleepDisturbances: form.sleepDisturbances,
-    activityType: form.activityType,
-    activityMinutes:
-      form.activityType === 'none' || form.activityMinutes <= 0
-        ? null
-        : Math.min(600, Math.max(0, Math.round(form.activityMinutes))),
-    socialFrequency: form.socialFrequency,
-    symptoms: activeSymptoms,
-    notes: form.notes.trim().length > 0 ? form.notes.trim().slice(0, 1000) : null,
-  }
-}
-
 async function handleSubmit() {
   if (isSubmitting.value) return
   isSubmitting.value = true
   try {
-    const savedLog = await createLog(buildPayload())
+    const savedLog = await createLog(toCreateDailyLogInput(form, todayIso()))
     success('Thanks for logging today!')
     emit('submit', { ...form, symptoms: form.symptoms.map((s) => ({ ...s })) })
     emit('saved', savedLog)
