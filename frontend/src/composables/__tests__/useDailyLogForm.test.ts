@@ -198,6 +198,27 @@ describe('useDailyLogForm', () => {
       expect(isReady.value).toBe(true)
     })
 
+    it('devuelve una promesa que se resuelve al terminar la lectura', async () => {
+      vi.mocked(logsApi.today).mockResolvedValue(makeLog({ moodRating: 2 }))
+      const { form, isLoading, loadToday } = useDailyLogForm()
+
+      await loadToday()
+
+      expect(form.mood).toBe(2)
+      expect(isLoading.value).toBe(false)
+    })
+
+    it('la promesa no se rechaza aunque la lectura falle: el fallo queda en loadError', async () => {
+      vi.mocked(logsApi.today).mockRejectedValue(
+        new ApiError(500, { code: 'INTERNAL_ERROR', message: 'boom', details: [] }),
+      )
+      const { loadError, loadToday } = useDailyLogForm()
+
+      await expect(loadToday()).resolves.toBeUndefined()
+
+      expect(loadError.value).not.toBeNull()
+    })
+
     it('pide el registro del día local', async () => {
       vi.mocked(logsApi.today).mockResolvedValue(null)
 

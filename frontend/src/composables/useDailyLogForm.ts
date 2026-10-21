@@ -91,28 +91,29 @@ export function useDailyLogForm() {
     currentStep.value = 0
   }
 
-  /** Lee el registro del día local: lo precarga si existe y, si no, deja el formulario vacío. */
-  function loadToday() {
+  /**
+   * Lee el registro del día local: lo precarga si existe y, si no, deja el formulario vacío. La
+   * promesa se resuelve al terminar, también si la lectura falla (el fallo queda en `loadError`).
+   */
+  async function loadToday(): Promise<void> {
     currentStep.value = 0
     isLoading.value = true
     loadError.value = null
-    getToday(todayIso())
-      .then((log: DailyLog | null) => {
-        if (log) {
-          fill(log)
-        } else {
-          reset()
-        }
-      })
-      .catch((thrown: unknown) => {
-        // No se pudo leer el registro de hoy: en vez del formulario se muestra el
-        // aviso con reintento, así que nadie edita sobre datos que no llegaron.
-        loadError.value = describeError(thrown)
+    try {
+      const log = await getToday(todayIso())
+      if (log) {
+        fill(log)
+      } else {
         reset()
-      })
-      .finally(() => {
-        isLoading.value = false
-      })
+      }
+    } catch (thrown) {
+      // No se pudo leer el registro de hoy: en vez del formulario se muestra el
+      // aviso con reintento, así que nadie edita sobre datos que no llegaron.
+      loadError.value = describeError(thrown)
+      reset()
+    } finally {
+      isLoading.value = false
+    }
   }
 
   return {

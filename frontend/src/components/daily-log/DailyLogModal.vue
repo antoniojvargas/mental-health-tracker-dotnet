@@ -59,11 +59,11 @@ const {
 watch(
   () => props.open,
   (open) => {
-    if (open) loadToday()
+    if (open) void loadToday()
   },
 )
 
-async function handleSubmit() {
+async function onSubmit() {
   if (isSubmitting.value) return
   isSubmitting.value = true
   try {
@@ -81,10 +81,6 @@ async function handleSubmit() {
   } finally {
     isSubmitting.value = false
   }
-}
-
-function onSubmit() {
-  handleSubmit()
 }
 
 function close() {
