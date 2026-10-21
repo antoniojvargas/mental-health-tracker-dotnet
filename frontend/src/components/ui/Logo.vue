@@ -29,7 +29,7 @@ const SIZES = { sm: 'h-8 w-8', md: 'h-10 w-10', lg: 'h-14 w-14' } as const
     viewBox="0 0 40 40"
     :class="SIZES[size]"
     :role="label ? 'img' : undefined"
-    :aria-label="label"
+    :aria-label="label || undefined"
     :aria-hidden="label ? undefined : 'true'"
     fill="none"
   >
