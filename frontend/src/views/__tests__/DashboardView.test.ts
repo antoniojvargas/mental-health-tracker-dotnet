@@ -8,8 +8,9 @@ import Skeleton from '../../components/ui/Skeleton.vue'
 import { useAuthStore } from '../../stores/useAuthStore'
 import { useLogsStore } from '../../stores/useLogsStore'
 import { useLogSocket } from '../../composables/useLogSocket'
-import type { DailyLog, IsoDate, User } from '../../types/daily-log'
+import type { DailyLog, User } from '../../types/daily-log'
 import { todayIso } from '../../utils/date'
+import { makeLog, makeUser } from '../../test-support/factories'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -19,30 +20,6 @@ vi.mock('vue-router', () => ({
 vi.mock('../../composables/useLogSocket', () => ({
   useLogSocket: vi.fn(),
 }))
-
-function makeLog(logDate: IsoDate): DailyLog {
-  return {
-    id: `id-${logDate}`,
-    logDate,
-    moodRating: 3,
-    anxietyLevel: 5,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 4,
-    sleepDisturbances: [],
-    activityType: null,
-    activityMinutes: null,
-    socialFrequency: 'none',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-09-13T17:18:21.1234567+00:00',
-    updatedAt: '2026-09-13T17:18:21.1234567+00:00',
-  }
-}
-
-function makeUser(name: string): User {
-  return { id: 'user-1', email: 'ana@example.com', name, avatarUrl: null }
-}
 
 interface Options {
   user?: User | null
@@ -95,7 +72,7 @@ describe('DashboardView', () => {
   })
 
   it('al reconectar el hub vuelve a pedir la ventana activa', () => {
-    mountDashboard({ user: makeUser('Ana Gómez') })
+    mountDashboard({ user: makeUser({ name: 'Ana Gómez' }) })
     const logs = useLogsStore()
     const onReconnected = vi.mocked(useLogSocket).mock.calls.at(-1)![1]!
     vi.mocked(logs.fetch).mockClear()
@@ -107,7 +84,7 @@ describe('DashboardView', () => {
   })
 
   it('saluda por el primer nombre', () => {
-    mountDashboard({ user: makeUser('Ana Gómez') })
+    mountDashboard({ user: makeUser({ name: 'Ana Gómez' }) })
 
     expect(wrapper!.text()).toContain('Hi, Ana.')
   })
@@ -120,7 +97,10 @@ describe('DashboardView', () => {
   })
 
   it('sin registro de hoy pide crear uno', () => {
-    mountDashboard({ user: makeUser('Ana Gómez'), logs: [makeLog('2026-09-30')] })
+    mountDashboard({
+      user: makeUser({ name: 'Ana Gómez' }),
+      logs: [makeLog({ logDate: '2026-09-30' })],
+    })
 
     expect(wrapper!.text()).toContain('How are you feeling today? Take a minute to log it.')
     expect(buttonByText('Log my day')).toBeTruthy()
@@ -128,7 +108,10 @@ describe('DashboardView', () => {
   })
 
   it('con registro de hoy ofrece ajustarlo', () => {
-    mountDashboard({ user: makeUser('Ana Gómez'), logs: [makeLog(todayIso())] })
+    mountDashboard({
+      user: makeUser({ name: 'Ana Gómez' }),
+      logs: [makeLog({ logDate: todayIso() })],
+    })
 
     expect(wrapper!.text()).toContain(
       "You already logged how you're feeling today. You can adjust it if something changed.",
@@ -138,21 +121,21 @@ describe('DashboardView', () => {
   })
 
   it('muestra el esqueleto y el estado de espera mientras carga', () => {
-    mountDashboard({ user: makeUser('Ana Gómez'), loading: true })
+    mountDashboard({ user: makeUser({ name: 'Ana Gómez' }), loading: true })
 
     expect(wrapper!.findComponent(Skeleton).exists()).toBe(true)
     expect(wrapper!.text()).toContain("We're checking your day…")
   })
 
   it('retira el esqueleto cuando la carga terminó', () => {
-    mountDashboard({ user: makeUser('Ana Gómez'), logs: [] })
+    mountDashboard({ user: makeUser({ name: 'Ana Gómez' }), logs: [] })
 
     expect(wrapper!.findComponent(Skeleton).exists()).toBe(false)
   })
 
   it('si falla la carga muestra el aviso ya traducido y ofrece reintentar', () => {
     mountDashboard({
-      user: makeUser('Ana Gómez'),
+      user: makeUser({ name: 'Ana Gómez' }),
       error: "We couldn't reach the server. Please check your connection and try again.",
     })
 
@@ -166,7 +149,7 @@ describe('DashboardView', () => {
   })
 
   it('el reintento vuelve a pedir la ventana activa', async () => {
-    mountDashboard({ user: makeUser('Ana Gómez'), error: 'boom' })
+    mountDashboard({ user: makeUser({ name: 'Ana Gómez' }), error: 'boom' })
     const logs = useLogsStore()
 
     await buttonByText('Try again')!.trigger('click')

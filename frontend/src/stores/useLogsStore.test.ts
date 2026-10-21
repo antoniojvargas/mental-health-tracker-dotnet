@@ -4,26 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useLogsStore } from './useLogsStore'
 import { jsonResponse, mockFetch } from '../test-support/http'
 import type { DailyLog, IsoDate } from '../types/daily-log'
-
-function makeLog(logDate: IsoDate): DailyLog {
-  return {
-    id: `id-${logDate}`,
-    logDate,
-    moodRating: 3,
-    anxietyLevel: 5,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 4,
-    sleepDisturbances: [],
-    activityType: null,
-    activityMinutes: null,
-    socialFrequency: 'none',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-09-13T17:18:21.1234567+00:00',
-    updatedAt: '2026-09-13T17:18:21.1234567+00:00',
-  }
-}
+import { makeLog } from '../test-support/factories'
 
 function listResponse(data: DailyLog[]) {
   return jsonResponse({
@@ -47,7 +28,9 @@ describe('useLogsStore', () => {
   })
 
   it('pide los últimos 7 días (hoy incluido) y guarda los logs ordenados', async () => {
-    const fetchSpy = mockFetch(listResponse([makeLog('2026-10-03'), makeLog('2026-09-30')]))
+    const fetchSpy = mockFetch(
+      listResponse([makeLog({ logDate: '2026-10-03' }), makeLog({ logDate: '2026-09-30' })]),
+    )
     const store = useLogsStore()
 
     const pending = store.fetch('week')
@@ -65,12 +48,14 @@ describe('useLogsStore', () => {
   })
 
   it('al cambiar de rango vuelve a pedir la ventana y reemplaza la lista', async () => {
-    mockFetch(listResponse([makeLog('2026-10-01')]))
+    mockFetch(listResponse([makeLog({ logDate: '2026-10-01' })]))
     const store = useLogsStore()
     await store.fetch('week')
     expect(store.logs.map((log) => log.logDate)).toEqual(['2026-10-01'])
 
-    const fetchSpy = mockFetch(listResponse([makeLog('2026-09-05'), makeLog('2026-10-01')]))
+    const fetchSpy = mockFetch(
+      listResponse([makeLog({ logDate: '2026-09-05' }), makeLog({ logDate: '2026-10-01' })]),
+    )
     await store.fetch('month')
 
     const url = new URL(fetchSpy.mock.calls[0][0] as string, 'http://localhost')
@@ -82,7 +67,7 @@ describe('useLogsStore', () => {
   })
 
   it('traduce el error a un mensaje de la app y no relanza, sin vaciar los logs ya cargados', async () => {
-    mockFetch(listResponse([makeLog('2026-10-03')]))
+    mockFetch(listResponse([makeLog({ logDate: '2026-10-03' })]))
     const store = useLogsStore()
     await store.fetch('week')
 
@@ -103,21 +88,25 @@ describe('useLogsStore', () => {
   })
 
   it('mergeLog inserta un registro nuevo conservando el orden ascendente', async () => {
-    mockFetch(listResponse([makeLog('2026-10-01'), makeLog('2026-10-03')]))
+    mockFetch(
+      listResponse([makeLog({ logDate: '2026-10-01' }), makeLog({ logDate: '2026-10-03' })]),
+    )
     const store = useLogsStore()
     await store.fetch('week')
 
-    store.mergeLog(makeLog('2026-10-02'))
+    store.mergeLog(makeLog({ logDate: '2026-10-02' }))
 
     expect(store.logs.map((log) => log.logDate)).toEqual(['2026-10-01', '2026-10-02', '2026-10-03'])
   })
 
   it('mergeLog reemplaza el registro del mismo logDate sin duplicar', async () => {
-    mockFetch(listResponse([makeLog('2026-10-01'), makeLog('2026-10-02')]))
+    mockFetch(
+      listResponse([makeLog({ logDate: '2026-10-01' }), makeLog({ logDate: '2026-10-02' })]),
+    )
     const store = useLogsStore()
     await store.fetch('week')
 
-    const edited = { ...makeLog('2026-10-02'), moodRating: 5 }
+    const edited = { ...makeLog({ logDate: '2026-10-02' }), moodRating: 5 }
     store.mergeLog(edited)
 
     expect(store.logs).toHaveLength(2)
@@ -127,8 +116,8 @@ describe('useLogsStore', () => {
   it('mergeLog funciona sin una carga previa', () => {
     const store = useLogsStore()
 
-    store.mergeLog(makeLog('2026-10-02'))
-    store.mergeLog(makeLog('2026-10-01'))
+    store.mergeLog(makeLog({ logDate: '2026-10-02' }))
+    store.mergeLog(makeLog({ logDate: '2026-10-01' }))
 
     expect(store.logs.map((log) => log.logDate)).toEqual(['2026-10-01', '2026-10-02'])
   })

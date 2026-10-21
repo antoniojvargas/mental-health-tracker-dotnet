@@ -9,26 +9,21 @@ import { ApiError } from '../../services/api-client'
 import * as logsApi from '../../services/logs.api'
 import type { DailyLog } from '../../types/daily-log'
 import { FORM_STEPS, createEmptyForm, useDailyLogForm } from '../useDailyLogForm'
+import { makeLog } from '../../test-support/factories'
 
-function makeLog(overrides: Partial<DailyLog> = {}): DailyLog {
-  return {
-    id: '1',
-    logDate: '2026-01-01',
-    moodRating: 4,
-    anxietyLevel: 6,
-    stressLevel: 7,
-    sleepHours: 6.5,
-    sleepQuality: 2,
-    sleepDisturbances: ['insomnia'],
-    activityType: 'cycling',
-    activityMinutes: 45,
-    socialFrequency: 'daily',
-    symptoms: [{ type: 'panic', severity: 3 }],
-    notes: 'bien',
-    createdAt: '2026-01-01T00:00:00.0000000+00:00',
-    updatedAt: '2026-01-01T00:00:00.0000000+00:00',
-    ...overrides,
-  }
+/** Un registro con todos los campos rellenos, para comprobar que `fill` los lleva al formulario. */
+const FILLED: Partial<DailyLog> = {
+  moodRating: 4,
+  anxietyLevel: 6,
+  stressLevel: 7,
+  sleepHours: 6.5,
+  sleepQuality: 2,
+  sleepDisturbances: ['insomnia'],
+  activityType: 'cycling',
+  activityMinutes: 45,
+  socialFrequency: 'daily',
+  symptoms: [{ type: 'panic', severity: 3 }],
+  notes: 'bien',
 }
 
 /** Deja resolverse las promesas pendientes (la lectura de hoy encadena then/catch/finally). */
@@ -76,7 +71,7 @@ describe('useDailyLogForm', () => {
       const { form, currentStep, fill } = useDailyLogForm()
       currentStep.value = 2
 
-      fill(makeLog())
+      fill(makeLog(FILLED))
 
       expect(form).toMatchObject({
         mood: 4,
@@ -285,7 +280,7 @@ describe('useDailyLogForm', () => {
         .mockRejectedValueOnce(
           new ApiError(500, { code: 'INTERNAL_ERROR', message: 'boom', details: [] }),
         )
-        .mockResolvedValueOnce(makeLog())
+        .mockResolvedValueOnce(makeLog(FILLED))
       const { form, isReady, loadError, loadToday } = useDailyLogForm()
 
       loadToday()

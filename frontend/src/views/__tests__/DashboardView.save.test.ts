@@ -6,8 +6,9 @@ import { nextTick } from 'vue'
 
 import DashboardView from '../DashboardView.vue'
 import { useAuthStore } from '../../stores/useAuthStore'
-import type { DailyLog, IsoDate } from '../../types/daily-log'
+import type { DailyLog } from '../../types/daily-log'
 import { todayIso } from '../../utils/date'
+import { makeLog } from '../../test-support/factories'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -16,26 +17,6 @@ vi.mock('vue-router', () => ({
 vi.mock('../../composables/useLogSocket', () => ({
   useLogSocket: vi.fn(),
 }))
-
-function makeLog(logDate: IsoDate): DailyLog {
-  return {
-    id: `id-${logDate}`,
-    logDate,
-    moodRating: 5,
-    anxietyLevel: 5,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 4,
-    sleepDisturbances: [],
-    activityType: 'none',
-    activityMinutes: null,
-    socialFrequency: 'none',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-09-13T17:18:21.1234567+00:00',
-    updatedAt: '2026-09-13T17:18:21.1234567+00:00',
-  }
-}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -61,7 +42,7 @@ function click(text: string) {
 }
 
 describe('DashboardView · guardar el registro de hoy (A9)', () => {
-  const saved = makeLog(todayIso())
+  const saved = makeLog({ logDate: todayIso() })
   let requests: { method: string; path: string }[]
 
   beforeEach(() => {
