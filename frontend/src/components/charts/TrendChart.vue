@@ -12,6 +12,7 @@ import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 
 import type { DailyLog } from '../../types/daily-log'
+import { parseIsoDate } from '../../utils/date'
 import { getMetric } from './metrics'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
@@ -49,8 +50,7 @@ const TOOLTIP_TEXT = '#FBF8F2'
 const SHORT_DATE = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' })
 
 function formatShortDate(iso: string): string {
-  const [year, month, day] = iso.split('-').map(Number)
-  return SHORT_DATE.format(new Date(year, month - 1, day))
+  return SHORT_DATE.format(parseIsoDate(iso))
 }
 
 /**
@@ -72,8 +72,7 @@ const LONG_DATE = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeri
  * como UTC restaría un día en husos positivos.
  */
 function formatLongDate(iso: string): string {
-  const [year, month, day] = iso.split('-').map(Number)
-  return LONG_DATE.format(new Date(year, month - 1, day))
+  return LONG_DATE.format(parseIsoDate(iso))
 }
 
 function axis(position: 'left' | 'right') {

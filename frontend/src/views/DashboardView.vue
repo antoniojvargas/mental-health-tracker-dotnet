@@ -12,7 +12,8 @@ import Skeleton from '../components/ui/Skeleton.vue'
 import { useLogSocket } from '../composables/useLogSocket'
 import { useAuthStore } from '../stores/useAuthStore'
 import { useLogsStore, type LogRange } from '../stores/useLogsStore'
-import type { DailyLog, IsoDate } from '../types/daily-log'
+import type { DailyLog } from '../types/daily-log'
+import { todayIso } from '../utils/date'
 
 const auth = useAuthStore()
 const logsStore = useLogsStore()
@@ -53,19 +54,6 @@ const avatarUrl = computed(() => auth.user?.avatarUrl ?? '')
 
 /** El primer nombre para el saludo; sin sesión, no hay nombre que saludar. */
 const firstName = computed(() => auth.user?.name.split(' ')[0] ?? '')
-
-/**
- * "Hoy" en hora local, que es la que usa el backend al guardar `logDate`.
- *
- * No sirve `toISOString()`: pasa a UTC y en un huso negativo devolvería el día
- * siguiente por la noche, que es justo el error que documenta `logs.api`.
- */
-function todayIso(): IsoDate {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${day}`
-}
 
 /**
  * El registro de hoy, sacado de los logs ya cargados: como toda ventana

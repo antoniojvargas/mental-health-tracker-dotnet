@@ -9,6 +9,7 @@ import { useAuthStore } from '../../stores/useAuthStore'
 import { useLogsStore } from '../../stores/useLogsStore'
 import { useLogSocket } from '../../composables/useLogSocket'
 import type { DailyLog, IsoDate, User } from '../../types/daily-log'
+import { todayIso } from '../../utils/date'
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn() }),
@@ -41,14 +42,6 @@ function makeLog(logDate: IsoDate): DailyLog {
 
 function makeUser(name: string): User {
   return { id: 'user-1', email: 'ana@example.com', name, avatarUrl: null }
-}
-
-/** "Hoy" en hora local, igual que lo calcula la vista. */
-function todayIso(): IsoDate {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${day}`
 }
 
 interface Options {
