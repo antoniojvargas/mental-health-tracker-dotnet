@@ -11,7 +11,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h, nextTick, ref } from 'vue'
-import DailyLogModal, { type DailyLogForm } from '../DailyLogModal.vue'
+import DailyLogModal from '../DailyLogModal.vue'
+import type { DailyLogForm } from '../../../types/daily-log-form'
+import { SYMPTOM_OPTIONS } from '../daily-log-options'
 
 const toastSuccess = vi.fn()
 const toastError = vi.fn()
@@ -379,14 +381,7 @@ describe('DailyLogModal · orden de foco e ids', () => {
     await press('Next')
 
     expect(focusOrder()).toEqual([
-      '#sym-check-panic',
-      '#sym-check-low_mood',
-      '#sym-check-fatigue',
-      '#sym-check-irritability',
-      '#sym-check-concentration',
-      '#sym-check-appetite_change',
-      '#sym-check-restlessness',
-      '#sym-check-hopelessness',
+      ...SYMPTOM_OPTIONS.map((o) => `#sym-check-${o.key}`),
       '#notes',
       'button "Back"',
       'button "Cancel"',
