@@ -14,7 +14,7 @@
  *   3. Los 4xx y 5xx no se devuelven: se lanzan como `ApiError`, con el `code` y
  *      el `message` de `ErrorBody` ya desenrollados del sobre `error`.
  *
- * Los tipos del contrato viven en src/types/daily-log.ts, no aquí.
+ * Los tipos del contrato viven en src/types (daily-log.ts y api-error.ts), no aquí.
  */
 
 import type {
@@ -22,7 +22,7 @@ import type {
   ApiErrorCode,
   ApiErrorDetail,
   ApiErrorResponse,
-} from '../types/daily-log'
+} from '../types/api-error'
 
 /** Prefijo común a todas las rutas. La API enruta bajo `api/` (AuthController). */
 const API_PREFIX = '/api'

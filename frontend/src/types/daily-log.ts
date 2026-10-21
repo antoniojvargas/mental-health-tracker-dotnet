@@ -5,9 +5,9 @@
  * la API. Cualquier tipo del dominio que viaje por HTTP se declara aquí y se
  * importa desde aquí; si aparece una forma local en un componente, está mal.
  *
- * Refleja los DTOs de backend/MentalHealthTracker.Api/Modules/DailyLog/Dtos/,
- * los enums de backend/MentalHealthTracker.Domain/Enums/ y el contrato de
- * error de Core/Exceptions/GlobalExceptionHandler.cs.
+ * Refleja los DTOs de backend/MentalHealthTracker.Api/Modules/DailyLog/Dtos/ y
+ * los enums de backend/MentalHealthTracker.Domain/Enums/. El contrato de error
+ * (Core/Exceptions/GlobalExceptionHandler.cs) está aparte, en `api-error.ts`.
  *
  * Formato del cable (System.Text.Json con `JsonSerializerDefaults.Web`):
  *   - Propiedades en camelCase.
@@ -19,7 +19,7 @@
  *   - Los enteros de C# (`short`, `int`) son `number` en JS.
  *
  * Excepción a camelCase: `details[].field` de un error de validación llega en
- * PascalCase. Está anotado donde se declara.
+ * PascalCase. Está anotado en `api-error.ts`.
  */
 
 /** "yyyy-MM-dd". El backend lo formatea así y no acepta formato libre. */
@@ -183,49 +183,6 @@ export interface ListDailyLogsQuery {
   limit?: number
   /** Por defecto 0. */
   offset?: number
-}
-
-// ---------------------------------------------------------------------------
-// Errores
-//
-// Contrato transversal, no solo de registro diario. Vive aquí porque este es
-// el archivo que declara el contrato, pero no depende de nada de DailyLog, así
-// que si crece conviene moverlo a src/types/api-error.ts.
-// ---------------------------------------------------------------------------
-
-/**
- * Un fallo de validación por campo.
- *
- * Ojo: `field` llega en PascalCase ("MoodRating", "LogDate",
- * "Symptoms[0].Severity") mientras que todo lo demás en el cable es camelCase.
- * Es el nombre crudo de la propiedad de .NET que emite FluentValidation, así
- * que no lo pases por una función camelCase.
- */
-export interface ApiErrorDetail {
-  field: string
-  message: string
-}
-
-/** Códigos emitidos por `GlobalExceptionHandler`. */
-export type ApiErrorCode =
-  'VALIDATION_ERROR' | 'UNAUTHORIZED' | 'NOT_FOUND' | 'RATE_LIMITED' | 'INTERNAL_ERROR'
-
-/** Espejo de `ErrorBody`. */
-export interface ApiErrorBody {
-  code: ApiErrorCode
-  message: string
-  details: ApiErrorDetail[]
-}
-
-/**
- * Espejo de `ErrorResponse`. Es el cuerpo de cualquier respuesta 4xx y 5xx,
- * con la carga anidada bajo `error`:
- *
- *   { "error": { "code": "VALIDATION_ERROR", "message": "...",
- *                "details": [ { "field": "MoodRating", "message": "..." } ] } }
- */
-export interface ApiErrorResponse {
-  error: ApiErrorBody
 }
 
 // ---------------------------------------------------------------------------

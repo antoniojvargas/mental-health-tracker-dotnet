@@ -17,7 +17,7 @@
  */
 
 import { ApiError } from './api-client'
-import type { ApiErrorCode } from '../types/daily-log'
+import type { ApiErrorCode } from '../types/api-error'
 
 /** Frase por código, en la voz de la app. */
 const BY_CODE: Record<ApiErrorCode, string> = {
