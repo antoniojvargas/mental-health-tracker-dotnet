@@ -2,6 +2,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import Logo from '../components/ui/Logo.vue'
 import { useAuthStore } from '../stores/useAuthStore'
 
 const route = useRoute()
@@ -65,25 +66,8 @@ onMounted(async () => {
     <section
       class="animate-slide-up relative w-full max-w-sm rounded-2xl border border-ink-100 bg-paper-50 px-8 py-10 shadow-sm"
     >
-      <!--
-        Marca: un anillo abierto con un punto en el centro. El hueco evoca la
-        entrada y la salida de aire del ejercicio de respiración, que es lo que
-        sostiene el resto de la interfaz. Va en línea y con `currentColor` para
-        no poder desincronizarse de la paleta.
-      -->
-      <svg viewBox="0 0 40 40" class="h-10 w-10" fill="none" aria-hidden="true">
-        <circle
-          cx="20"
-          cy="20"
-          r="14"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-dasharray="66 22"
-          class="text-ink-300"
-        />
-        <circle cx="20" cy="20" r="5" fill="currentColor" class="text-clearsky-500" />
-      </svg>
+      <!-- Marca decorativa: el nombre de la app ya está en el título de debajo. -->
+      <Logo size="md" label="" />
 
       <!-- `display` es la familia de los momentos de marca y los títulos. -->
       <h1 class="font-display mt-6 text-2xl font-semibold text-ink-700">Stillwater</h1>

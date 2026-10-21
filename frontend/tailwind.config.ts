@@ -1,62 +1,25 @@
 import type { Config } from 'tailwindcss'
+import plugin from 'tailwindcss/plugin'
+
+import { palette } from './src/theme/palette.ts'
+
+// Tailwind 4 solo escribe las variables `--color-*` de los colores que vienen de `@theme` en CSS, no
+// de esta config en JS. Las genera este plugin desde la misma paleta, con el mismo nombre que usa
+// Tailwind (`--color-ink-200`), para que index.css pueda usar `var(--color-ink-200)` sin repetir el hex.
+const themeColorVariables = plugin(({ addBase }) => {
+  const variables: Record<string, string> = {}
+  for (const [name, tones] of Object.entries(palette)) {
+    for (const [tone, hex] of Object.entries(tones)) {
+      variables[`--color-${name}-${tone}`] = hex
+    }
+  }
+  addBase({ ':root': variables })
+})
 
 export default {
   theme: {
     extend: {
-      colors: {
-        // Warm linen paper — page and card backgrounds.
-        paper: {
-          50: '#FBF8F2',
-          100: '#F6F1E7',
-          200: '#EAE0CB',
-          300: '#D7C7A2',
-          400: '#BFA679',
-        },
-        // Teal-charcoal "ink" — all text and hairline borders.
-        ink: {
-          50: '#EEF2F1',
-          100: '#DCE4E2',
-          200: '#B9C9C6',
-          300: '#8A9B97',
-          400: '#5D726D',
-          500: '#3E524E',
-          600: '#33453F',
-          700: '#2B3A3A',
-        },
-        // Dusty blue — the primary interactive accent (buttons, focus, active states).
-        clearsky: {
-          50: '#EDF3F5',
-          100: '#D7E6EA',
-          200: '#B4CFD7',
-          300: '#96BAC5',
-          400: '#7FA3B2',
-          500: '#6F94A6',
-          600: '#587989',
-          700: '#465F6C',
-          // Un escalón más oscuro que 700, solo para el `hover` del botón
-          // primario: con 700 como relleno base (necesario para que el texto
-          // `paper-50` llegue a 4.5:1) hacía falta un tono de hover más oscuro
-          // que siguiera cumpliendo el contraste, y no existía.
-          800: '#3A4F5A',
-        },
-        // Soft sage — secondary/confirmation accent, used sparingly.
-        meadow: {
-          50: '#EFF3EC',
-          100: '#DCE6D6',
-          200: '#BFD3B4',
-          300: '#A3BE95',
-          400: '#93AA89',
-          500: '#7C9473',
-          600: '#63775B',
-        },
-        // Warm clay — reserved for the ambient login gradient only, never UI chrome.
-        ember: {
-          100: '#F3DCC9',
-          300: '#E7BBA0',
-          400: '#D89A78',
-          500: '#C97C5D',
-        },
-      },
+      colors: palette,
       fontFamily: {
         // Default everywhere (`font-sans`, and the body via preflight). A calm
         // text serif, not a UI grotesque: reading, not interface chrome. All
@@ -84,4 +47,5 @@ export default {
       },
     },
   },
+  plugins: [themeColorVariables],
 } satisfies Config

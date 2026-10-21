@@ -26,26 +26,7 @@ vi.mock('../../../composables/useToast', () => ({
 import { ApiError } from '../../../services/api-client'
 import * as logsApi from '../../../services/logs.api'
 import { SOCIAL_FREQUENCIES, type DailyLog } from '../../../types/daily-log'
-
-function makeLog(): DailyLog {
-  return {
-    id: '1',
-    logDate: '2026-01-01',
-    moodRating: 3,
-    anxietyLevel: 5,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 3,
-    sleepDisturbances: [],
-    activityType: 'none',
-    activityMinutes: null,
-    socialFrequency: 'none',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-01-01T00:00:00.0000000+00:00',
-    updatedAt: '2026-01-01T00:00:00.0000000+00:00',
-  }
-}
+import { makeLog } from '../../../test-support/factories'
 
 const Harness = defineComponent({
   components: { DailyLogModal, Toast },

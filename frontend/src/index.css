@@ -19,8 +19,8 @@
    pulgar se dibujan aquí. El elemento mide 44px de alto —el mínimo táctil— y la
    pista visible queda fina en el centro; el pulgar sube a 20px para poder
    agarrarlo. Sin esto, `appearance-none` deja el control sin pulgar visible y el
-   único punto para arrastrar es una barra de 8px. Colores de la paleta
-   (tailwind.config.ts) en literal porque aquí no hay acceso a sus nombres. */
+   único punto para arrastrar es una barra de 8px. Los colores son las variables
+   de tema de Tailwind (`--color-<nombre>-<tono>`), que salen de src/theme/palette.ts. */
 input[type='range'] {
   appearance: none;
   -webkit-appearance: none;
@@ -31,7 +31,7 @@ input[type='range'] {
 input[type='range']::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 9999px;
-  background: #b9c9c6; /* ink-200 */
+  background: var(--color-ink-200);
 }
 
 input[type='range']::-webkit-slider-thumb {
@@ -40,21 +40,21 @@ input[type='range']::-webkit-slider-thumb {
   width: 20px;
   height: 20px;
   margin-top: -7px; /* (20 - 6) / 2: centra el pulgar sobre la pista */
-  border: 2px solid #fbf8f2; /* paper-50: separa el pulgar de la pista */
+  border: 2px solid var(--color-paper-50); /* separa el pulgar de la pista */
   border-radius: 9999px;
-  background: #587989; /* clearsky-600 */
+  background: var(--color-clearsky-600);
 }
 
 input[type='range']::-moz-range-track {
   height: 6px;
   border-radius: 9999px;
-  background: #b9c9c6;
+  background: var(--color-ink-200);
 }
 
 input[type='range']::-moz-range-thumb {
   width: 20px;
   height: 20px;
-  border: 2px solid #fbf8f2;
+  border: 2px solid var(--color-paper-50);
   border-radius: 9999px;
-  background: #587989;
+  background: var(--color-clearsky-600);
 }

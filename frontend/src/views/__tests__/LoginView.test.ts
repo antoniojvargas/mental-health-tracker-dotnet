@@ -61,6 +61,46 @@ async function mountAt(url: string) {
 }
 
 describe('LoginView', () => {
+  describe('la marca', () => {
+    // Antes era un SVG copiado en la vista; ahora es <Logo size="md" label="" />. El DOM tiene que
+    // seguir siendo el mismo: decorativo para los lectores de pantalla y con el mismo dibujo.
+    it('es un SVG decorativo: aria-hidden, sin rol ni nombre, de 40 px', async () => {
+      const { wrapper } = await mountAt('/login')
+
+      const logo = wrapper.get('svg[viewBox="0 0 40 40"]')
+
+      expect(logo.attributes('aria-hidden')).toBe('true')
+      expect(logo.attributes()).not.toHaveProperty('role')
+      expect(logo.attributes()).not.toHaveProperty('aria-label')
+      expect(logo.attributes('class')).toBe('h-10 w-10')
+      expect(logo.attributes('fill')).toBe('none')
+    })
+
+    it('dibuja el anillo abierto y el punto con los mismos trazos y colores', async () => {
+      const { wrapper } = await mountAt('/login')
+
+      const [ring, dot] = wrapper.get('svg[viewBox="0 0 40 40"]').findAll('circle')
+
+      expect(ring.attributes()).toMatchObject({
+        cx: '20',
+        cy: '20',
+        r: '14',
+        stroke: 'currentColor',
+        'stroke-width': '1.5',
+        'stroke-linecap': 'round',
+        'stroke-dasharray': '66 22',
+        class: 'text-ink-300',
+      })
+      expect(dot.attributes()).toMatchObject({
+        cx: '20',
+        cy: '20',
+        r: '5',
+        fill: 'currentColor',
+        class: 'text-clearsky-500',
+      })
+    })
+  })
+
   describe('el enlace de Google', () => {
     it('se renderiza apuntando a /api/auth/google, y no a un router-link', async () => {
       const { wrapper } = await mountAt('/login')

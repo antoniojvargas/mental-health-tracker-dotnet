@@ -83,6 +83,24 @@ export default tseslint.config(
     },
   },
   {
+    // Las fechas del cliente se calculan y se parsean en src/utils/date.ts (toIsoDate, todayIso,
+    // parseIsoDate), que fija la hora local. Formatear a mano con getFullYear() y padStart() es
+    // reescribir esa función, y es donde se cuela el desfase de huso (toISOString() pasa a UTC).
+    files: ['src/**/*.{ts,vue}'],
+    ignores: ['src/utils/date.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'warn',
+        {
+          selector:
+            ':function:has(CallExpression[callee.property.name="getFullYear"]):has(CallExpression[callee.property.name="padStart"])',
+          message:
+            'No formatees fechas a mano con getFullYear() y padStart(): usa toIsoDate() o todayIso() de utils/date.ts.',
+        },
+      ],
+    },
+  },
+  {
     // El UI kit se llama por lo que hace, no por un prefijo: `Button`, no
     // `UiButton`. Un `Button` dentro de `components/ui/` no colisiona con nada,
     // mientras que el prefijo redundaría con la carpeta. La regla se relaja solo

@@ -1,28 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { getMetric, METRICS } from '../metrics'
-import type { DailyLog } from '../../../types/daily-log'
-
-function makeLog(overrides: Partial<DailyLog> = {}): DailyLog {
-  return {
-    id: 'log-1',
-    logDate: '2026-08-01',
-    moodRating: 3,
-    anxietyLevel: 4,
-    stressLevel: 5,
-    sleepHours: 7.5,
-    sleepQuality: 3,
-    sleepDisturbances: [],
-    activityType: null,
-    activityMinutes: null,
-    socialFrequency: 'occasional',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: '2026-08-01T00:00:00.000Z',
-    ...overrides,
-  }
-}
+import { makeLog } from '../../../test-support/factories'
 
 describe('METRICS', () => {
   it('define las siete métricas del dashboard en orden', () => {

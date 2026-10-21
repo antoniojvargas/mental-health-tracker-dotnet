@@ -37,27 +37,7 @@ import { ApiError } from '../../../services/api-client'
 import * as logsApi from '../../../services/logs.api'
 import { SYMPTOM_TYPES, type DailyLog } from '../../../types/daily-log'
 import { todayIso } from '../../../utils/date'
-
-function makeLog(overrides: Partial<DailyLog> = {}): DailyLog {
-  return {
-    id: 'log-1',
-    logDate: todayIso(),
-    moodRating: 4,
-    anxietyLevel: 6,
-    stressLevel: 3,
-    sleepHours: 6.5,
-    sleepQuality: 2,
-    sleepDisturbances: ['nightmares'],
-    activityType: 'running',
-    activityMinutes: 45,
-    socialFrequency: 'daily',
-    symptoms: [{ type: 'panic', severity: 4 }],
-    notes: 'ya registrado',
-    createdAt: '2026-01-01T00:00:00.0000000+00:00',
-    updatedAt: '2026-01-01T00:00:00.0000000+00:00',
-    ...overrides,
-  }
-}
+import { makeLog } from '../../../test-support/factories'
 
 // El orden en que el padre recibe los eventos importa: submit, saved y close.
 const events: string[] = []
@@ -629,7 +609,22 @@ describe('DailyLogModal · lectura de hoy (loadToday)', () => {
   })
 
   it('con registro de hoy rellena el formulario y permite avanzar desde el primer paso', async () => {
-    await openModal(makeLog())
+    await openModal(
+      makeLog({
+        logDate: todayIso(),
+        moodRating: 4,
+        anxietyLevel: 6,
+        stressLevel: 3,
+        sleepHours: 6.5,
+        sleepQuality: 2,
+        sleepDisturbances: ['nightmares'],
+        activityType: 'running',
+        activityMinutes: 45,
+        socialFrequency: 'daily',
+        symptoms: [{ type: 'panic', severity: 4 }],
+        notes: 'ya registrado',
+      }),
+    )
 
     expect(
       dialog()

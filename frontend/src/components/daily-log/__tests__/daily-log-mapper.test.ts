@@ -10,26 +10,7 @@ import {
   type SleepDisturbance,
   type SymptomType,
 } from '../../../types/daily-log'
-
-function makeLog(): DailyLog {
-  return {
-    id: '1',
-    logDate: '2026-01-01',
-    moodRating: 3,
-    anxietyLevel: 5,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 3,
-    sleepDisturbances: [],
-    activityType: 'none',
-    activityMinutes: null,
-    socialFrequency: 'none',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-01-01T00:00:00.0000000+00:00',
-    updatedAt: '2026-01-01T00:00:00.0000000+00:00',
-  }
-}
+import { makeLog } from '../../../test-support/factories'
 
 // Ida y vuelta: leer un registro en el formulario y volver a enviarlo sin tocar nada debe dar a
 // `create` exactamente los mismos campos que el registro (A5 del Apéndice de MEJORAS.md).

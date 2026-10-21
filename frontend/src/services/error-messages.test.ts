@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ApiError } from './api-client'
 import { describeError } from './error-messages'
-import type { ApiErrorCode } from '../types/daily-log'
+import type { ApiErrorCode } from '../types/api-error'
 
 function apiError(code: string, message = 'texto crudo del servidor', status = 400): ApiError {
   return new ApiError(status, { code: code as ApiErrorCode, message, details: [] })

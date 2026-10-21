@@ -17,7 +17,8 @@ import { defineComponent, h } from 'vue'
 
 import { useLogSocket } from '../useLogSocket'
 import { acquireLogHub, releaseLogHub } from '../../services/hub-client'
-import type { DailyLog, IsoDate } from '../../types/daily-log'
+import type { DailyLog } from '../../types/daily-log'
+import { makeLog } from '../../test-support/factories'
 
 vi.mock('../../services/hub-client', () => ({
   acquireLogHub: vi.fn(),
@@ -32,26 +33,6 @@ const connection = {
   onreconnected: vi.fn<(callback: () => void) => void>(),
   start: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   stop: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-}
-
-function makeLog(logDate: IsoDate): DailyLog {
-  return {
-    id: `id-${logDate}`,
-    logDate,
-    moodRating: 3,
-    anxietyLevel: 5,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 4,
-    sleepDisturbances: [],
-    activityType: null,
-    activityMinutes: null,
-    socialFrequency: 'none',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-09-13T17:18:21.1234567+00:00',
-    updatedAt: '2026-09-13T17:18:21.1234567+00:00',
-  }
 }
 
 let wrapper: VueWrapper | null = null
@@ -111,7 +92,7 @@ describe('useLogSocket', () => {
   it('propaga el registro que llega por log:created', () => {
     const onLog = vi.fn()
     mountSocket(onLog)
-    const log = makeLog('2026-08-01')
+    const log = makeLog({ logDate: '2026-08-01' })
 
     handlerFor('log:created')(log)
 
@@ -121,7 +102,7 @@ describe('useLogSocket', () => {
   it('propaga el registro que llega por log:updated', () => {
     const onLog = vi.fn()
     mountSocket(onLog)
-    const log = makeLog('2026-08-02')
+    const log = makeLog({ logDate: '2026-08-02' })
 
     handlerFor('log:updated')(log)
 
@@ -184,7 +165,7 @@ describe('useLogSocket', () => {
     expect(connection.off).toHaveBeenCalledWith('log:created', firstHandler)
     expect(connection.off).not.toHaveBeenCalledWith('log:created', secondHandler)
 
-    const log = makeLog('2026-08-03')
+    const log = makeLog({ logDate: '2026-08-03' })
     secondHandler(log)
     expect(second).toHaveBeenCalledWith(log)
   })

@@ -23,28 +23,7 @@ vi.mock('vue-chartjs', () => ({
 import { Line } from 'vue-chartjs'
 
 import TrendChart from '../TrendChart.vue'
-import type { DailyLog, IsoDate } from '../../../types/daily-log'
-
-function makeLog(logDate: IsoDate, overrides: Partial<DailyLog> = {}): DailyLog {
-  return {
-    id: `id-${logDate}`,
-    logDate,
-    moodRating: 3,
-    anxietyLevel: 4,
-    stressLevel: 5,
-    sleepHours: 7,
-    sleepQuality: 3,
-    sleepDisturbances: [],
-    activityType: null,
-    activityMinutes: null,
-    socialFrequency: 'occasional',
-    symptoms: [],
-    notes: null,
-    createdAt: '2026-08-01T00:00:00.000Z',
-    updatedAt: '2026-08-01T00:00:00.000Z',
-    ...overrides,
-  }
-}
+import { makeLog } from '../../../test-support/factories'
 
 interface ChartData {
   labels: string[]
@@ -65,8 +44,8 @@ describe('TrendChart', () => {
 
   describe('transformación de datos', () => {
     const logs = [
-      makeLog('2026-10-01', { moodRating: 2, sleepHours: 6 }),
-      makeLog('2026-10-02', { moodRating: 5, sleepHours: 8 }),
+      makeLog({ logDate: '2026-10-01', moodRating: 2, sleepHours: 6 }),
+      makeLog({ logDate: '2026-10-02', moodRating: 5, sleepHours: 8 }),
     ]
 
     it('usa las fechas como etiquetas y una serie por métrica', () => {
@@ -116,7 +95,7 @@ describe('TrendChart', () => {
   })
 
   describe('prefers-reduced-motion', () => {
-    const logs = [makeLog('2026-10-01', { moodRating: 4 })]
+    const logs = [makeLog({ logDate: '2026-10-01', moodRating: 4 })]
 
     it('apaga la animación del trazado cuando el sistema pide menos movimiento', () => {
       vi.stubGlobal(
