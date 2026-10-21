@@ -3,8 +3,9 @@
  *
  * Expone una única conexión, creada de forma perezosa la primera vez que se pide
  * y reutilizada después. Construirla NO conecta: el `HubConnection` se queda
- * detenido hasta que alguien llame a `start()`, para que ningún import del
- * módulo abra un socket por su cuenta.
+ * detenido hasta que el primer consumidor llama a `acquireLogHub()`, para que ningún
+ * import del módulo abra un socket por su cuenta. Los consumidores se cuentan: la
+ * conexión se detiene cuando el último llama a `releaseLogHub()`.
  *
  * La sesión viaja en la cookie httpOnly `access_token` (igual que en
  * api-client.ts), así que la conexión necesita `withCredentials` para que el
@@ -19,6 +20,7 @@ import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
 import { LOGS_HUB_PATH } from './hub-events'
 
 let connection: HubConnection | null = null
+let consumers = 0
 
 /**
  * Devuelve la conexión al hub, creándola la primera vez.
@@ -36,4 +38,30 @@ export function getLogHubConnection(): HubConnection {
   }
 
   return connection
+}
+
+/**
+ * Pide la conexión como consumidor: la arranca el primero y las demás peticiones la
+ * comparten ya en marcha. Cada `acquireLogHub` debe emparejarse con un `releaseLogHub`.
+ *
+ * El arranque no se reintenta por consumidor: si el `start()` del primero falla, la conexión
+ * queda detenida igual que antes, con uno o con varios consumidores.
+ */
+export function acquireLogHub(): HubConnection {
+  const hub = getLogHubConnection()
+  consumers += 1
+  if (consumers === 1) void hub.start()
+
+  return hub
+}
+
+/**
+ * Devuelve la conexión: el último consumidor en soltarla la detiene. Soltar de más (sin un
+ * `acquireLogHub` pendiente) no hace nada, para que un desmontaje duplicado no pare a nadie.
+ */
+export function releaseLogHub(): void {
+  if (consumers === 0) return
+
+  consumers -= 1
+  if (consumers === 0) void getLogHubConnection().stop()
 }

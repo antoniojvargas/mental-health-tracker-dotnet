@@ -2,9 +2,10 @@
  * Suscripción al hub de registros durante la vida de un componente.
  *
  * Al montar registra un mismo manejador para `log:created` y `log:updated` y
- * arranca la conexión compartida de hub-client.ts; al desmontar retira ESE
- * manejador (misma referencia, que es lo que evita dejarlo colgado) de ambos
- * eventos y detiene la conexión.
+ * toma la conexión compartida de hub-client.ts (`acquireLogHub`, que la arranca si es
+ * el primer consumidor); al desmontar retira ESE manejador (misma referencia, que es lo
+ * que evita dejarlo colgado) de ambos eventos y la suelta (`releaseLogHub`, que la detiene
+ * si era el último).
  *
  * No se reintenta el arranque inicial a mano: si `start()` falla —servidor
  * caído, sesión caducada—, la conexión se queda detenida y la reconexión
@@ -18,33 +19,40 @@
  * lo silencia al desmontar.
  */
 
+import type { HubConnection } from '@microsoft/signalr'
 import { onMounted, onUnmounted } from 'vue'
 
-import { getLogHubConnection } from '../services/hub-client'
+import { acquireLogHub, releaseLogHub } from '../services/hub-client'
 import { LOG_HUB_EVENTS } from '../services/hub-events'
 import type { DailyLog } from '../types/daily-log'
 
 export function useLogSocket(onLog: (log: DailyLog) => void, onReconnected?: () => void): void {
-  const connection = getLogHubConnection()
+  let connection: HubConnection | null = null
   const handleLog = (log: DailyLog) => onLog(log)
   let mounted = false
 
   onMounted(() => {
     mounted = true
+    // acquireLogHub arranca la conexión si es la primera; start() es asíncrono, así que los
+    // manejadores quedan registrados antes de que llegue ningún evento.
+    const hub = acquireLogHub()
+    connection = hub
     if (onReconnected) {
-      connection.onreconnected(() => {
+      hub.onreconnected(() => {
         if (mounted) onReconnected()
       })
     }
-    connection.on(LOG_HUB_EVENTS.created, handleLog)
-    connection.on(LOG_HUB_EVENTS.updated, handleLog)
-    void connection.start()
+    hub.on(LOG_HUB_EVENTS.created, handleLog)
+    hub.on(LOG_HUB_EVENTS.updated, handleLog)
   })
 
   onUnmounted(() => {
     mounted = false
+    if (!connection) return
+
     connection.off(LOG_HUB_EVENTS.created, handleLog)
     connection.off(LOG_HUB_EVENTS.updated, handleLog)
-    void connection.stop()
+    connection = null
+    releaseLogHub()
   })
 }

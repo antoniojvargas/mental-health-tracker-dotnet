@@ -16,11 +16,12 @@ import { mount, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
 
 import { useLogSocket } from '../useLogSocket'
-import { getLogHubConnection } from '../../services/hub-client'
+import { acquireLogHub, releaseLogHub } from '../../services/hub-client'
 import type { DailyLog, IsoDate } from '../../types/daily-log'
 
 vi.mock('../../services/hub-client', () => ({
-  getLogHubConnection: vi.fn(),
+  acquireLogHub: vi.fn(),
+  releaseLogHub: vi.fn(),
 }))
 
 type ConnectionHandler = (log: DailyLog) => void
@@ -75,7 +76,9 @@ function handlerFor(event: string): ConnectionHandler {
 
 describe('useLogSocket', () => {
   beforeEach(() => {
-    vi.mocked(getLogHubConnection).mockReturnValue(connection as never)
+    vi.mocked(acquireLogHub).mockReturnValue(connection as never)
+    vi.mocked(acquireLogHub).mockClear()
+    vi.mocked(releaseLogHub).mockClear()
     connection.on.mockClear()
     connection.off.mockClear()
     connection.onreconnected.mockClear()
@@ -88,10 +91,10 @@ describe('useLogSocket', () => {
     wrapper = null
   })
 
-  it('al montar arranca la conexión y se suscribe a los dos eventos', () => {
+  it('al montar pide la conexión y se suscribe a los dos eventos', () => {
     mountSocket(vi.fn())
 
-    expect(connection.start).toHaveBeenCalledTimes(1)
+    expect(acquireLogHub).toHaveBeenCalledTimes(1)
     expect(connection.on).toHaveBeenCalledWith('log:created', expect.any(Function))
     expect(connection.on).toHaveBeenCalledWith('log:updated', expect.any(Function))
   })
@@ -122,7 +125,7 @@ describe('useLogSocket', () => {
     expect(onLog).toHaveBeenCalledWith(log)
   })
 
-  it('al desmontar retira ambos manejadores y detiene la conexión', () => {
+  it('al desmontar retira ambos manejadores y suelta la conexión', () => {
     mountSocket(vi.fn())
     const created = handlerFor('log:created')
     const updated = handlerFor('log:updated')
@@ -131,7 +134,7 @@ describe('useLogSocket', () => {
 
     expect(connection.off).toHaveBeenCalledWith('log:created', created)
     expect(connection.off).toHaveBeenCalledWith('log:updated', updated)
-    expect(connection.stop).toHaveBeenCalledTimes(1)
+    expect(releaseLogHub).toHaveBeenCalledTimes(1)
   })
 
   it('al reconectar avisa para que el cliente recupere lo perdido durante el corte', () => {
@@ -161,5 +164,25 @@ describe('useLogSocket', () => {
     mountSocket(vi.fn())
 
     expect(connection.onreconnected).not.toHaveBeenCalled()
+  })
+
+  it('con dos componentes, desmontar uno retira solo sus manejadores y suelta una vez', () => {
+    const first = vi.fn()
+    const second = vi.fn()
+    const firstWrapper = mountSocket(first)
+    const firstHandler = handlerFor('log:created')
+    mountSocket(second)
+    const secondHandler = connection.on.mock.calls.filter(([name]) => name === 'log:created')[1][1]
+
+    firstWrapper.unmount()
+
+    expect(acquireLogHub).toHaveBeenCalledTimes(2)
+    expect(releaseLogHub).toHaveBeenCalledTimes(1)
+    expect(connection.off).toHaveBeenCalledWith('log:created', firstHandler)
+    expect(connection.off).not.toHaveBeenCalledWith('log:created', secondHandler)
+
+    const log = makeLog('2026-08-03')
+    secondHandler(log)
+    expect(second).toHaveBeenCalledWith(log)
   })
 })
