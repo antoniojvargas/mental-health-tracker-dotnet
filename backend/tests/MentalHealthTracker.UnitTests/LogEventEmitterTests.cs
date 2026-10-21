@@ -9,9 +9,17 @@ public sealed class LogEventEmitterTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
 
+    // Los nombres viajan por el cable y el frontend se suscribe a estas cadenas: se fijan literales.
+    [Fact]
+    public void EventNames_AreTheOnesTheFrontendSubscribesTo()
+    {
+        Assert.Equal("log:created", LogHubEvents.LogCreated);
+        Assert.Equal("log:updated", LogHubEvents.LogUpdated);
+    }
+
     [Theory]
-    [InlineData("log:created")]
-    [InlineData("log:updated")]
+    [InlineData(LogHubEvents.LogCreated)]
+    [InlineData(LogHubEvents.LogUpdated)]
     public async Task Emit_WhenSendThrows_LogsWarningWithEventAndUserAndDoesNotRethrow(string eventName)
     {
         var logger = new CapturingLogger();
@@ -38,8 +46,8 @@ public sealed class LogEventEmitterTests
     }
 
     [Theory]
-    [InlineData("log:created")]
-    [InlineData("log:updated")]
+    [InlineData(LogHubEvents.LogCreated)]
+    [InlineData(LogHubEvents.LogUpdated)]
     public async Task Emit_WhenCallerTokenIsAlreadyCancelled_StillSendsWithNoneToken(string eventName)
     {
         var hub = new FakeHub(null);
@@ -54,7 +62,7 @@ public sealed class LogEventEmitterTests
     }
 
     private static Task Emit(LogEventEmitter emitter, string eventName, CancellationToken token) =>
-        eventName == "log:created"
+        eventName == LogHubEvents.LogCreated
             ? emitter.EmitLogCreatedAsync(UserId, Log(), token)
             : emitter.EmitLogUpdatedAsync(UserId, Log(), token);
 

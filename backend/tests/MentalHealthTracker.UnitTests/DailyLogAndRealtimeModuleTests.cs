@@ -50,7 +50,7 @@ public sealed class DailyLogAndRealtimeModuleTests
     public void TheHubPathIsTheOneTheClientsUse()
     {
         // frontend/src/services/hub-client.ts, nginx.conf y vite.config.ts apuntan a /hub/logs.
-        Assert.Equal("/hub/logs", RealtimeModule.LogsHubPath);
+        Assert.Equal("/hub/logs", HubRoutes.Logs);
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public sealed class DailyLogAndRealtimeModuleTests
             .OfType<RouteEndpoint>()
             .Select(endpoint => endpoint.RoutePattern.RawText)
             .ToList();
-        Assert.Contains(RealtimeModule.LogsHubPath, routes);
-        Assert.Contains(RealtimeModule.LogsHubPath + "/negotiate", routes);
+        Assert.Contains(HubRoutes.Logs, routes);
+        Assert.Contains(HubRoutes.Logs + "/negotiate", routes);
     }
 
     private static void AssertRegistration<TService, TImplementation>(IServiceCollection services, ServiceLifetime lifetime) =>
