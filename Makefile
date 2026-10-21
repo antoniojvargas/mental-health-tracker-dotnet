@@ -3,7 +3,7 @@
 
 DOTNET ?= dotnet
 COVERAGE_DIR := $(CURDIR)/coverage
-COVERAGE_THRESHOLD := 70
+COVERAGE_THRESHOLD := 77.8
 
 up: ## Levanta el stack completo de desarrollo (postgres, backend, frontend)
 	docker compose up -d --build

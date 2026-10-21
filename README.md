@@ -159,7 +159,7 @@ Los comandos se ejecutan desde la raíz del repositorio. `dotnet-ef` y `reportge
 | `dotnet tool run dotnet-ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
 | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
 | `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`, o la cadena de Npgsql de otra base en `TEST_DATABASE_URL`). |
-| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 70 %. |
+| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 77,8 %. |
 
 ### Dependencias NuGet
 
@@ -208,7 +208,7 @@ Los comandos se ejecutan dentro de `frontend/`.
 
 **Notas**
 
-- `make test` fusiona la cobertura de las dos capas del backend (Coverlet + ReportGenerator) y **falla si la cobertura de líneas baja del 70 %**; la medición actual es de 75 %.
+- `make test` fusiona la cobertura de las dos capas del backend (Coverlet + ReportGenerator) y **falla si la cobertura de líneas baja del 77,8 %**; la medición actual es de 79,8 %.
 - `npm run test:unit` del frontend usa Vitest y corre sin navegador. El entorno global es `node`, porque el cliente de la API y el store no tocan el DOM; los tests de componente que sí lo necesitan montan la vista con Vue Test Utils sobre `jsdom` mediante un docblock `@vitest-environment`, de modo que solo ese fichero paga el coste de levantar un DOM.
 - La suite de frontend cubre hoy el cliente de la API, el store de autenticación y la vista de login. Los tests de componente montan la vista real con un router de memoria y un Pinia reales, y solo sustituyen `fetch`: la lógica que interesa es la que une el `query` de la ruta, el store y el router, así que falsificar cualquiera de los dos dejaría el cableado real fuera del alcance del test.
 - La suite E2E vive en `e2e/`; `make test-e2e` ejecuta la suite completa y requiere la pila E2E levantada. Ver [Pruebas E2E](#pruebas-e2e-playwright) para levantar la pila, instalar los navegadores de Playwright y volver al entorno normal.
@@ -253,7 +253,7 @@ El workflow `.github/workflows/ci.yml` corre en cada `pull_request` y en `push` 
 | ---------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Backend (.NET)         | Restaura, compila y ejecuta los tests unitarios del backend.                                                 |
 | Frontend (Node)        | Instala dependencias, ejecuta los tests unitarios (Vitest) y compila el bundle.                              |
-| Backend tests          | Compila la solución y corre unitarias + integración (Postgres 16 como servicio) con cobertura ≥ 70 %.        |
+| Backend tests          | Compila la solución y corre unitarias + integración (Postgres 16 como servicio) con cobertura ≥ 77,8 %.        |
 | Frontend tests         | Ejecuta los tests unitarios de Vitest con cobertura.                                                         |
 | Lint                   | `dotnet format --verify-no-changes`, ESLint y Prettier.                                                      |
 | Security audit         | `dotnet list package --vulnerable --include-transitive` y `npm audit --audit-level=high`.                    |
