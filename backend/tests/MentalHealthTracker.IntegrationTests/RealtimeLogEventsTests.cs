@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static readonly string[] NoDisturbances = ["none"];
 

@@ -16,7 +16,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // Serilog que guarda los eventos en memoria.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class RequestLoggingTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const string RequestLogSource = "Serilog.AspNetCore.RequestLoggingMiddleware";
 

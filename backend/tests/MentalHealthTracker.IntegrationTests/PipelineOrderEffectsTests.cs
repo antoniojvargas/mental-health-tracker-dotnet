@@ -16,7 +16,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // y, detrás del proxy, el limitador ya ve la IP reenviada y no la del proxy.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private int WritePermitLimit =>
         Factory.Services.GetRequiredService<IOptions<RateLimitingOptions>>().Value.Write.PermitLimit;
@@ -127,7 +127,7 @@ public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factor
 // compartirían la IP del proxy y se bloquearían entre sí. ForwardedHeadersTests ya fija
 // el aislamiento entre dos IPs; aquí se fija el efecto inverso, que muchos clientes
 // distintos a través del mismo proxy nunca agotan una cuota común.
-[Collection(IntegrationTestGroup.Name)]
+[Collection(IntegrationTestGroup.IsolatedName)]
 public sealed class ForwardedClientPartitionTests(ForwardedHeadersFixture fixture)
     : IClassFixture<ForwardedHeadersFixture>
 {

@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // JWT se verifique una sola vez y el segundo reutilice el resultado.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class SingleVerificationPerRequestTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task PostLogs_WithValidSession_VerifiesTheTokenOnce()

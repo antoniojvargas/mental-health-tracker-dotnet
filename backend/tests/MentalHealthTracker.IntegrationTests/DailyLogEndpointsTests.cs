@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task PostLog_WhenNoExistingLog_Returns201()

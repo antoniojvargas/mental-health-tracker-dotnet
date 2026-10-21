@@ -15,7 +15,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // respondiendo 201 y el dato debe poder leerse después.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class RealtimeFailureTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task PostLog_WhenHubSendThrows_StillReturns201AndTheLogIsReadable()

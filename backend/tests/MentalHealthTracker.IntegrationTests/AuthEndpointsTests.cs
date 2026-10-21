@@ -16,7 +16,7 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class AuthEndpointsTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task Me_WithoutCookie_Returns401()

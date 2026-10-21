@@ -20,7 +20,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // para que un nuevo camino de error que se salga del sobre rompa esta clase.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Theory]
     [InlineData("me-deleted-user", HttpStatusCode.Unauthorized, "UNAUTHORIZED")]

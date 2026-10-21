@@ -8,7 +8,7 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class LogsHubAuthTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task Negotiate_WithoutCookie_Returns401()

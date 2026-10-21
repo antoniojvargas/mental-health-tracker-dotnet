@@ -25,10 +25,10 @@ namespace MentalHealthTracker.IntegrationTests;
 // siguiente la vacía igual al arrancar. Así una prueba que falle a la mitad, o que ni
 // llegue a DisposeAsync, no puede arrastrar basura a la siguiente.
 //
-// Al heredar de esta clase hay que escribir la lista de bases como
-// `: IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>`, con la
-// clase base primero. Al revés no compila: con constructor primario, C# no acepta que una
-// interfaz preceda a una clase base con argumentos y falla con CS1003.
+// La factory llega por constructor: la comparte toda la colección IntegrationTestGroup.Name
+// (ICollectionFixture, un arranque y una migración por ejecución) o, en la colección
+// aislada, la trae la propia clase como IClassFixture. Se hereda con
+// `: IntegrationTestBase(factory)`.
 public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) : IAsyncLifetime
 {
     protected CustomWebApplicationFactory Factory { get; } = factory;

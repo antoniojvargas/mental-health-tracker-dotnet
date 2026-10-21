@@ -19,7 +19,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // y un error que saliera sin cabeceras sería justo el caso que nadie mira.
 [Collection(IntegrationTestGroup.Name)]
 public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const string StrictCsp =
         "default-src 'self'; object-src 'none'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'";

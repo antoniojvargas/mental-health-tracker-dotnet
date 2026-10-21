@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // necesitan el seguimiento.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class ChangeTrackingTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static readonly DateOnly LogDate = new(2030, 6, 15);
 

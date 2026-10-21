@@ -15,7 +15,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // acota la fecha a "UTC + 1 día", porque UTC+14 es la zona más adelantada.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class TodayEndpointTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static DateOnly UtcToday => DateOnly.FromDateTime(DateTime.UtcNow);
 

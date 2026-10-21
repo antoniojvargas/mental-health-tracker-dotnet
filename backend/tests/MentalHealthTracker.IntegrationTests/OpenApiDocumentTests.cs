@@ -11,7 +11,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // cobertura porque los tests de integración no piden /swagger.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class OpenApiDocumentTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public void SwaggerDocument_GeneratesDailyLogsSchemaWithValidationBounds()

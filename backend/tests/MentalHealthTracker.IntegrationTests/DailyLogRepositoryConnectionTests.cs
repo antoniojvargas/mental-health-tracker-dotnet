@@ -15,7 +15,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // también valen para el upsert) y no la deja abierta si ella fue quien la abrió.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class DailyLogRepositoryConnectionTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static readonly DateOnly LogDate = new(2030, 6, 15);
 

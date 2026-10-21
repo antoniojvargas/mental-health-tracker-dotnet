@@ -5,7 +5,7 @@ namespace MentalHealthTracker.IntegrationTests;
 
 [Collection(IntegrationTestGroup.Name)]
 public sealed class UnknownApiRouteTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Theory]
     [InlineData("GET", "/api/does-not-exist")]

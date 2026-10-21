@@ -19,7 +19,7 @@ namespace MentalHealthTracker.IntegrationTests;
 //     dotnet test -c Release --filter LogsListingBenchmark
 [Collection(IntegrationTestGroup.Name)]
 public sealed class LogsListingBenchmark(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const int Warmup = 200;
 

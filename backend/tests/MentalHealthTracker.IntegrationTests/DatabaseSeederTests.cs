@@ -18,7 +18,7 @@ namespace MentalHealthTracker.IntegrationTests;
 //   UPDATE_SEED_GOLDEN=1 dotnet test --filter DatabaseSeederTests
 [Collection(IntegrationTestGroup.Name)]
 public sealed class DatabaseSeederTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private static readonly DateTimeOffset FixedNow = new(2030, 6, 15, 12, 0, 0, TimeSpan.Zero);
 

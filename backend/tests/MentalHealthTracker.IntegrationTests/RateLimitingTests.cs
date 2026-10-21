@@ -15,9 +15,9 @@ namespace MentalHealthTracker.IntegrationTests;
 // Verifica las políticas de rate limiting: "auth" (por IP) sobre el callback de Google
 // OAuth, y "write" (por id de usuario) sobre POST /api/logs. Los límites se leen de
 // RateLimitingOptions, la única fuente de verdad (por defecto 20 y 30 por 15 min).
-// Cada clase de test tiene su propia instancia de CustomWebApplicationFactory, por lo que el
-// estado del rate limiter (y agotar cuotas) queda aislado a esta clase.
-[Collection(IntegrationTestGroup.Name)]
+// Esta clase mantiene su propia CustomWebApplicationFactory (IClassFixture, en la colección
+// aislada) en lugar de la compartida, para que agotar cuotas no afecte a otros tests y viceversa.
+[Collection(IntegrationTestGroup.IsolatedName)]
 public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
     : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
 {

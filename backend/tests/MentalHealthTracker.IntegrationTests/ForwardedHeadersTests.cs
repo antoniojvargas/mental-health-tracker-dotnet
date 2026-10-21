@@ -17,7 +17,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // resuelve la IP real desde X-Forwarded-For, pero solo si la petición llega de un proxy
 // declarado como conocido. TestServer no tiene socket, así que un IStartupFilter de test
 // fija Connection.RemoteIpAddress (cabecera X-Test-Remote-Ip) antes de ForwardedHeaders.
-[Collection(IntegrationTestGroup.Name)]
+[Collection(IntegrationTestGroup.IsolatedName)]
 public sealed class ForwardedHeadersTests(ForwardedHeadersFixture fixture)
     : IClassFixture<ForwardedHeadersFixture>
 {

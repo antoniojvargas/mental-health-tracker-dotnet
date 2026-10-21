@@ -23,7 +23,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // y revisar el diff de Contracts/ antes de hacer commit.
 [Collection(IntegrationTestGroup.Name)]
 public sealed partial class ContractGoldenTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     private const string LogDate = "2026-03-15";
 

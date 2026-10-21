@@ -14,7 +14,7 @@ namespace MentalHealthTracker.IntegrationTests;
 // propio y pg_stat_activity cuenta cuántas conexiones físicas tiene abiertas ese host.
 [Collection(IntegrationTestGroup.Name)]
 public sealed class NpgsqlDataSourceTests(CustomWebApplicationFactory factory)
-    : IntegrationTestBase(factory), IClassFixture<CustomWebApplicationFactory>
+    : IntegrationTestBase(factory)
 {
     [Fact]
     public async Task EfCoreAndTheHealthCheckShareOnePool()
