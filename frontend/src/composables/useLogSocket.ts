@@ -21,6 +21,7 @@
 import { onMounted, onUnmounted } from 'vue'
 
 import { getLogHubConnection } from '../services/hub-client'
+import { LOG_HUB_EVENTS } from '../services/hub-events'
 import type { DailyLog } from '../types/daily-log'
 
 export function useLogSocket(onLog: (log: DailyLog) => void, onReconnected?: () => void): void {
@@ -35,15 +36,15 @@ export function useLogSocket(onLog: (log: DailyLog) => void, onReconnected?: () 
         if (mounted) onReconnected()
       })
     }
-    connection.on('log:created', handleLog)
-    connection.on('log:updated', handleLog)
+    connection.on(LOG_HUB_EVENTS.created, handleLog)
+    connection.on(LOG_HUB_EVENTS.updated, handleLog)
     void connection.start()
   })
 
   onUnmounted(() => {
     mounted = false
-    connection.off('log:created', handleLog)
-    connection.off('log:updated', handleLog)
+    connection.off(LOG_HUB_EVENTS.created, handleLog)
+    connection.off(LOG_HUB_EVENTS.updated, handleLog)
     void connection.stop()
   })
 }

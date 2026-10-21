@@ -10,11 +10,13 @@
  * api-client.ts), así que la conexión necesita `withCredentials` para que el
  * navegador la mande; sin eso el hub responde 401.
  *
- * La ruta va relativa al origen, sin el prefijo `/api`: el proxy de Vite y el de
+ * La ruta (hub-events.ts) va relativa al origen, sin el prefijo `/api`: el proxy de Vite y el de
  * producción reenvían `/hub` (con soporte de WebSocket) contra el backend.
  */
 
 import { HubConnectionBuilder, type HubConnection } from '@microsoft/signalr'
+
+import { LOGS_HUB_PATH } from './hub-events'
 
 let connection: HubConnection | null = null
 
@@ -28,7 +30,7 @@ let connection: HubConnection | null = null
 export function getLogHubConnection(): HubConnection {
   if (!connection) {
     connection = new HubConnectionBuilder()
-      .withUrl('/hub/logs', { withCredentials: true })
+      .withUrl(LOGS_HUB_PATH, { withCredentials: true })
       .withAutomaticReconnect()
       .build()
   }
