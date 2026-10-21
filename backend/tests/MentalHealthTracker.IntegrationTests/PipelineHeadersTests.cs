@@ -121,18 +121,7 @@ public sealed partial class PipelineHeadersTests(CustomWebApplicationFactory fac
             case "400-validation":
                 {
                     var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
-                    var body = JsonContent.Create(new
-                    {
-                        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                        moodRating = 9,
-                        anxietyLevel = 5,
-                        stressLevel = 5,
-                        sleepHours = 7,
-                        sleepQuality = 4,
-                        sleepDisturbances = Array.Empty<string>(),
-                        socialFrequency = "none",
-                        symptoms = Array.Empty<object>(),
-                    });
+                    var body = JsonBody(new CreateDailyLogRequestBuilder().WithMoodRating(9).Build());
                     return await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, body, requestId);
                 }
 

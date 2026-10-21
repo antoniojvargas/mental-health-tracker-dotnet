@@ -1,9 +1,13 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
+using MentalHealthTracker.Domain.Enums;
+using MentalHealthTracker.Domain.ValueObjects;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,28 +34,27 @@ public sealed partial class ContractGoldenTests(CustomWebApplicationFactory fact
     [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{7}\+00:00$")]
     private static partial Regex RoundTripDate();
 
-    private static readonly object FixedBody = new
-    {
-        logDate = LogDate,
-        moodRating = 4,
-        anxietyLevel = 6,
-        stressLevel = 3,
-        sleepHours = 7.5,
-        sleepQuality = 4,
-        sleepDisturbances = new[] { "frequent_waking", "early_waking" },
-        activityType = "walking",
-        activityMinutes = 30,
-        socialFrequency = "occasional",
-        symptoms = new[] { new { type = "appetite_change", severity = 3 }, new { type = "low_mood", severity = 2 } },
-        notes = "fixed body",
-    };
+    private static readonly CreateDailyLogRequest FixedBody = new CreateDailyLogRequestBuilder()
+        .WithLogDate(DateOnly.ParseExact(LogDate, "yyyy-MM-dd", CultureInfo.InvariantCulture))
+        .WithMoodRating(4)
+        .WithAnxietyLevel(6)
+        .WithStressLevel(3)
+        .WithSleepHours(7.5m)
+        .WithSleepQuality(4)
+        .WithSleepDisturbances([SleepDisturbance.FrequentWaking, SleepDisturbance.EarlyWaking])
+        .WithActivityType(ActivityType.Walking)
+        .WithActivityMinutes(30)
+        .WithSocialFrequency(SocialFrequency.Occasional)
+        .WithSymptoms([new Symptom(SymptomType.AppetiteChange, 3), new Symptom(SymptomType.LowMood, 2)])
+        .WithNotes("fixed body")
+        .Build();
 
     [Fact]
     public async Task PostLogs_Created_MatchesTheGolden()
     {
         var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
 
-        using var response = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonContent.Create(FixedBody));
+        using var response = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonBody(FixedBody));
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         await AssertGoldenAsync("post-logs-created", response);
@@ -61,10 +64,10 @@ public sealed partial class ContractGoldenTests(CustomWebApplicationFactory fact
     public async Task PostLogs_Updated_HasTheSameShapeAsCreated()
     {
         var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
-        using var first = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonContent.Create(FixedBody));
+        using var first = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonBody(FixedBody));
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-        using var second = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonContent.Create(FixedBody));
+        using var second = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonBody(FixedBody));
 
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         await AssertGoldenAsync("post-logs-created", second);
@@ -85,7 +88,7 @@ public sealed partial class ContractGoldenTests(CustomWebApplicationFactory fact
     public async Task GetToday_WithDate_MatchesTheGolden()
     {
         var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
-        using var created = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonContent.Create(FixedBody));
+        using var created = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonBody(FixedBody));
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
 
         using var response = await SendAsync(Factory, HttpMethod.Get, $"/api/logs/today?date={LogDate}", token);
@@ -98,20 +101,12 @@ public sealed partial class ContractGoldenTests(CustomWebApplicationFactory fact
     public async Task Error400_Validation_MatchesTheGolden()
     {
         var (_, _, token) = await CreateAuthenticatedSessionAsync(NewEmail());
-        var invalid = new
-        {
-            logDate = LogDate,
-            moodRating = 9,
-            anxietyLevel = 5,
-            stressLevel = 5,
-            sleepHours = 7,
-            sleepQuality = 4,
-            sleepDisturbances = Array.Empty<string>(),
-            socialFrequency = "none",
-            symptoms = Array.Empty<object>(),
-        };
+        var invalid = new CreateDailyLogRequestBuilder()
+            .WithLogDate(DateOnly.ParseExact(LogDate, "yyyy-MM-dd", CultureInfo.InvariantCulture))
+            .WithMoodRating(9)
+            .Build();
 
-        using var response = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonContent.Create(invalid));
+        using var response = await SendAsync(Factory, HttpMethod.Post, "/api/logs", token, JsonBody(invalid));
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         await AssertGoldenAsync("error-400-validation", response);

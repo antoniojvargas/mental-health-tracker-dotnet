@@ -26,7 +26,7 @@ public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factor
     [Fact]
     public async Task Unauthorized401_CarriesRequestIdAndSecurityHeaders()
     {
-        using var response = await Factory.CreateClient().PostAsJsonAsync("/api/logs", ValidLog());
+        using var response = await Factory.CreateClient().PostAsJsonAsync("/api/logs", new CreateDailyLogRequestBuilder().Build(), AppJsonOptions);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         AssertCarriesPipelineHeaders(response);
@@ -54,7 +54,7 @@ public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factor
 
         for (var i = 0; i < WritePermitLimit + 10; i++)
         {
-            using var anonymous = await client.PostAsJsonAsync("/api/logs", ValidLog());
+            using var anonymous = await client.PostAsJsonAsync("/api/logs", new CreateDailyLogRequestBuilder().Build(), AppJsonOptions);
             Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
         }
 
@@ -98,28 +98,15 @@ public sealed class PipelineOrderEffectsTests(CustomWebApplicationFactory factor
         return last;
     }
 
-    private static HttpRequestMessage AuthenticatedLogRequest(string token)
+    private HttpRequestMessage AuthenticatedLogRequest(string token)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
         {
-            Content = JsonContent.Create(ValidLog()),
+            Content = JsonBody(new CreateDailyLogRequestBuilder().Build()),
         };
         request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
         return request;
     }
-
-    private static object ValidLog() => new
-    {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating = 5,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7,
-        sleepQuality = 4,
-        sleepDisturbances = Array.Empty<string>(),
-        socialFrequency = "none",
-        symptoms = Array.Empty<object>(),
-    };
 }
 
 // Detrás de un proxy declarado, la partición de la política auth debe salir de la IP

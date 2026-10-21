@@ -31,18 +31,7 @@ public sealed class RealtimeFailureTests(CustomWebApplicationFactory factory)
 
         using var post = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
         {
-            Content = JsonContent.Create(new
-            {
-                logDate = today,
-                moodRating = 3,
-                anxietyLevel = 5,
-                stressLevel = 5,
-                sleepHours = 7,
-                sleepQuality = 4,
-                sleepDisturbances = Array.Empty<string>(),
-                socialFrequency = "none",
-                symptoms = Array.Empty<object>(),
-            }),
+            Content = JsonBody(new CreateDailyLogRequestBuilder().Build()),
         };
         post.Headers.TryAddWithoutValidation("Cookie", cookie);
         var created = await failing.CreateClient().SendAsync(post);

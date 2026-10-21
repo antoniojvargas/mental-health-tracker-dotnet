@@ -52,31 +52,18 @@ public sealed class SingleVerificationPerRequestTests(CustomWebApplicationFactor
                     provider.GetRequiredService<TimeProvider>(),
                     counter))));
 
-    private static async Task<HttpResponseMessage> PostLogAsync(
+    private async Task<HttpResponseMessage> PostLogAsync(
         Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> host,
         string token)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs")
         {
-            Content = JsonContent.Create(ValidLog()),
+            Content = JsonBody(new CreateDailyLogRequestBuilder().Build()),
         };
         request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
 
         return await host.CreateClient().SendAsync(request);
     }
-
-    private static object ValidLog() => new
-    {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating = 5,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7,
-        sleepQuality = 4,
-        sleepDisturbances = Array.Empty<string>(),
-        socialFrequency = "none",
-        symptoms = Array.Empty<object>(),
-    };
 
     private sealed class VerificationCounter
     {

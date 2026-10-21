@@ -97,18 +97,10 @@ public sealed class ErrorEnvelopeContractTests(CustomWebApplicationFactory facto
     private async Task<HttpResponseMessage> InvalidPostAsync()
     {
         var (client, _, _) = await CreateAuthenticatedSessionAsync($"contract-{Guid.NewGuid():N}@example.com");
-        return await client.PostAsJsonAsync("/api/logs", new
-        {
-            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            moodRating = 9,
-            anxietyLevel = 5,
-            stressLevel = 5,
-            sleepHours = 7,
-            sleepQuality = 4,
-            sleepDisturbances = Array.Empty<string>(),
-            socialFrequency = "none",
-            symptoms = Array.Empty<object>(),
-        });
+        return await client.PostAsJsonAsync(
+            "/api/logs",
+            new CreateDailyLogRequestBuilder().WithMoodRating(9).Build(),
+            AppJsonOptions);
     }
 
     // El limitador es estado del host: un host nuevo (WithWebHostBuilder) evita agotar

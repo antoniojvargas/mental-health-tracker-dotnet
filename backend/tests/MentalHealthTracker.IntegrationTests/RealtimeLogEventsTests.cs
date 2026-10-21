@@ -80,21 +80,7 @@ public sealed class RealtimeLogEventsTests(CustomWebApplicationFactory factory)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
         request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonContent.Create(new
-        {
-            logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            moodRating = 3,
-            anxietyLevel = 5,
-            stressLevel = 5,
-            sleepHours = 7.5,
-            sleepQuality = 4,
-            sleepDisturbances = NoDisturbances,
-            activityType = "walking",
-            activityMinutes = 30,
-            socialFrequency = "occasional",
-            symptoms = new[] { new { type = "fatigue", severity = 3 } },
-            notes = "mejor que ayer",
-        });
+        request.Content = JsonBody(new CreateDailyLogRequestBuilder().WithNotes("mejor que ayer").Build());
 
         return await Factory.CreateClient().SendAsync(request);
     }

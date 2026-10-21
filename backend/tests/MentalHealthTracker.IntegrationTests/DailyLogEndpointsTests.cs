@@ -21,7 +21,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         var (_, token) = await CreateSessionTokenAsync();
         var logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        var response = await PostLogAsync(token, Body());
+        var response = await PostLogAsync(token, new CreateDailyLogRequestBuilder().Build());
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
@@ -37,10 +37,10 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     {
         var (_, token) = await CreateSessionTokenAsync();
 
-        var first = await PostLogAsync(token, Body());
+        var first = await PostLogAsync(token, new CreateDailyLogRequestBuilder().Build());
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-        var updated = await PostLogAsync(token, Body(moodRating: 2, notes: "updated"));
+        var updated = await PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(2).WithNotes("updated").Build());
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
 
         using var document = JsonDocument.Parse(await updated.Content.ReadAsStringAsync());
@@ -61,7 +61,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         var (user, token) = await CreateSessionTokenAsync();
         var logDate = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var tasks = new[] { PostLogAsync(token, Body(moodRating: 3)), PostLogAsync(token, Body(moodRating: 4)) };
+        var tasks = new[] { PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(3).Build()), PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(4).Build()) };
         var results = await Task.WhenAll(tasks);
 
         Assert.All(results, r => Assert.True(r.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK));
@@ -81,7 +81,7 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
     {
         var (_, token) = await CreateSessionTokenAsync();
 
-        var response = await PostLogAsync(token, Body(moodRating: 9));
+        var response = await PostLogAsync(token, new CreateDailyLogRequestBuilder().WithMoodRating(9).Build());
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
@@ -179,11 +179,11 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         var (userA, tokenA) = await CreateSessionTokenAsync();
         var (_, tokenB) = await CreateSessionTokenAsync();
 
-        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var threeDaysAgo = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-3);
         Assert.NotNull(userA);
 
-        var createdToday = await PostLogAsync(tokenA, Body());
-        var createdPast = await PostLogAsync(tokenA, Body(moodRating: 4, logDate: threeDaysAgo));
+        var createdToday = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().Build());
+        var createdPast = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().WithMoodRating(4).WithLogDate(threeDaysAgo).Build());
         Assert.Equal(HttpStatusCode.Created, createdToday.StatusCode);
         Assert.Equal(HttpStatusCode.Created, createdPast.StatusCode);
 
@@ -245,15 +245,6 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
         });
     }
 
-    private async Task<HttpResponseMessage> PostLogAsync(string token, object body)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonContent.Create(body);
-
-        return await Factory.CreateClient().SendAsync(request);
-    }
-
     private async Task<HttpResponseMessage> GetLogsAsync(string token, string? query = null)
     {
         using var request = new HttpRequestMessage(
@@ -263,20 +254,4 @@ public sealed class DailyLogEndpointsTests(CustomWebApplicationFactory factory)
 
         return await Factory.CreateClient().SendAsync(request);
     }
-
-    private static object Body(int moodRating = 3, string? notes = null, string? logDate = null) => new
-    {
-        logDate = logDate ?? DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7.5,
-        sleepQuality = 4,
-        sleepDisturbances = new[] { "none" },
-        activityType = "walking",
-        activityMinutes = 30,
-        socialFrequency = "occasional",
-        symptoms = new[] { new { type = "fatigue", severity = 3 } },
-        notes,
-    };
 }

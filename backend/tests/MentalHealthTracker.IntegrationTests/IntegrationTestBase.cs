@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using MentalHealthTracker.Api.Modules.Auth;
+using MentalHealthTracker.Api.Modules.DailyLog.Dtos;
 using MentalHealthTracker.Domain.Entities;
 using MentalHealthTracker.Domain.Models;
 using MentalHealthTracker.Domain.Repositories;
@@ -8,6 +10,7 @@ using MentalHealthTracker.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace MentalHealthTracker.IntegrationTests;
 
@@ -88,6 +91,26 @@ public abstract class IntegrationTestBase(CustomWebApplicationFactory factory) :
         var client = Factory.CreateDefaultClient(new SessionCookieHandler(token));
 
         return (client, user, token);
+    }
+
+    // Las opciones de JSON de la propia API (las de MVC: camelCase y enums en snake_case). Se
+    // resuelven de la factory para que las peticiones de test viajen exactamente como las
+    // serializa y deserializa la aplicación, y no con las opciones por defecto de System.Text.Json.
+    protected JsonSerializerOptions AppJsonOptions =>
+        Factory.Services.GetRequiredService<IOptions<Microsoft.AspNetCore.Mvc.JsonOptions>>().Value.JsonSerializerOptions;
+
+    protected JsonContent JsonBody(CreateDailyLogRequest request) =>
+        JsonContent.Create(request, options: AppJsonOptions);
+
+    // POST /api/logs con la cookie de sesión del token. Se construye el cuerpo con
+    // CreateDailyLogRequestBuilder para declarar solo lo que cada prueba quiere variar.
+    protected async Task<HttpResponseMessage> PostLogAsync(string token, CreateDailyLogRequest request)
+    {
+        using var message = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
+        message.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
+        message.Content = JsonBody(request);
+
+        return await Factory.CreateClient().SendAsync(message);
     }
 
     // Sesión creada sin pasar por HTTP: inserta el usuario con el repositorio y firma el token con

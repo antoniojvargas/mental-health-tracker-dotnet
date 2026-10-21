@@ -63,12 +63,12 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
 
         for (var i = 0; i < WritePermitLimit; i++)
         {
-            var response = await PostLogAsync(tokenA, Body());
+            var response = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().Build());
             Assert.True(response.StatusCode is HttpStatusCode.Created or HttpStatusCode.OK,
                 $"El usuario A debería escribir dentro de su cuota, recibió {response.StatusCode}");
         }
 
-        var rejectedA = await PostLogAsync(tokenA, Body());
+        var rejectedA = await PostLogAsync(tokenA, new CreateDailyLogRequestBuilder().Build());
         Assert.Equal(HttpStatusCode.TooManyRequests, rejectedA.StatusCode);
         Assert.Equal(WritePermitLimit.ToString(CultureInfo.InvariantCulture), SingleHeader(rejectedA, "RateLimit-Limit"));
         Assert.Equal("0", SingleHeader(rejectedA, "RateLimit-Remaining"));
@@ -76,7 +76,7 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
         using var document = JsonDocument.Parse(await rejectedA.Content.ReadAsStringAsync());
         Assert.Equal("RATE_LIMITED", document.RootElement.GetProperty("error").GetProperty("code").GetString());
 
-        var responseB = await PostLogAsync(tokenB, Body());
+        var responseB = await PostLogAsync(tokenB, new CreateDailyLogRequestBuilder().Build());
         Assert.Equal(HttpStatusCode.Created, responseB.StatusCode);
     }
 
@@ -85,29 +85,4 @@ public sealed class RateLimitingTests(CustomWebApplicationFactory factory)
         Assert.True(response.Headers.TryGetValues(name, out var values), $"Falta la cabecera {name}");
         return Assert.Single(values!);
     }
-
-    private async Task<HttpResponseMessage> PostLogAsync(string token, object body)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.TryAddWithoutValidation("Cookie", $"{SessionCookie.AccessTokenName}={token}");
-        request.Content = JsonContent.Create(body);
-
-        return await Factory.CreateClient().SendAsync(request);
-    }
-
-    private static object Body() => new
-    {
-        logDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        moodRating = 3,
-        anxietyLevel = 5,
-        stressLevel = 5,
-        sleepHours = 7.5,
-        sleepQuality = 4,
-        sleepDisturbances = new[] { "none" },
-        activityType = "walking",
-        activityMinutes = 30,
-        socialFrequency = "occasional",
-        symptoms = new[] { new { type = "fatigue", severity = 3 } },
-        notes = (string?)null,
-    };
 }
