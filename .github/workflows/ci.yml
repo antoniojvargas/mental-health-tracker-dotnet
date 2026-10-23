@@ -37,9 +37,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: Restore
-        run: dotnet restore MentalHealthTracker.slnx
+        # --locked-mode: falla si packages.lock.json no coincide con los csproj, en vez de
+        # resolver otras versiones en silencio.
+        run: dotnet restore MentalHealthTracker.slnx --locked-mode
 
       - name: Build
         run: dotnet build MentalHealthTracker.slnx --no-restore --configuration Release
@@ -87,6 +91,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: dotnet format
         working-directory: backend
@@ -119,6 +125,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: NuGet audit
         working-directory: backend
