@@ -1,0 +1,35 @@
+version: 2
+
+# Las acciones del workflow van fijadas por SHA (con el tag en un comentario);
+# Dependabot actualiza el SHA y el comentario juntos.
+updates:
+  - package-ecosystem: nuget
+    directory: /backend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /e2e
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Imágenes base de backend/Dockerfile{,.prod} y frontend/Dockerfile{,.prod}.
+  - package-ecosystem: docker
+    directory: /backend
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /frontend
+    schedule:
+      interval: weekly
