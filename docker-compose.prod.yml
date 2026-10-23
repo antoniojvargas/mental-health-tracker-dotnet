@@ -68,6 +68,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile.prod
     restart: unless-stopped
+    # Mayor que el ShutdownTimeout del host (10 s, HostingExtensions): con los 10 s por
+    # defecto de Docker el SIGKILL llegaria justo cuando vence el apagado ordenado.
+    stop_grace_period: 15s
     # Tres de los cuatro secretos los consume el backend via *_FILE.
     environment:
       GoogleOAuth__ClientId: ${GOOGLE_CLIENT_ID:?export GOOGLE_CLIENT_ID}
