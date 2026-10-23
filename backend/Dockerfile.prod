@@ -3,6 +3,9 @@
 #   2) runtime: imagen aspnet minima, usuario no root, lista para desplegar.
 #
 # Uso: docker build -f backend/Dockerfile.prod -t mht-backend:prod backend
+#
+# Solo se restaura y publica la API (Api, Domain, Infrastructure): los tests no entran
+# en la imagen, y Dockerfile.prod.dockerignore los saca tambien del contexto de build.
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /source
@@ -13,8 +16,6 @@ COPY MentalHealthTracker.slnx ./
 COPY MentalHealthTracker.Api/MentalHealthTracker.Api.csproj MentalHealthTracker.Api/
 COPY MentalHealthTracker.Domain/MentalHealthTracker.Domain.csproj MentalHealthTracker.Domain/
 COPY MentalHealthTracker.Infrastructure/MentalHealthTracker.Infrastructure.csproj MentalHealthTracker.Infrastructure/
-COPY tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj tests/MentalHealthTracker.UnitTests/
-COPY tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj tests/MentalHealthTracker.IntegrationTests/
 
 RUN dotnet restore MentalHealthTracker.Api/MentalHealthTracker.Api.csproj
 

@@ -1,0 +1,14 @@
+# Con BuildKit, este fichero sustituye a .dockerignore SOLO para Dockerfile.prod
+# (<Dockerfile>.dockerignore tiene prioridad), asi que repite las reglas de
+# .dockerignore y anade tests/: la imagen de produccion no los usa.
+**/bin/
+**/obj/
+**/coverage/
+*.log
+.git/
+.gitignore
+**/.env
+**/.env.*
+**/appsettings.*.local.json
+
+tests/
