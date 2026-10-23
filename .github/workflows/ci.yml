@@ -6,6 +6,16 @@ on:
     branches:
       - main
 
+# El token del workflow solo lee el repositorio: ningún job escribe en él.
+permissions:
+  contents: read
+
+# Un push nuevo a la misma PR cancela la ejecución anterior, que ya no sirve. En `main`
+# no se cancela: cada merge conserva su ejecución completa.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   DOTNET_VERSION: '9.0.x'
   NODE_VERSION: '22'
@@ -14,6 +24,7 @@ jobs:
   backend-test:
     name: Backend tests (.NET + Postgres)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -61,6 +72,7 @@ jobs:
   frontend-test:
     name: Frontend tests (Node)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -85,6 +97,7 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -119,6 +132,7 @@ jobs:
   audit:
     name: Security audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -157,6 +171,7 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -220,6 +235,7 @@ jobs:
   prod-smoke:
     name: Prod smoke (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -279,6 +295,7 @@ jobs:
   dev-stack-smoke:
     name: Dev stack smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -312,6 +329,7 @@ jobs:
   build-prod-images:
     name: Build prod images
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
