@@ -6,60 +6,25 @@ on:
     branches:
       - main
 
+# El token del workflow solo lee el repositorio: ningún job escribe en él.
+permissions:
+  contents: read
+
+# Un push nuevo a la misma PR cancela la ejecución anterior, que ya no sirve. En `main`
+# no se cancela: cada merge conserva su ejecución completa.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   DOTNET_VERSION: '9.0.x'
   NODE_VERSION: '22'
 
 jobs:
-  backend:
-    name: Backend (.NET)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Restore
-        run: dotnet restore MentalHealthTracker.slnx
-
-      - name: Build
-        run: dotnet build MentalHealthTracker.slnx --no-restore --configuration Release
-
-      - name: Tests unitarios
-        run: dotnet test tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj --no-build --configuration Release
-
-  frontend:
-    name: Frontend (Node)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install
-        run: npm ci
-
-      - name: Tests unitarios
-        run: npm run test:unit
-
-      - name: Build
-        run: npm run build
-
   backend-test:
     name: Backend tests (.NET + Postgres)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -78,14 +43,18 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: Restore
-        run: dotnet restore MentalHealthTracker.slnx
+        # --locked-mode: falla si packages.lock.json no coincide con los csproj, en vez de
+        # resolver otras versiones en silencio.
+        run: dotnet restore MentalHealthTracker.slnx --locked-mode
 
       - name: Build
         run: dotnet build MentalHealthTracker.slnx --no-restore --configuration Release
@@ -103,13 +72,14 @@ jobs:
   frontend-test:
     name: Frontend tests (Node)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -117,6 +87,14 @@ jobs:
 
       - name: Install
         run: npm ci
+
+      # Deriva de tipos: openapi.json (que OpenApiSnapshotTests verifica contra el
+      # backend) es la fuente; si api.generated.d.ts no coincide con lo que se
+      # genera de él, alguien editó uno sin regenerar el otro.
+      - name: Comprobar que los tipos generados están al día
+        run: |
+          npm run generate:types
+          git diff --exit-code src/types/api.generated.d.ts
 
       - name: Build
         run: npm run build
@@ -127,18 +105,21 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: dotnet format
         working-directory: backend
         run: dotnet format MentalHealthTracker.slnx --verify-no-changes
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -159,12 +140,15 @@ jobs:
   audit:
     name: Security audit
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
+          cache: true
+          cache-dependency-path: backend/**/packages.lock.json
 
       - name: NuGet audit
         working-directory: backend
@@ -195,8 +179,9 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # .env desechable con valores ficticios: sin secretos reales. OAuth esta
       # puenteado en E2E, asi que GoogleOAuth__* solo cumplen la validacion de
@@ -221,11 +206,25 @@ jobs:
       - name: Levantar la pila E2E
         run: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d --build --wait --wait-timeout 600
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: e2e/package-lock.json
+
+      # Los navegadores pesan cientos de MB y solo cambian con la version de
+      # @playwright/test, que se lee del lockfile. `install --with-deps` se ejecuta
+      # siempre (las librerias del sistema no se cachean) pero no vuelve a descargar
+      # el navegador si ya esta en la cache.
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('./e2e/package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de navegadores de Playwright
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Instalar Playwright
         working-directory: e2e
@@ -243,7 +242,7 @@ jobs:
 
       - name: Subir reporte E2E y logs del backend
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: e2e-artifacts
           path: |
@@ -258,8 +257,9 @@ jobs:
   prod-smoke:
     name: Prod smoke (Playwright)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Imagenes reales de produccion (nginx + bundle compilado) en el puerto 8080: la
       # suite `e2e` corre contra el servidor de Vite y no ejercita las cabeceras ni la
@@ -268,17 +268,56 @@ jobs:
       - name: Generar secretos desechables
         run: ./e2e/prod-secrets.sh
 
+      # Las imagenes se construyen aqui con la cache de BuildKit que escribe el job
+      # `build-prod-images` (mismos Dockerfile y contexto, mismo scope) y se cargan con
+      # los nombres que espera docker-compose.prod.yml. Este job solo lee la cache.
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Construir imagen del backend (cache de BuildKit)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          file: backend/Dockerfile.prod
+          tags: mht-backend:prod
+          load: true
+          cache-from: type=gha,scope=backend-prod
+
+      - name: Construir imagen del frontend (cache de BuildKit)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: frontend
+          file: frontend/Dockerfile.prod
+          tags: mht-frontend:prod
+          load: true
+          cache-from: type=gha,scope=frontend-prod
+
+      # Sin --build: compose usa las imagenes ya cargadas en vez de reconstruirlas
+      # (su builder no comparte la cache de BuildKit de arriba).
       - name: Levantar la pila de produccion
         run: |
           docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
             -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml \
-            up -d --build --wait --wait-timeout 600
+            up -d --wait --wait-timeout 600
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: e2e/package-lock.json
+
+      # Los navegadores pesan cientos de MB y solo cambian con la version de
+      # @playwright/test, que se lee del lockfile. `install --with-deps` se ejecuta
+      # siempre (las librerias del sistema no se cachean) pero no vuelve a descargar
+      # el navegador si ya esta en la cache.
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('./e2e/package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de navegadores de Playwright
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Instalar Playwright
         working-directory: e2e
@@ -299,7 +338,7 @@ jobs:
 
       - name: Subir reporte y logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: prod-smoke-artifacts
           path: |
@@ -317,8 +356,9 @@ jobs:
   dev-stack-smoke:
     name: Dev stack smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # Sigue el flujo del README (cp .env.example .env) y solo sustituye los
       # secretos vacios por valores desechables. Evita que el stack de desarrollo
@@ -350,14 +390,33 @@ jobs:
   build-prod-images:
     name: Build prod images
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # `mode=max` guarda tambien las capas intermedias (restore, build) para que
+      # `prod-smoke` y las ejecuciones siguientes las reutilicen. Solo este job escribe.
       - name: Build backend prod image
-        run: docker build -f backend/Dockerfile.prod -t mht-backend:ci backend
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          file: backend/Dockerfile.prod
+          tags: mht-backend:ci
+          load: true
+          cache-from: type=gha,scope=backend-prod
+          cache-to: type=gha,scope=backend-prod,mode=max
 
       - name: Build frontend prod image
-        run: docker build -f frontend/Dockerfile.prod -t mht-frontend:ci frontend
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: frontend
+          file: frontend/Dockerfile.prod
+          tags: mht-frontend:ci
+          load: true
+          cache-from: type=gha,scope=frontend-prod
+          cache-to: type=gha,scope=frontend-prod,mode=max
 
       - name: Verificar usuario no root del backend
         run: |
