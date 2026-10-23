@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { create, list, today } from './logs.api'
 
 function respond(status: number, body: unknown = {}) {
-  return vi.fn().mockResolvedValue(
+  return vi.fn<typeof fetch>().mockResolvedValue(
     new Response(JSON.stringify(body), {
       status,
       headers: { 'Content-Type': 'application/json' },
@@ -23,7 +23,7 @@ describe('logs.api · today', () => {
     const log = await today('2026-03-15')
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/logs/today?date=2026-03-15')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/logs/today?date=2026-03-15')
     expect(log?.logDate).toBe('2026-03-15')
   })
 
@@ -68,7 +68,7 @@ describe('logs.api · list', () => {
     const result = await list('2026-03-01', '2026-03-31')
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/logs?from=2026-03-01&to=2026-03-31')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/logs?from=2026-03-01&to=2026-03-31')
     expect(fetchMock.mock.calls[0][1]?.method).toBe('GET')
     expect(result).toEqual(body)
   })
@@ -140,7 +140,7 @@ describe('logs.api · create', () => {
     const input = { logDate: '2026-03-15', moodRating: 3 } as Parameters<typeof create>[0]
     const result = await create(input)
 
-    expect(String(fetchMock.mock.calls[0][0])).toBe('/api/logs')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/logs')
     expect(fetchMock.mock.calls[0][1]?.method).toBe('POST')
     expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual(input)
     expect(result).toEqual(saved)
