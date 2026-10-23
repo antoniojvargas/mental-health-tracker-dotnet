@@ -27,7 +27,7 @@ RUN dotnet publish MentalHealthTracker.Api/MentalHealthTracker.Api.csproj \
     --no-restore
 
 # mcr.microsoft.com/dotnet/aspnet:9.0-alpine
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine@sha256:8de358846985e2eea2509f3d4f21979313363276e46fa78faa7159b98258d9c8 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine@sha256:ecf8dcbaab8ebc4bdfb2322d6fe4217bbb118894310ebb6d53c580874ab4b27d AS runtime
 WORKDIR /app
 
 COPY --from=build /publish /app
