@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36 # postgres:16-alpine
     container_name: mental-health-tracker-postgres
     restart: unless-stopped
     environment:
@@ -22,6 +22,9 @@ services:
       context: ./backend
     container_name: mental-health-tracker-backend
     restart: unless-stopped
+    # Mayor que el ShutdownTimeout del host (10 s, HostingExtensions): con los 10 s por
+    # defecto de Docker el SIGKILL llegaria justo cuando vence el apagado ordenado.
+    stop_grace_period: 15s
     ports:
       - "3000:3000"
     # Solo entran al contenedor las variables declaradas aqui: el .env del

@@ -1,5 +1,6 @@
 # Restore stage: dependencies restored in a dedicated layer to leverage Docker cache
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS restore
+# mcr.microsoft.com/dotnet/sdk:9.0
+FROM mcr.microsoft.com/dotnet/sdk:9.0@sha256:d9ad72f6b3eb5d61adb158db510ae1c3098c12c92d23ab8da833418275f1c652 AS restore
 WORKDIR /source
 
 COPY Directory.Build.props .
@@ -15,7 +16,8 @@ COPY tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationT
 RUN dotnet restore MentalHealthTracker.slnx
 
 # Dev stage: hot-reload with dotnet watch
-FROM mcr.microsoft.com/dotnet/sdk:9.0
+# mcr.microsoft.com/dotnet/sdk:9.0
+FROM mcr.microsoft.com/dotnet/sdk:9.0@sha256:d9ad72f6b3eb5d61adb158db510ae1c3098c12c92d23ab8da833418275f1c652
 WORKDIR /app
 
 COPY --from=restore /source ./
