@@ -88,6 +88,14 @@ jobs:
       - name: Install
         run: npm ci
 
+      # Deriva de tipos: openapi.json (que OpenApiSnapshotTests verifica contra el
+      # backend) es la fuente; si api.generated.d.ts no coincide con lo que se
+      # genera de él, alguien editó uno sin regenerar el otro.
+      - name: Comprobar que los tipos generados están al día
+        run: |
+          npm run generate:types
+          git diff --exit-code src/types/api.generated.d.ts
+
       - name: Build
         run: npm run build
 
