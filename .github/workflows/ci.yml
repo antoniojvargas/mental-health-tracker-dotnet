@@ -212,6 +212,20 @@ jobs:
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
+      # Los navegadores pesan cientos de MB y solo cambian con la version de
+      # @playwright/test, que se lee del lockfile. `install --with-deps` se ejecuta
+      # siempre (las librerias del sistema no se cachean) pero no vuelve a descargar
+      # el navegador si ya esta en la cache.
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('./e2e/package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de navegadores de Playwright
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Instalar Playwright
         working-directory: e2e
         run: |
@@ -254,17 +268,56 @@ jobs:
       - name: Generar secretos desechables
         run: ./e2e/prod-secrets.sh
 
+      # Las imagenes se construyen aqui con la cache de BuildKit que escribe el job
+      # `build-prod-images` (mismos Dockerfile y contexto, mismo scope) y se cargan con
+      # los nombres que espera docker-compose.prod.yml. Este job solo lee la cache.
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Construir imagen del backend (cache de BuildKit)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          file: backend/Dockerfile.prod
+          tags: mht-backend:prod
+          load: true
+          cache-from: type=gha,scope=backend-prod
+
+      - name: Construir imagen del frontend (cache de BuildKit)
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: frontend
+          file: frontend/Dockerfile.prod
+          tags: mht-frontend:prod
+          load: true
+          cache-from: type=gha,scope=frontend-prod
+
+      # Sin --build: compose usa las imagenes ya cargadas en vez de reconstruirlas
+      # (su builder no comparte la cache de BuildKit de arriba).
       - name: Levantar la pila de produccion
         run: |
           docker compose -p mht-prod-e2e --env-file e2e/prod-smoke.env \
             -f docker-compose.prod.yml -f docker-compose.prod.e2e.yml \
-            up -d --build --wait --wait-timeout 600
+            up -d --wait --wait-timeout 600
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: e2e/package-lock.json
+
+      # Los navegadores pesan cientos de MB y solo cambian con la version de
+      # @playwright/test, que se lee del lockfile. `install --with-deps` se ejecuta
+      # siempre (las librerias del sistema no se cachean) pero no vuelve a descargar
+      # el navegador si ya esta en la cache.
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(node -p "require('./e2e/package-lock.json').packages['node_modules/@playwright/test'].version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache de navegadores de Playwright
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
 
       - name: Instalar Playwright
         working-directory: e2e
@@ -341,11 +394,29 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # `mode=max` guarda tambien las capas intermedias (restore, build) para que
+      # `prod-smoke` y las ejecuciones siguientes las reutilicen. Solo este job escribe.
       - name: Build backend prod image
-        run: docker build -f backend/Dockerfile.prod -t mht-backend:ci backend
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: backend
+          file: backend/Dockerfile.prod
+          tags: mht-backend:ci
+          load: true
+          cache-from: type=gha,scope=backend-prod
+          cache-to: type=gha,scope=backend-prod,mode=max
 
       - name: Build frontend prod image
-        run: docker build -f frontend/Dockerfile.prod -t mht-frontend:ci frontend
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: frontend
+          file: frontend/Dockerfile.prod
+          tags: mht-frontend:ci
+          load: true
+          cache-from: type=gha,scope=frontend-prod
+          cache-to: type=gha,scope=frontend-prod,mode=max
 
       - name: Verificar usuario no root del backend
         run: |
