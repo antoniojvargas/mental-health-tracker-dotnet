@@ -159,7 +159,13 @@ Los comandos se ejecutan desde la raíz del repositorio. `dotnet-ef` y `reportge
 | `dotnet tool run dotnet-ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
 | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
 | `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`, o la cadena de Npgsql de otra base en `TEST_DATABASE_URL`). |
-| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 77,8 %. |
+| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 77,8 %. Baja `postgres-test` también cuando los tests fallan. |
+| `make test-frontend` | Tipos generados al día, build y Vitest con umbral de cobertura (como el job `Frontend tests`). |
+| `make lint` / `make format` | `lint` comprueba (`dotnet format --verify-no-changes`, ESLint, Prettier) como el CI; `format` corrige y modifica ficheros. |
+| `make audit` | Auditoría de vulnerabilidades de NuGet y npm (como el job `Security audit`). |
+| `make build-images` | Construye las imágenes de producción y verifica usuario no root y reintento de BD (como `Build prod images`). |
+| `make smoke-prod` | Recorrido crítico de Playwright contra las imágenes de producción en `:8080`; baja la pila siempre. |
+| `make ci` | `lint`, `test`, `test-frontend`, `audit`, `build-images` y `smoke-prod`. No incluye `E2E` ni `Dev stack smoke`: necesitan un `.env` en la raíz y la pila de desarrollo (puertos 3000/5173), y no se tocan sin avisarte. |
 
 ### Dependencias NuGet
 
