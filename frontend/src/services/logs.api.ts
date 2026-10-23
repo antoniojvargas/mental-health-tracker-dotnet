@@ -48,11 +48,18 @@ export function create(input: CreateDailyLogInput): Promise<DailyLog> {
  * `data` puede venir truncada y `meta.total` es el que dice cuántas hay. Un
  * gráfico de un año con esta función saldría incompleto sin avisar.
  *
+ * `options.signal` cancela la petición: la promesa rechaza con el `AbortError` del
+ * navegador, no con un `ApiError`, así que quien aborta debe distinguirlo.
+ *
  * @throws {ApiError} `VALIDATION_ERROR` si el rango no cumple las reglas de arriba.
  */
-export function list(from: IsoDate, to: IsoDate): Promise<DailyLogListResponse> {
+export function list(
+  from: IsoDate,
+  to: IsoDate,
+  options: { signal?: AbortSignal } = {},
+): Promise<DailyLogListResponse> {
   const query = new URLSearchParams({ from, to })
-  return apiRequest<DailyLogListResponse>(`/logs?${query.toString()}`)
+  return apiRequest<DailyLogListResponse>(`/logs?${query.toString()}`, { signal: options.signal })
 }
 
 /**

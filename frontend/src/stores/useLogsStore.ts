@@ -36,6 +36,8 @@ export const useLogsStore = defineStore('logs', () => {
 
   /** Identifica la última petición lanzada; una respuesta con otro número es obsoleta. */
   let latestRequest = 0
+  /** Cancela la petición en vuelo cuando se lanza otra. */
+  let inFlight: AbortController | null = null
   /**
    * Registros integrados con `mergeLog` mientras hay un `fetch` en vuelo. La
    * respuesta puede haberse calculado antes de ese guardado, así que al llegar se
@@ -57,17 +59,23 @@ export const useLogsStore = defineStore('logs', () => {
    * Gana la última petición: si una respuesta lenta llega después de otra pedida
    * más tarde (p. ej. `week` tras `month`), se descarta, también su error y su
    * fin de `loading`. Los `mergeLog` que ocurrieron mientras estaba en vuelo se
-   * reaplican sobre la respuesta.
+   * reaplican sobre la respuesta. Además la petición anterior se aborta; su
+   * `AbortError` es nuestro y nunca llega a `error`.
    */
   async function fetch(range: LogRange): Promise<void> {
     const request = ++latestRequest
+    inFlight?.abort()
+    const controller = new AbortController()
+    inFlight = controller
     loading.value = true
     error.value = null
     try {
       const to = new Date()
       const from = new Date(to)
       from.setDate(from.getDate() - (RANGE_DAYS[range] - 1))
-      const { data } = await list(toIsoDate(from), toIsoDate(to))
+      const { data } = await list(toIsoDate(from), toIsoDate(to), {
+        signal: controller.signal,
+      })
       if (request !== latestRequest) return
       logs.value = [...data].sort((a, b) => a.logDate.localeCompare(b.logDate))
       // Se vacía antes de reaplicar: `mergeLog` vuelve a anotar mientras `loading` es true.
@@ -82,6 +90,7 @@ export const useLogsStore = defineStore('logs', () => {
       error.value = describeError(thrown)
     } finally {
       if (request === latestRequest) {
+        inFlight = null
         loading.value = false
         mergedWhileFetching = []
       }

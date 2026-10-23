@@ -73,6 +73,25 @@ describe('logs.api · list', () => {
     expect(result).toEqual(body)
   })
 
+  it('pasa el signal a fetch para poder cancelar la petición', async () => {
+    const fetchMock = respond(200, { data: [], meta: {} })
+    vi.stubGlobal('fetch', fetchMock)
+    const controller = new AbortController()
+
+    await list('2026-03-01', '2026-03-31', { signal: controller.signal })
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBe(controller.signal)
+  })
+
+  it('sin opciones no manda signal', async () => {
+    const fetchMock = respond(200, { data: [], meta: {} })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await list('2026-03-01', '2026-03-31')
+
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeUndefined()
+  })
+
   it('propaga el error de validación del rango', async () => {
     vi.stubGlobal(
       'fetch',

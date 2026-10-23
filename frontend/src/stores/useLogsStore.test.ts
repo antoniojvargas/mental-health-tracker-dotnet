@@ -127,15 +127,22 @@ describe('useLogsStore', () => {
     function deferredFetch() {
       const resolvers: Array<(response: Response) => void> = []
       const rejecters: Array<(reason: unknown) => void> = []
+      const signals: Array<AbortSignal | null | undefined> = []
       const spy = vi.fn(
-        () =>
+        (_url: unknown, init?: RequestInit) =>
           new Promise<Response>((resolve, reject) => {
             resolvers.push(resolve)
             rejecters.push(reject)
+            signals.push(init?.signal)
+            // Como el fetch real: abortar rechaza con un AbortError.
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('The operation was aborted.', 'AbortError')),
+            )
           }),
       )
       vi.stubGlobal('fetch', spy)
       return {
+        signals,
         resolve: (i: number, r: Response) => resolvers[i](r),
         reject: (i: number, e: unknown) => rejecters[i](e),
       }
@@ -187,6 +194,53 @@ describe('useLogsStore', () => {
 
       expect(store.error).toBeNull()
       expect(store.logs).toHaveLength(1)
+    })
+
+    it('una petición nueva aborta la anterior y le pasa su propio signal', async () => {
+      const http = deferredFetch()
+      const store = useLogsStore()
+
+      const week = store.fetch('week')
+      const month = store.fetch('month')
+
+      expect(http.signals[0]?.aborted).toBe(true)
+      expect(http.signals[1]?.aborted).toBe(false)
+      expect(http.signals[0]).not.toBe(http.signals[1])
+
+      http.resolve(1, listResponse([makeLog({ logDate: '2026-09-05' })]))
+      await Promise.all([week, month])
+    })
+
+    it('el AbortError propio no se muestra como error ni apaga loading', async () => {
+      const http = deferredFetch()
+      const store = useLogsStore()
+
+      const week = store.fetch('week')
+      const month = store.fetch('month')
+      // `week` ya rechazó con AbortError al abortarse; `month` sigue en vuelo.
+      await week
+
+      expect(store.error).toBeNull()
+      expect(store.loading).toBe(true)
+
+      http.resolve(1, listResponse([makeLog({ logDate: '2026-09-05' })]))
+      await month
+      expect(store.error).toBeNull()
+      expect(store.loading).toBe(false)
+    })
+
+    it('una petición que termina no se aborta al lanzar la siguiente', async () => {
+      const http = deferredFetch()
+      const store = useLogsStore()
+
+      const first = store.fetch('week')
+      http.resolve(0, listResponse([]))
+      await first
+      const second = store.fetch('month')
+
+      expect(http.signals[0]?.aborted).toBe(false)
+      http.resolve(1, listResponse([]))
+      await second
     })
 
     it('un mergeLog que llega con un fetch en vuelo sobrevive a la respuesta', async () => {
