@@ -22,7 +22,7 @@ import { ApiError } from '../services/api-client'
  * necesita `undici` ni MSW.
  */
 export function mockFetch(response: Response) {
-  const fetchSpy = vi.fn().mockResolvedValue(response)
+  const fetchSpy = vi.fn<typeof fetch>().mockResolvedValue(response)
   vi.stubGlobal('fetch', fetchSpy)
   return fetchSpy
 }

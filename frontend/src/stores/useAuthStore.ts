@@ -18,6 +18,8 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   /** `true` mientras `fetchMe` está en vuelo, para que la vista no parpadee. */
   const loading = ref(false)
+  /** La consulta en vuelo, compartida por quien llame a `fetchMe` mientras dure. */
+  let inFlight: Promise<User | null> | null = null
 
   /**
    * Consulta la sesión al backend y la deja en el store.
@@ -33,10 +35,22 @@ export const useAuthStore = defineStore('auth', () => {
    * (un proxy, por ejemplo) llega sin sobre y `apiRequest` lo degrada a
    * `INTERNAL_ERROR`.
    *
+   * Las llamadas concurrentes (el guard y la vista, por ejemplo) comparten la
+   * misma promesa: una sola petición a /api/auth/me, con el mismo resultado y,
+   * si falla, el mismo error. Al terminar se libera, así que la siguiente llamada
+   * vuelve a consultar al backend.
+   *
    * @returns El usuario, o `null` si no hay sesión.
    * @throws {ApiError} Cualquier estado que no sea 401.
    */
-  async function fetchMe(): Promise<User | null> {
+  function fetchMe(): Promise<User | null> {
+    inFlight ??= requestMe().finally(() => {
+      inFlight = null
+    })
+    return inFlight
+  }
+
+  async function requestMe(): Promise<User | null> {
     loading.value = true
     try {
       user.value = await me()

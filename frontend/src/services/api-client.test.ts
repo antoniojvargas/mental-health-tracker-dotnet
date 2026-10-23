@@ -5,7 +5,7 @@ import { captureError, emptyResponse, jsonResponse, mockFetch } from '../test-su
 
 /** Los headers con los que se envió la petición, para poder comprobar el Content-Type. */
 function headersOf(fetchSpy: ReturnType<typeof mockFetch>): HeadersInit {
-  return fetchSpy.mock.calls[0][1].headers as HeadersInit
+  return fetchSpy.mock.calls[0][1]?.headers as HeadersInit
 }
 
 describe('apiRequest', () => {
@@ -21,8 +21,8 @@ describe('apiRequest', () => {
     // El prefijo lo pone el wrapper, no quien llama.
     expect(url).toBe('/api/auth/me')
     // Sin esto el navegador no manda la cookie `access_token` y la API responde 401.
-    expect(init.credentials).toBe('include')
-    expect(init.method).toBe('GET')
+    expect(init?.credentials).toBe('include')
+    expect(init?.method).toBe('GET')
   })
 
   it('serializa el body y solo declara Content-Type cuando lo hay', async () => {
@@ -31,8 +31,8 @@ describe('apiRequest', () => {
     await apiRequest('/logs', { method: 'POST', body: { logDate: '2026-09-30' } })
 
     const init = withBody.mock.calls[0][1]
-    expect(init.method).toBe('POST')
-    expect(init.body).toBe('{"logDate":"2026-09-30"}')
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBe('{"logDate":"2026-09-30"}')
     expect(headersOf(withBody)).toEqual({ 'Content-Type': 'application/json' })
 
     const withoutBody = mockFetch(emptyResponse(204))

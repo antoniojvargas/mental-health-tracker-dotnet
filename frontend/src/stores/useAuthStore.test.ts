@@ -95,4 +95,69 @@ describe('useAuthStore', () => {
     // mentirle al usuario: recargando volvería a estar dentro.
     expect(store.user).toEqual(USER)
   })
+
+  describe('con llamadas concurrentes a fetchMe', () => {
+    it('hace una sola petición y todas reciben el mismo usuario', async () => {
+      const fetchSpy = mockFetch(jsonResponse(USER))
+      const store = useAuthStore()
+
+      const [a, b, c] = await Promise.all([store.fetchMe(), store.fetchMe(), store.fetchMe()])
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(a).toEqual(USER)
+      expect(b).toBe(a)
+      expect(c).toBe(a)
+      expect(store.loading).toBe(false)
+    })
+
+    it('comparten también el error: todas rechazan con la misma instancia', async () => {
+      const fetchSpy = mockFetch(
+        jsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'x', details: [] } }, 500),
+      )
+      const store = useAuthStore()
+
+      const first = captureError(store.fetchMe())
+      const second = captureError(store.fetchMe())
+      const [errorA, errorB] = await Promise.all([first, second])
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(errorA.status).toBe(500)
+      expect(errorB).toBe(errorA)
+      expect(store.loading).toBe(false)
+    })
+
+    it('comparten el 401: todas devuelven null con una sola petición', async () => {
+      const fetchSpy = mockFetch(emptyResponse(401, 'Unauthorized'))
+      const store = useAuthStore()
+
+      const results = await Promise.all([store.fetchMe(), store.fetchMe()])
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(results).toEqual([null, null])
+    })
+
+    it('al terminar libera la promesa: la llamada siguiente vuelve a consultar', async () => {
+      const fetchSpy = mockFetch(jsonResponse(USER))
+      const store = useAuthStore()
+
+      await store.fetchMe()
+      // Un Response solo se lee una vez, así que el segundo uso necesita otro.
+      const second = mockFetch(jsonResponse({ ...USER, name: 'Grace' }))
+      const refreshed = await store.fetchMe()
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(second).toHaveBeenCalledTimes(1)
+      expect(refreshed?.name).toBe('Grace')
+    })
+
+    it('tras un fallo también se libera: se puede reintentar', async () => {
+      mockFetch(jsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'x', details: [] } }, 500))
+      const store = useAuthStore()
+      await captureError(store.fetchMe())
+
+      mockFetch(jsonResponse(USER))
+
+      expect(await store.fetchMe()).toEqual(USER)
+    })
+  })
 })

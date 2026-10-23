@@ -21,6 +21,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text'],
+      // Medido: líneas 90.65, funciones 88.44, ramas 87.63. Cada umbral es el valor
+      // medido menos 2, redondeado hacia abajo; por debajo, `test:unit:coverage` falla.
+      thresholds: {
+        lines: 88,
+        functions: 86,
+        branches: 85,
+      },
     },
   },
 })

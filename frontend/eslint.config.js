@@ -69,6 +69,20 @@ export default tseslint.config(
       },
     },
   },
+  // Lint con tipos (recommendedTypeChecked) solo en la capa de datos: services y stores,
+  // donde una promesa sin esperar o un `any` que se cuela cambian el comportamiento sin
+  // que nada lo avise. Es más lento que el lint sintáctico, así que no se extiende a
+  // todo `src/` (componentes, vistas) sin decidirlo.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: ['src/services/**/*.ts', 'src/stores/**/*.ts'],
+  })),
+  {
+    files: ['src/services/**/*.ts', 'src/stores/**/*.ts'],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+  },
   {
     // prettier ya formatea, así que las reglas de estilo de ESLint sobran.
     files: ['**/*.{js,ts,vue}'],

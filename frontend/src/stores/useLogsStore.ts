@@ -34,6 +34,17 @@ export const useLogsStore = defineStore('logs', () => {
    */
   const error = ref<string | null>(null)
 
+  /** Identifica la última petición lanzada; una respuesta con otro número es obsoleta. */
+  let latestRequest = 0
+  /** Cancela la petición en vuelo cuando se lanza otra. */
+  let inFlight: AbortController | null = null
+  /**
+   * Registros integrados con `mergeLog` mientras hay un `fetch` en vuelo. La
+   * respuesta puede haberse calculado antes de ese guardado, así que al llegar se
+   * vuelven a aplicar encima para no perderlos.
+   */
+  let mergedWhileFetching: DailyLog[] = []
+
   /**
    * Carga la ventana pedida (hoy incluido) y reemplaza la lista.
    *
@@ -44,23 +55,45 @@ export const useLogsStore = defineStore('logs', () => {
    * Los fallos se dejan en `error` en vez de relanzarse para que la vista los
    * pinte sin envolver la llamada en un try/catch. Un fallo nunca vacía `logs`:
    * una recarga que falla no borra lo que ya había en pantalla.
+   *
+   * Gana la última petición: si una respuesta lenta llega después de otra pedida
+   * más tarde (p. ej. `week` tras `month`), se descarta, también su error y su
+   * fin de `loading`. Los `mergeLog` que ocurrieron mientras estaba en vuelo se
+   * reaplican sobre la respuesta. Además la petición anterior se aborta; su
+   * `AbortError` es nuestro y nunca llega a `error`.
    */
   async function fetch(range: LogRange): Promise<void> {
+    const request = ++latestRequest
+    inFlight?.abort()
+    const controller = new AbortController()
+    inFlight = controller
     loading.value = true
     error.value = null
     try {
       const to = new Date()
       const from = new Date(to)
       from.setDate(from.getDate() - (RANGE_DAYS[range] - 1))
-      const { data } = await list(toIsoDate(from), toIsoDate(to))
+      const { data } = await list(toIsoDate(from), toIsoDate(to), {
+        signal: controller.signal,
+      })
+      if (request !== latestRequest) return
       logs.value = [...data].sort((a, b) => a.logDate.localeCompare(b.logDate))
+      // Se vacía antes de reaplicar: `mergeLog` vuelve a anotar mientras `loading` es true.
+      const merged = mergedWhileFetching
+      mergedWhileFetching = []
+      for (const log of merged) mergeLog(log)
     } catch (thrown) {
+      if (request !== latestRequest) return
       // Se guarda un mensaje ya traducido, nunca `thrown.message`: el `message`
       // de la API puede traer nombres de campo o detalles internos, y este string
       // termina tal cual en la pantalla.
       error.value = describeError(thrown)
     } finally {
-      loading.value = false
+      if (request === latestRequest) {
+        inFlight = null
+        loading.value = false
+        mergedWhileFetching = []
+      }
     }
   }
 
@@ -72,6 +105,7 @@ export const useLogsStore = defineStore('logs', () => {
    * o actualiza sobre esa fecha: dos registros del mismo día son el mismo.
    */
   function mergeLog(log: DailyLog): void {
+    if (loading.value) mergedWhileFetching.push(log)
     const index = logs.value.findIndex((existing) => existing.logDate === log.logDate)
     if (index === -1) {
       logs.value.push(log)
