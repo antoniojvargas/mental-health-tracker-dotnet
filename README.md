@@ -122,6 +122,8 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/api/auth/google/callback` |
 | `AppUrls__FrontendUrl` | Backend · `AppUrls:FrontendUrl` — política CORS y redirecciones al frontend | Sí | No | `http://localhost:5173` |
 | `Database__MigrateOnStartup` | Backend · `Database:MigrateOnStartup` — si el arranque aplica las migraciones pendientes. Con varias réplicas se pone a `false` y se migra antes con `--migrate` (ver `docs/architecture.md`) | No | No | `true` |
+| `Scaling__Redis__ConnectionString` | Backend · `Scaling:Redis:ConnectionString` — Redis opcional: activa a la vez el backplane de SignalR y las cuotas de rate limiting compartidas entre réplicas (ver `docs/architecture.md`). Vacía = una instancia, todo en memoria | No | No | vacía · `redis:6379` |
+| `Scaling__Redis__KeyPrefix` | Backend · `Scaling:Redis:KeyPrefix` — prefijo de canales y claves en Redis | No | No | `mht` |
 | `LOG_LEVEL` | Backend · nivel mínimo de Serilog (`Verbose`…`Fatal`) | No | No | `Information` |
 | `ASPNETCORE_ENVIRONMENT` | Backend · entorno del host (`Development`/`Testing`/`Production`) — habilita Swagger y `POST /api/auth/test-login` | No | No | `Development` (dev) · `Production` (prod) |
 | `ASPNETCORE_URLS` | Backend · direcciones de escucha de Kestrel | No | No | `http://+:3000` (imagen) |

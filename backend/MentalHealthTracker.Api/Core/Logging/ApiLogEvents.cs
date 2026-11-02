@@ -27,4 +27,6 @@ internal static class ApiLogEvents
     public const int RealtimeSendFailed = 1401;
 
     public const int MigrationsSkipped = 1501;
+
+    public const int RateLimitStoreUnavailable = 1502;
 }

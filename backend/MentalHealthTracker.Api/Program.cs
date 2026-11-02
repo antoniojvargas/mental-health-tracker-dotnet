@@ -15,7 +15,7 @@ builder.Host.UseSerilogLogging().UseGracefulShutdownTimeout();
 
 builder.Services.AddAppOptions(builder.Configuration).AddReverseProxyTrust();
 builder.Services.AddPersistence(builder.Configuration).AddApiCore().AddFrontendCors(builder.Configuration);
-builder.Services.AddAuthModule().AddDailyLogModule().AddRealtimeModule();
+builder.Services.AddAuthModule().AddDailyLogModule().AddRealtimeModule(builder.Configuration);
 builder.Services.AddApiRateLimiting().AddApiDocumentation().AddApplicationHealth();
 
 var app = builder.Build();
