@@ -25,9 +25,14 @@ app.MapRealtimeHubs();
 app.MapAuthEndpoints(app.Environment);
 app.MapApiFallback();
 app.MapHealthEndpoints();
-await app.InitializeDatabaseAsync();
+await app.MigrateIfNeededAsync(args);
 
-if (args.Contains("--seed"))
+if (DatabaseStartupExtensions.IsMigrateOnly(args))
+{
+    return;
+}
+
+if (args.Contains(DatabaseStartupExtensions.SeedFlag))
 {
     await app.SeedDatabaseAsync();
     return;

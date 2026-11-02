@@ -30,6 +30,7 @@ public sealed class LogEventIdsTests
         { 1301, "ShutdownClosingConnections", LogLevel.Information, "GracefulShutdownService.LogClosingConnections" },
         { 1302, "ShutdownClosingPool", LogLevel.Information, "GracefulShutdownService.LogClosingPool" },
         { 1401, "RealtimeSendFailed", LogLevel.Warning, "LogEventEmitter.LogSendFailed" },
+        { 1501, "MigrationsSkipped", LogLevel.Information, "DatabaseStartupExtensions.LogMigrationsSkipped" },
         { 2001, "MigrationsApplying", LogLevel.Information, "DatabaseInitializer.LogApplyingMigrations" },
         { 2002, "MigrationsApplied", LogLevel.Information, "DatabaseInitializer.LogMigrationsApplied" },
         { 2003, "DatabaseNotReady", LogLevel.Warning, "DatabaseInitializer.LogDatabaseNotReady" },

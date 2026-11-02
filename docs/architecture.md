@@ -943,11 +943,44 @@ vez; EF Core usa bloqueos para serializar, pero se producen esperas, contención
 parcial, riesgo de quedar en un estado intermedio con varias instancias reintentando. El arranque
 de la aplicación queda además acoplado a la disponibilidad de la base.
 
-**Mitigación identificada**: sacar las migraciones de la API y correrlas como un **job de
-migración separado** antes de desplegar/escalar (un `docker compose run` o un job de
-Kubernetes/CI que termina antes de que el servicio reciba tráfico). La API arrancaría sin migrar
-y el despliegue garantizaría el esquema como paso previo. Es la evolución natural junto con
-Redis: ambos separan el estado operativo (esquema, grupos/contadores) del proceso de la API.
+**Mitigación disponible: migrar en un job previo y arrancar las réplicas sin migrar.** Hay dos
+piezas, y la configuración por defecto no cambia (`Database:MigrateOnStartup` vale `true`):
+
+| Pieza | Qué hace |
+| --- | --- |
+| `--migrate` | Aplica las migraciones pendientes y **termina** sin arrancar Kestrel (como `--seed`). Sale con código 0 si todo fue bien y distinto de 0 si no pudo migrar o la base no responde tras los reintentos. |
+| `Database:MigrateOnStartup=false` (`Database__MigrateOnStartup=false`) | El arranque normal no toca el esquema: registra `MigrationsSkipped` (evento 1501) y empieza a servir. `--migrate` y `--seed` migran igualmente aunque esté a `false`. |
+
+Orden de un despliegue con varias réplicas:
+
+1. **Migrar una sola vez**, con la imagen nueva y la misma cadena de conexión, y esperar a que
+   termine. El ENTRYPOINT de la imagen es `dotnet MentalHealthTracker.Api.dll`, así que los
+   argumentos se pasan tal cual:
+
+   ```bash
+   # Compose de producción
+   docker compose --env-file .env.production -f docker-compose.prod.yml run --rm backend --migrate
+   ```
+
+   En Kubernetes es un `Job` (o un hook `pre-install`/`pre-upgrade` de Helm) con la misma imagen y
+   `args: ["--migrate"]`; en CI/CD, un paso previo al de escalado. **Si el job falla (código ≠ 0),
+   el despliegue se detiene** y las réplicas viejas siguen sirviendo.
+2. **Arrancar o escalar las réplicas** con `Database__MigrateOnStartup=false`. Ninguna compite por
+   el esquema, y su arranque ya no depende de poder migrar (solo de poder conectar).
+3. Con una sola instancia no hace falta nada de esto: basta dejar el valor por defecto.
+
+Dos cautelas que el job no resuelve por sí solo:
+
+- **Compatibilidad entre versiones.** Mientras las réplicas viejas siguen vivas, el esquema ya es
+  el nuevo; cada migración debe ser compatible con el código anterior (primero añadir, después
+  retirar en un despliegue posterior). Las migraciones destructivas necesitan ventana de
+  mantenimiento.
+- **Una réplica con `MigrateOnStartup=false` no comprueba el esquema.** Si se olvida el job, la
+  API arranca igual y fallará en las consultas, no al arrancar. `GET /api/health` solo hace
+  `SELECT 1`; el orden del despliegue es lo que garantiza el esquema.
+
+Es la evolución natural junto con Redis: ambos separan el estado operativo (esquema,
+grupos/contadores) del proceso de la API.
 
 ## De Node/React a .NET/Vue
 

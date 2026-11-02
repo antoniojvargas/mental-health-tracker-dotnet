@@ -121,6 +121,7 @@ Las **seis claves obligatorias del backend** (`Database:ConnectionString`, `Jwt:
 | `GOOGLE_CLIENT_SECRET` | Backend · `GoogleOAuth:ClientSecret` — intercambio de tokens con Google | Sí | Sí (`GOOGLE_CLIENT_SECRET_FILE`) | secreto de Google Cloud Console |
 | `GoogleOAuth__RedirectUri` | Backend · `GoogleOAuth:RedirectUri` — callback del flujo OAuth | Sí | No | `http://localhost:5173/api/auth/google/callback` |
 | `AppUrls__FrontendUrl` | Backend · `AppUrls:FrontendUrl` — política CORS y redirecciones al frontend | Sí | No | `http://localhost:5173` |
+| `Database__MigrateOnStartup` | Backend · `Database:MigrateOnStartup` — si el arranque aplica las migraciones pendientes. Con varias réplicas se pone a `false` y se migra antes con `--migrate` (ver `docs/architecture.md`) | No | No | `true` |
 | `LOG_LEVEL` | Backend · nivel mínimo de Serilog (`Verbose`…`Fatal`) | No | No | `Information` |
 | `ASPNETCORE_ENVIRONMENT` | Backend · entorno del host (`Development`/`Testing`/`Production`) — habilita Swagger y `POST /api/auth/test-login` | No | No | `Development` (dev) · `Production` (prod) |
 | `ASPNETCORE_URLS` | Backend · direcciones de escucha de Kestrel | No | No | `http://+:3000` (imagen) |

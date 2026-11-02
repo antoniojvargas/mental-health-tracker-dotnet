@@ -8,6 +8,11 @@ public sealed class DatabaseOptions
 
     [Required(ErrorMessage = "Database:ConnectionString is required.")]
     public string ConnectionString { get; init; } = string.Empty;
+
+    // Si la API aplica las migraciones pendientes al arrancar (por defecto, sí). Con varias
+    // réplicas se pone a false y el esquema se migra antes con `--migrate` (ver
+    // docs/architecture.md, "Migraciones aplicadas al arrancar").
+    public bool MigrateOnStartup { get; init; } = true;
 }
 
 public sealed class JwtOptions
