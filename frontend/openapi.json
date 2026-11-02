@@ -788,6 +788,30 @@
           }
         }
       }
+    },
+    "/api/health/live": {
+      "get": {
+        "tags": [
+          "MentalHealthTracker.Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": [
+          "MentalHealthTracker.Api"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {

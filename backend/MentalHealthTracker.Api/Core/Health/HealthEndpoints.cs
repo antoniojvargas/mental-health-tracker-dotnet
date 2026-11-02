@@ -35,8 +35,13 @@ public static partial class HealthEndpoints
         _ = app.ServiceProvider.GetRequiredService<ApplicationUptime>();
 
         // /api/health sigue igual (es el que usan los healthchecks de Compose y del CI) y comparte con
-        // /api/health/ready la misma comprobación de la base, con la misma respuesta.
-        app.MapGet(HealthPath, CheckDatabaseAsync);
+        // /api/health/ready la misma comprobación de la base, con la misma respuesta. Se mapea con una
+        // lambda y no con el método directamente: así OpenAPI conserva el tag que /api/health ya tenía
+        // (con un método de HealthEndpoints saldría "HealthEndpoints" y cambiaría el contrato).
+        Func<IDatabaseProbe, ApplicationUptime, ILogger<Program>, CancellationToken, Task<IResult>> checkDatabase =
+            (databaseProbe, applicationUptime, logger, requestAborted) =>
+                CheckDatabaseAsync(databaseProbe, applicationUptime, logger, requestAborted);
+        app.MapGet(HealthPath, checkDatabase);
 
         // Liveness: el proceso responde. No toca la base a propósito: una base caída no debe hacer
         // que un orquestador reinicie un proceso sano.
@@ -45,7 +50,7 @@ public static partial class HealthEndpoints
 
         // Readiness: la base responde (SELECT 1 con el mismo timeout). Un 503 saca a la réplica del
         // balanceo sin reiniciarla.
-        app.MapGet(ReadyPath, CheckDatabaseAsync);
+        app.MapGet(ReadyPath, checkDatabase);
 
         return app;
     }
