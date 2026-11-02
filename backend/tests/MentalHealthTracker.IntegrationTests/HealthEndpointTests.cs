@@ -82,6 +82,91 @@ public sealed class HealthEndpointTests(CustomWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task Live_Returns200WithStatusAndUptime()
+    {
+        var response = await Factory.CreateClient().GetAsync("/api/health/live");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = body.RootElement;
+        Assert.Equal(["status", "uptime"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("ok", root.GetProperty("status").GetString());
+        Assert.True(root.GetProperty("uptime").GetInt32() >= 0);
+    }
+
+    [Fact]
+    public async Task Live_WithAHungDatabase_StillAnswers200WithoutProbingIt()
+    {
+        var probe = new HangingProbe();
+        await using var hung = HostWith(probe);
+        var client = hung.CreateClient();
+
+        var watch = Stopwatch.StartNew();
+        var response = await client.GetAsync("/api/health/live").WaitAsync(TimeSpan.FromSeconds(10));
+        watch.Stop();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(probe.Started.IsCompleted, "Liveness no debe tocar la base.");
+        Assert.True(watch.Elapsed < HealthEndpoints.ProbeTimeout);
+    }
+
+    [Fact]
+    public async Task Live_WithUnreachableDatabase_StillAnswers200()
+    {
+        await using var unreachable = Factory.WithWebHostBuilder(_ => { });
+        var client = unreachable.CreateClient();
+        await unreachable.Services.GetRequiredService<NpgsqlDataSource>().DisposeAsync();
+
+        var response = await client.GetAsync("/api/health/live");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Ready_WithReachableDatabase_Returns200WithStatusAndUptime()
+    {
+        var response = await Factory.CreateClient().GetAsync("/api/health/ready");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = body.RootElement;
+        Assert.Equal(["status", "uptime"], root.EnumerateObject().Select(property => property.Name));
+        Assert.Equal("ok", root.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task Ready_WithUnreachableDatabase_Returns503WithTheSameErrorBodyAsHealth()
+    {
+        await using var unreachable = Factory.WithWebHostBuilder(_ => { });
+        var client = unreachable.CreateClient();
+        await unreachable.Services.GetRequiredService<NpgsqlDataSource>().DisposeAsync();
+
+        var ready = await client.GetAsync("/api/health/ready");
+        var health = await client.GetAsync("/api/health");
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, ready.StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, health.StatusCode);
+        Assert.Equal(await health.Content.ReadAsStringAsync(), await ready.Content.ReadAsStringAsync());
+        Assert.Equal("""{"status":"error","db":"unreachable"}""", await ready.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Ready_WithAHungDatabase_AnswersThe503WithinTheTimeoutInsteadOfHanging()
+    {
+        var probe = new HangingProbe();
+        await using var hung = HostWith(probe);
+        var client = hung.CreateClient();
+
+        var watch = Stopwatch.StartNew();
+        var response = await client.GetAsync("/api/health/ready").WaitAsync(TimeSpan.FromSeconds(10));
+        watch.Stop();
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.True(probe.WasCancelled);
+        Assert.InRange(watch.Elapsed, TimeSpan.FromSeconds(1.5), TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
     public async Task TheProbeCommand_HasItsOwnTimeout_SoASlowQueryDoesNotWaitForeverEvenWithoutAToken()
     {
         var dataSource = Factory.Services.GetRequiredService<NpgsqlDataSource>();

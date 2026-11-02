@@ -93,9 +93,9 @@ public sealed class RequestLoggingTests(CustomWebApplicationFactory factory)
         await using var host = HostWith(sink);
         var client = host.CreateClient();
 
-        for (var i = 0; i < 3; i++)
+        foreach (var path in new[] { "/api/health", "/api/health/live", "/api/health/ready", "/api/health", "/api/health/live" })
         {
-            using var health = await client.GetAsync("/api/health");
+            using var health = await client.GetAsync(path);
             Assert.Equal(HttpStatusCode.OK, health.StatusCode);
         }
 

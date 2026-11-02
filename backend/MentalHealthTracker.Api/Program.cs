@@ -15,7 +15,7 @@ builder.Host.UseSerilogLogging().UseGracefulShutdownTimeout();
 
 builder.Services.AddAppOptions(builder.Configuration).AddReverseProxyTrust();
 builder.Services.AddPersistence(builder.Configuration).AddApiCore().AddFrontendCors(builder.Configuration);
-builder.Services.AddAuthModule().AddDailyLogModule().AddRealtimeModule();
+builder.Services.AddAuthModule().AddDailyLogModule().AddRealtimeModule(builder.Configuration);
 builder.Services.AddApiRateLimiting().AddApiDocumentation().AddApplicationHealth();
 
 var app = builder.Build();
@@ -25,9 +25,14 @@ app.MapRealtimeHubs();
 app.MapAuthEndpoints(app.Environment);
 app.MapApiFallback();
 app.MapHealthEndpoints();
-await app.InitializeDatabaseAsync();
+await app.MigrateIfNeededAsync(args);
 
-if (args.Contains("--seed"))
+if (DatabaseStartupExtensions.IsMigrateOnly(args))
+{
+    return;
+}
+
+if (args.Contains(DatabaseStartupExtensions.SeedFlag))
 {
     await app.SeedDatabaseAsync();
     return;

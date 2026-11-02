@@ -4,6 +4,12 @@ namespace MentalHealthTracker.Api.Core.Health;
 
 public static partial class HealthEndpoints
 {
+    public const string HealthPath = "/api/health";
+
+    public const string LivePath = "/api/health/live";
+
+    public const string ReadyPath = "/api/health/ready";
+
     // Tiempo máximo que el health check espera a la base de datos. Un orquestador que sondea tiene
     // su propio timeout: si la base se cuelga y el endpoint no contesta, el sondeo expira sin
     // respuesta; con este tope contesta el mismo 503 de siempre.
@@ -28,40 +34,58 @@ public static partial class HealthEndpoints
         // que el uptime cuente desde el arranque del host.
         _ = app.ServiceProvider.GetRequiredService<ApplicationUptime>();
 
-        app.MapGet("/api/health", async (
-            IDatabaseProbe databaseProbe,
-            ApplicationUptime applicationUptime,
-            ILogger<Program> logger,
-            CancellationToken requestAborted) =>
-        {
-            var uptime = applicationUptime.Elapsed;
+        // /api/health sigue igual (es el que usan los healthchecks de Compose y del CI) y comparte con
+        // /api/health/ready la misma comprobación de la base, con la misma respuesta. Se mapea con una
+        // lambda y no con el método directamente: así OpenAPI conserva el tag que /api/health ya tenía
+        // (con un método de HealthEndpoints saldría "HealthEndpoints" y cambiaría el contrato).
+        Func<IDatabaseProbe, ApplicationUptime, ILogger<Program>, CancellationToken, Task<IResult>> checkDatabase =
+            (databaseProbe, applicationUptime, logger, requestAborted) =>
+                CheckDatabaseAsync(databaseProbe, applicationUptime, logger, requestAborted);
+        app.MapGet(HealthPath, checkDatabase);
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
-            timeout.CancelAfter(ProbeTimeout);
+        // Liveness: el proceso responde. No toca la base a propósito: una base caída no debe hacer
+        // que un orquestador reinicie un proceso sano.
+        app.MapGet(LivePath, (ApplicationUptime applicationUptime) =>
+            Results.Json(new { status = "ok", uptime = (int)applicationUptime.Elapsed.TotalSeconds }));
 
-            try
-            {
-                await databaseProbe.ProbeAsync(timeout.Token);
-            }
-            // Si quien cancela es el cliente (cerró la conexión) no hay a quién contestar ni
-            // es un fallo de la base: la excepción sube al manejador global, que lo anota en Debug.
-            catch (OperationCanceledException) when (requestAborted.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception exception)
-            {
-                LogHealthCheckFailed(logger, exception);
-                return Results.Json(
-                    new { status = "error", db = "unreachable" },
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
-            }
-
-            return Results.Json(
-                new { status = "ok", uptime = (int)uptime.TotalSeconds });
-        });
+        // Readiness: la base responde (SELECT 1 con el mismo timeout). Un 503 saca a la réplica del
+        // balanceo sin reiniciarla.
+        app.MapGet(ReadyPath, checkDatabase);
 
         return app;
+    }
+
+    private static async Task<IResult> CheckDatabaseAsync(
+        IDatabaseProbe databaseProbe,
+        ApplicationUptime applicationUptime,
+        ILogger<Program> logger,
+        CancellationToken requestAborted)
+    {
+        var uptime = applicationUptime.Elapsed;
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(requestAborted);
+        timeout.CancelAfter(ProbeTimeout);
+
+        try
+        {
+            await databaseProbe.ProbeAsync(timeout.Token);
+        }
+        // Si quien cancela es el cliente (cerró la conexión) no hay a quién contestar ni
+        // es un fallo de la base: la excepción sube al manejador global, que lo anota en Debug.
+        catch (OperationCanceledException) when (requestAborted.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            LogHealthCheckFailed(logger, exception);
+            return Results.Json(
+                new { status = "error", db = "unreachable" },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Results.Json(
+            new { status = "ok", uptime = (int)uptime.TotalSeconds });
     }
 
     [LoggerMessage(EventId = ApiLogEvents.HealthCheckFailed, EventName = nameof(ApiLogEvents.HealthCheckFailed), Level = LogLevel.Error, Message = "Database health check failed")]

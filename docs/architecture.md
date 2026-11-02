@@ -157,6 +157,10 @@ poder reconstruirse con una lectura a la API; el hub solo evita tener que recarg
 
 ### Escalado horizontal del canal en tiempo real: señalada limitación, sin backplane (decisión de alcance)
 
+> **Actualización:** el backplane existe y es opcional: con `Scaling:Redis:ConnectionString` configurada
+> SignalR lo usa (ver «Redis opcional»). Esta sección describe el comportamiento **sin** él, que sigue
+> siendo el de por defecto.
+
 El canal en tiempo real **no está preparado para correr en varias réplicas de la API**:
 no hay backplane (p. ej. Azure SignalR Service o Redis) detrás de SignalR. Su estado de
 grupos y conexiones vive **en memoria de cada instancia**. Es una **decisión consciente de
@@ -191,6 +195,10 @@ en B" volvería a entregar el evento. El diseño actual no impide este cambio: e
 implementación en infraestructura.
 
 ### Rate limiting en memoria: mismo backplane pendiente que SignalR (decisión de alcance)
+
+> **Actualización:** los contadores distribuidos existen y son opcionales: con `Scaling:Redis:ConnectionString`
+> configurada las cuotas viven en Redis (ver «Redis opcional»). Esta sección describe el comportamiento
+> **sin** él, que sigue siendo el de por defecto.
 
 Las políticas de rate limiting (`auth`: 20 req/15 min por IP en `GET /api/auth/google/callback`;
 `write`: 30 req/15 min por id de usuario en `POST /api/logs`; valores por defecto de
@@ -264,6 +272,54 @@ contra Redis sin cambiar el contrato HTTP (mismas cabeceras `RateLimit-*` y `429
 el backplane es un detalle de implementación para `ILogEventEmitter`. Hasta entonces, el estado
 operativo entre instancias depende de una decisión única: SignalR y rate limiting escalan
 **juntos**, con la misma pieza, o ninguno lo garantiza.
+
+### Redis opcional: backplane de SignalR y rate limiting distribuido (`Scaling:Redis`)
+
+Las dos limitaciones anteriores se resuelven con **la misma pieza**, y por eso se activan con **un
+solo interruptor**: `Scaling:Redis:ConnectionString`. Vacía (valor por defecto) no cambia nada: una
+instancia, todo en memoria. Con ella definida, a la vez:
+
+| Efecto | Qué hace |
+| --- | --- |
+| Backplane de SignalR | `AddStackExchangeRedis` (paquete `Microsoft.AspNetCore.SignalR.StackExchangeRedis`): los grupos `user:{userId}` valen entre réplicas, de modo que un evento emitido por la instancia B llega a un cliente conectado a la A. `ILogEventEmitter` y `LogsHub` no cambian. |
+| Rate limiting distribuido | Las políticas `auth` y `write` cuentan en Redis (`DistributedFixedWindowRateLimiter` sobre `IRateLimitCounterStore`), así que la cuota es una sola para todas las réplicas. Mismos límites (`RateLimiting:*`), mismas cabeceras `RateLimit-*` / `Retry-After` y mismo `429`. |
+
+| Variable | Significado | Por defecto |
+| --- | --- | --- |
+| `Scaling__Redis__ConnectionString` | Cadena de StackExchange.Redis, p. ej. `redis:6379,password=…`. Si es inválida, el arranque falla (`ValidateOnStart`). | vacía (desactivado) |
+| `Scaling__Redis__KeyPrefix` | Prefijo de los canales de SignalR y de las claves de los contadores (`{prefix}:rl:{política}:{clave}`), para compartir un Redis entre entornos. | `mht` |
+
+**La partición `auth` sigue siendo la IP real.** La clave de la cuota se calcula al evaluar la política,
+cuando `UseForwardedHeaders` ya ha sustituido `RemoteIpAddress` por la IP de `X-Forwarded-For` (con las
+mismas condiciones de arriba: solo de proxies conocidos y `ForwardLimit=1`). En Redis la clave es
+`mht:rl:auth:203.0.113.1`, no la de nginx; `write` se sigue particionando por id de usuario
+(`mht:rl:write:{userId}`). `DistributedRateLimitingTests` lo comprueba con un almacén compartido por dos
+hosts que hacen de réplicas.
+
+**El contador** es una ventana fija como la de memoria (se abre con la primera petición): un script Lua
+atómico hace `INCRBY` y, si la clave no tiene caducidad, le pone la de la ventana.
+
+**Si Redis no responde**, el rate limiting **deja pasar** la petición y registra un aviso
+(`RateLimitStoreUnavailable`, evento 1502): una caída de Redis no debe impedir iniciar sesión ni guardar
+un registro; el efecto es el mismo límite laxo de antes, no uno nuevo. La API tampoco se cae al arrancar con
+Redis caído (la conexión se abre en el primer uso, sin abortar). Para el tiempo real, el emisor ya es de
+mejor esfuerzo (un fallo se registra y no se propaga) y el dato sigue en la API.
+
+**Qué hay que hacer en el despliegue**
+
+1. Poner un Redis accesible desde todas las réplicas y pasar `Scaling__Redis__ConnectionString` (con la
+   contraseña por variable de entorno o secreto del orquestador, no en un fichero versionado). Los composes
+   del repositorio **no** traen Redis: es opcional y no cambia el despliegue de una instancia.
+2. Migrar con el job previo y arrancar las réplicas con `Database__MigrateOnStartup=false` (ver
+   «Migraciones aplicadas al arrancar»).
+3. El balanceador debe mantener **afinidad de sesión** (sticky sessions) para SignalR, o usar solo WebSockets
+   sin negociación: el backplane reparte los mensajes entre réplicas, pero la negociación y el *long polling*
+   siguen siendo peticiones que tienen que llegar a la misma instancia.
+
+**Cobertura**: el script y el backplane se verificaron a mano contra un Redis real (contador, caducidad,
+200 incrementos concurrentes, Redis caído, y un evento creado en una instancia recibido por un cliente de
+otra). La suite automática usa un almacén en memoria y comprueba el cableado; no hay Redis en `docker-compose.test.yml`
+ni en el CI.
 
 ### HTTPS y HSTS: responsabilidad del proxy de borde, no de la API
 
@@ -888,10 +944,25 @@ con `[RequireAuth]`: los orquestadores lo consultan sin sesión.
 - No filtra detalle de infraestructura al cliente: la excepción va al log y la respuesta es un
   literal genérico.
 
-**Cuándo reconsiderar**: si se necesitara separar *liveness* de *readiness* (un reinicio del
-proceso no debería dispararse por una base momentáneamente caída), lo correcto es dividir en
-`/live` —el proceso responde— y `/ready` —la base responde—, y apuntar cada sonda al endpoint
-que le corresponde.
+**Liveness y readiness separados**: además de `/api/health`, existen dos sondas para orquestadores
+que distinguen un proceso colgado de una dependencia caída. `/api/health` **no cambia** (misma
+respuesta y mismos códigos) y sigue siendo el que usan los healthchecks de Compose y del CI.
+
+| Endpoint | Pregunta | Respuesta | Qué debería hacer el orquestador si falla |
+| --- | --- | --- | --- |
+| `GET /api/health/live` | ¿Responde el proceso? | `200 {"status":"ok","uptime":…}`. No toca la base. | Reiniciar el contenedor/pod (*liveness probe*). |
+| `GET /api/health/ready` | ¿Responde la base? | Igual que `/api/health`: `200 {"status":"ok","uptime":…}` o `503 {"status":"error","db":"unreachable"}` (`SELECT 1` con el mismo timeout de 2 s). | Dejar de enviarle tráfico sin reiniciarla (*readiness probe*). |
+
+`/api/health` y `/api/health/ready` comparten la misma comprobación (`CheckDatabaseAsync`). Ninguno
+de los tres lleva `[RequireAuth]` ni aparece en el log de peticiones. Ejemplo para Kubernetes:
+
+```yaml
+livenessProbe:  { httpGet: { path: /api/health/live,  port: 3000 } }
+readinessProbe: { httpGet: { path: /api/health/ready, port: 3000 } }
+```
+
+Con una base momentáneamente caída las réplicas pasan a *not ready* y se recuperan solas cuando
+vuelve, en vez de reiniciarse en bucle. Compose sigue usando `/api/health`, que equivale a *ready*.
 
 ## Límites conocidos de alcance
 
@@ -903,8 +974,8 @@ diseño de la aplicación.
 
 | Límite | Qué pasa hoy | Cuándo se rompe | Mitigación identificada |
 | ------ | ------------ | --------------- | ----------------------- |
-| SignalR sin backplane | El estado de grupos (`user:{userId}`) y conexiones vive en la memoria de cada instancia | Varias réplicas: el evento de una escritura procesada por la instancia B no llega a un usuario conectado a la A | Backplane de SignalR (Redis o Azure SignalR Service), registrado en `AddSignalR()` |
-| Rate limiting en memoria | Los contadores de `FixedWindowRateLimiter` viven en la memoria de la instancia | Varias réplicas: cada una cuenta por separado y el límite deja de ser una garantía global | Contadores distribuidos en Redis (`INCR`/`EXPIRE`), la misma pieza que el backplane de SignalR |
+| SignalR sin backplane | El estado de grupos (`user:{userId}`) y conexiones vive en la memoria de cada instancia | Varias réplicas: el evento de una escritura procesada por la instancia B no llega a un usuario conectado a la A | Backplane de SignalR (Redis o Azure SignalR Service), registrado en `AddSignalR()`. **Disponible con Redis:** `Scaling:Redis` |
+| Rate limiting en memoria | Los contadores de `FixedWindowRateLimiter` viven en la memoria de la instancia | Varias réplicas: cada una cuenta por separado y el límite deja de ser una garantía global | Contadores distribuidos en Redis (`INCR`/`EXPIRE`), la misma pieza que el backplane de SignalR. **Disponible:** `Scaling:Redis` |
 | Migraciones al arrancar | La API aplica las migraciones con `DatabaseInitializer.MigrateAsync` antes de empezar a escuchar | Varias réplicas: varias instancias compiten por migrar el esquema a la vez | Job de migración separado, previo a escalar la API |
 
 ### SignalR sin backplane
@@ -943,11 +1014,44 @@ vez; EF Core usa bloqueos para serializar, pero se producen esperas, contención
 parcial, riesgo de quedar en un estado intermedio con varias instancias reintentando. El arranque
 de la aplicación queda además acoplado a la disponibilidad de la base.
 
-**Mitigación identificada**: sacar las migraciones de la API y correrlas como un **job de
-migración separado** antes de desplegar/escalar (un `docker compose run` o un job de
-Kubernetes/CI que termina antes de que el servicio reciba tráfico). La API arrancaría sin migrar
-y el despliegue garantizaría el esquema como paso previo. Es la evolución natural junto con
-Redis: ambos separan el estado operativo (esquema, grupos/contadores) del proceso de la API.
+**Mitigación disponible: migrar en un job previo y arrancar las réplicas sin migrar.** Hay dos
+piezas, y la configuración por defecto no cambia (`Database:MigrateOnStartup` vale `true`):
+
+| Pieza | Qué hace |
+| --- | --- |
+| `--migrate` | Aplica las migraciones pendientes y **termina** sin arrancar Kestrel (como `--seed`). Sale con código 0 si todo fue bien y distinto de 0 si no pudo migrar o la base no responde tras los reintentos. |
+| `Database:MigrateOnStartup=false` (`Database__MigrateOnStartup=false`) | El arranque normal no toca el esquema: registra `MigrationsSkipped` (evento 1501) y empieza a servir. `--migrate` y `--seed` migran igualmente aunque esté a `false`. |
+
+Orden de un despliegue con varias réplicas:
+
+1. **Migrar una sola vez**, con la imagen nueva y la misma cadena de conexión, y esperar a que
+   termine. El ENTRYPOINT de la imagen es `dotnet MentalHealthTracker.Api.dll`, así que los
+   argumentos se pasan tal cual:
+
+   ```bash
+   # Compose de producción
+   docker compose --env-file .env.production -f docker-compose.prod.yml run --rm backend --migrate
+   ```
+
+   En Kubernetes es un `Job` (o un hook `pre-install`/`pre-upgrade` de Helm) con la misma imagen y
+   `args: ["--migrate"]`; en CI/CD, un paso previo al de escalado. **Si el job falla (código ≠ 0),
+   el despliegue se detiene** y las réplicas viejas siguen sirviendo.
+2. **Arrancar o escalar las réplicas** con `Database__MigrateOnStartup=false`. Ninguna compite por
+   el esquema, y su arranque ya no depende de poder migrar (solo de poder conectar).
+3. Con una sola instancia no hace falta nada de esto: basta dejar el valor por defecto.
+
+Dos cautelas que el job no resuelve por sí solo:
+
+- **Compatibilidad entre versiones.** Mientras las réplicas viejas siguen vivas, el esquema ya es
+  el nuevo; cada migración debe ser compatible con el código anterior (primero añadir, después
+  retirar en un despliegue posterior). Las migraciones destructivas necesitan ventana de
+  mantenimiento.
+- **Una réplica con `MigrateOnStartup=false` no comprueba el esquema.** Si se olvida el job, la
+  API arranca igual y fallará en las consultas, no al arrancar. `GET /api/health` solo hace
+  `SELECT 1`; el orden del despliegue es lo que garantiza el esquema.
+
+Es la evolución natural junto con Redis: ambos separan el estado operativo (esquema,
+grupos/contadores) del proceso de la API.
 
 ## De Node/React a .NET/Vue
 

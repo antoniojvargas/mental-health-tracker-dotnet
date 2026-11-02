@@ -4,6 +4,7 @@ using MentalHealthTracker.Api.Core.Exceptions;
 using MentalHealthTracker.Api.Modules.Auth;
 using MentalHealthTracker.Api.Modules.DailyLog;
 using MentalHealthTracker.Domain.Errors;
+using MentalHealthTracker.Api.Core.Scaling;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
@@ -19,8 +20,14 @@ public static class RateLimitingServiceCollectionExtensions
     // sería la del proxy y la cuota se compartiría entre todos los usuarios: con
     // ReverseProxy:Enabled, UseForwardedHeaders (primer middleware) sustituye esa IP por la
     // de X-Forwarded-For, aceptada solo si la petición llega de un proxy conocido.
+    //
+    // Con Scaling:Redis configurado los contadores pasan a Redis (IRateLimitCounterStore) y la cuota
+    // es una sola para todas las réplicas; la clave de la partición no cambia (la IP de arriba, el id
+    // de usuario) ni el contrato HTTP. Sin él, siguen en memoria de la instancia.
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services)
     {
+        services.AddSingleton<IRateLimitCounterStore, RedisRateLimitCounterStore>();
+
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -64,14 +71,13 @@ public static class RateLimitingServiceCollectionExtensions
                 var limits = httpContext.RequestServices
                     .GetRequiredService<IOptions<RateLimitingOptions>>().Value.Auth;
 
-                return RateLimitPartition.GetFixedWindowLimiter(
+                // La IP se lee aquí, al evaluar la política, cuando UseForwardedHeaders ya la sustituyó
+                // por la del cliente real: la partición distribuida usa esa misma IP.
+                return FixedWindowPartition(
+                    httpContext,
+                    AuthController.AuthRateLimitPolicy,
                     httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = limits.PermitLimit,
-                        Window = limits.Window,
-                        AutoReplenishment = true,
-                    });
+                    limits);
             });
 
             // POST /api/logs (upsert de registros) se limita por id de usuario y no por IP:
@@ -96,17 +102,40 @@ public static class RateLimitingServiceCollectionExtensions
                 var limits = httpContext.RequestServices
                     .GetRequiredService<IOptions<RateLimitingOptions>>().Value.Write;
 
-                return RateLimitPartition.GetFixedWindowLimiter(
-                    userId,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = limits.PermitLimit,
-                        Window = limits.Window,
-                        AutoReplenishment = true,
-                    });
+                return FixedWindowPartition(httpContext, DailyLogController.WriteRateLimitPolicy, userId, limits);
             });
         });
 
         return services;
+    }
+
+    // Una partición de ventana fija: en memoria de la instancia, o contra Redis si Scaling:Redis está
+    // configurado. Se decide al evaluar la política (con IOptions) y no al registrarla, igual que los
+    // límites.
+    private static RateLimitPartition<TKey> FixedWindowPartition<TKey>(
+        HttpContext httpContext,
+        string policyName,
+        TKey partitionKey,
+        RateLimitPolicyOptions limits)
+    {
+        var redis = httpContext.RequestServices.GetRequiredService<IOptions<ScalingOptions>>().Value.Redis;
+        if (!redis.Enabled)
+        {
+            return RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey,
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = limits.PermitLimit,
+                    Window = limits.Window,
+                    AutoReplenishment = true,
+                });
+        }
+
+        var store = httpContext.RequestServices.GetRequiredService<IRateLimitCounterStore>();
+        var logger = httpContext.RequestServices.GetRequiredService<ILogger<DistributedFixedWindowRateLimiter>>();
+        return RateLimitPartition.Get(
+            partitionKey,
+            key => new DistributedFixedWindowRateLimiter(
+                store, $"{redis.KeyPrefix}:rl:{policyName}:{key}", limits.PermitLimit, limits.Window, logger));
     }
 }

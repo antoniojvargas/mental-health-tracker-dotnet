@@ -2,7 +2,7 @@ namespace MentalHealthTracker.Api.Core.Logging;
 
 // Catálogo de EventId de los logs de la API. Los números son estables: alimentan alertas y
 // consultas en el agregador de logs, así que NO se reutilizan ni se renumeran (un log retirado deja
-// su hueco). Rangos: 1000 auth, 1100 errores HTTP, 1200 salud, 1300 apagado, 1400 tiempo real.
+// su hueco). Rangos: 1000 auth, 1100 errores HTTP, 1200 salud, 1300 apagado, 1400 tiempo real, 1500 arranque.
 // Infrastructure tiene su propio catálogo en el rango 2000.
 internal static class ApiLogEvents
 {
@@ -25,4 +25,8 @@ internal static class ApiLogEvents
     public const int ShutdownClosingPool = 1302;
 
     public const int RealtimeSendFailed = 1401;
+
+    public const int MigrationsSkipped = 1501;
+
+    public const int RateLimitStoreUnavailable = 1502;
 }
