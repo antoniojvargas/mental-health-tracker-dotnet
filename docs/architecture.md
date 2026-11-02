@@ -888,10 +888,25 @@ con `[RequireAuth]`: los orquestadores lo consultan sin sesión.
 - No filtra detalle de infraestructura al cliente: la excepción va al log y la respuesta es un
   literal genérico.
 
-**Cuándo reconsiderar**: si se necesitara separar *liveness* de *readiness* (un reinicio del
-proceso no debería dispararse por una base momentáneamente caída), lo correcto es dividir en
-`/live` —el proceso responde— y `/ready` —la base responde—, y apuntar cada sonda al endpoint
-que le corresponde.
+**Liveness y readiness separados**: además de `/api/health`, existen dos sondas para orquestadores
+que distinguen un proceso colgado de una dependencia caída. `/api/health` **no cambia** (misma
+respuesta y mismos códigos) y sigue siendo el que usan los healthchecks de Compose y del CI.
+
+| Endpoint | Pregunta | Respuesta | Qué debería hacer el orquestador si falla |
+| --- | --- | --- | --- |
+| `GET /api/health/live` | ¿Responde el proceso? | `200 {"status":"ok","uptime":…}`. No toca la base. | Reiniciar el contenedor/pod (*liveness probe*). |
+| `GET /api/health/ready` | ¿Responde la base? | Igual que `/api/health`: `200 {"status":"ok","uptime":…}` o `503 {"status":"error","db":"unreachable"}` (`SELECT 1` con el mismo timeout de 2 s). | Dejar de enviarle tráfico sin reiniciarla (*readiness probe*). |
+
+`/api/health` y `/api/health/ready` comparten la misma comprobación (`CheckDatabaseAsync`). Ninguno
+de los tres lleva `[RequireAuth]` ni aparece en el log de peticiones. Ejemplo para Kubernetes:
+
+```yaml
+livenessProbe:  { httpGet: { path: /api/health/live,  port: 3000 } }
+readinessProbe: { httpGet: { path: /api/health/ready, port: 3000 } }
+```
+
+Con una base momentáneamente caída las réplicas pasan a *not ready* y se recuperan solas cuando
+vuelve, en vez de reiniciarse en bucle. Compose sigue usando `/api/health`, que equivale a *ready*.
 
 ## Límites conocidos de alcance
 
