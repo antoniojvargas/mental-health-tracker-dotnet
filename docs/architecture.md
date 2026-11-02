@@ -2,6 +2,125 @@
 
 Documento de arquitectura del Mental Health Tracker.
 
+## Estructura de módulos
+
+Cómo está organizado el código tras los refactors (módulos del backend, capas del frontend y contrato
+compartido) y cómo viajan los datos. Las flechas indican «usa a»; las discontinuas, lo opcional o
+solo de configuración.
+
+```mermaid
+flowchart LR
+  subgraph FE["Frontend (Vue 3 + Pinia)"]
+    direction TB
+    Views["views<br/>DashboardView, LoginView"]
+    Comps["components<br/>charts, ui, daily-log<br/>(DailyLogModal + steps)"]
+    Comp["composables<br/>useDailyLogForm, useLogSocket"]
+    Mapper["daily-log-mapper<br/>daily-log-options"]
+    Stores["stores<br/>useAuthStore, useLogsStore"]
+    Services["services<br/>api-client, logs.api, auth.api,<br/>hub-client, hub-events"]
+    Shared["utils/date, theme/palette,<br/>types (daily-log, api-error,<br/>api.generated)"]
+    Views --> Comps
+    Views --> Comp
+    Views --> Stores
+    Comps --> Comp
+    Comps --> Mapper
+    Comp --> Stores
+    Comp --> Services
+    Stores --> Services
+    Comps --> Shared
+    Stores --> Shared
+    Services --> Shared
+  end
+
+  subgraph BE["Backend (ASP.NET Core 9)"]
+    direction TB
+    Pipe["Core/Hosting: ApiPipeline<br/>ForwardedHeaders, log de peticiones,<br/>errores, RequestId, cabeceras,<br/>CORS, rate limiter, auth"]
+    subgraph Mods["Modules"]
+      Auth["Auth<br/>AuthController, GoogleOAuthClient,<br/>JwtService, SessionTokenReader"]
+      Log["DailyLog<br/>Controller → Service"]
+      RT["Realtime<br/>LogsHub, LogEventEmitter,<br/>LogHubEvents, HubRoutes"]
+    end
+    Core["Core (transversal)<br/>Configuration, Errors, Health,<br/>Logging, RateLimiting, Scaling,<br/>OpenApi, Serialization"]
+    Pipe --> Auth
+    Pipe --> Log
+    Pipe --> RT
+    Log --> RT
+    Pipe -.-> Core
+    Mods -.-> Core
+  end
+
+  subgraph INF["Infrastructure y Domain"]
+    direction TB
+    Repo["Repositories<br/>AppDbContext, DatabaseInitializer,<br/>DatabaseSeeder"]
+    Dom["Domain<br/>entidades, enums, errores,<br/>IUserRepository, IDailyLogRepository"]
+    Repo --> Dom
+  end
+
+  Nginx["nginx :8080<br/>(proxy de /api y /hub)"]
+  PG[("PostgreSQL 16")]
+  Redis[("Redis<br/>opcional")]
+
+  Services -->|"HTTP /api · WebSocket /hub"| Nginx
+  Nginx --> Pipe
+  Auth --> Repo
+  Log --> Repo
+  Repo --> PG
+  Mods -.-> Dom
+  RT -.->|"backplane"| Redis
+  Core -.->|"cuotas"| Redis
+```
+
+- **El contrato HTTP se comparte por un snapshot**, no por código: `frontend/openapi.json` →
+  `types/api.generated.d.ts` (ver «Tipos del contrato»). El nombre del evento y la ruta del hub
+  también se duplican a propósito en `LogHubEvents`/`HubRoutes` (backend) y `hub-events.ts` (frontend).
+- **Los módulos se tocan en pocos puntos:** `DailyLog` usa de `Auth` el atributo `[RequireAuth]` y de
+  `Realtime` solo la interfaz `ILogEventEmitter`, que no sabe qué transporte hay debajo (memoria o Redis).
+- **`Infrastructure` implementa los contratos de `Domain`** (`IUserRepository`, `IDailyLogRepository`);
+  la API no toca EF Core.
+
+### Flujo de datos: guardar un registro
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Navegador
+  participant FE as DailyLogModal / useDailyLogForm
+  participant API as logs.api + api-client
+  participant N as nginx :8080
+  participant P as ApiPipeline
+  participant C as DailyLogController
+  participant S as DailyLogService
+  participant R as IDailyLogRepository
+  participant DB as PostgreSQL
+  participant E as LogEventEmitter
+  participant H as LogsHub (grupo user:id)
+  participant ST as useLogsStore
+
+  U->>FE: rellena el formulario y envía
+  FE->>API: toCreateDailyLogInput(form, hoy local) → create()
+  API->>N: POST /api/logs (cookie access_token)
+  N->>P: proxifica con X-Forwarded-For
+  P->>P: IP real, RequestId, rate limiter (write: por usuario), auth
+  P->>C: [RequireAuth] + validación
+  C->>S: userId de los claims + petición
+  S->>R: UpsertAsync (ON CONFLICT user_id, log_date)
+  R->>DB: INSERT … ON CONFLICT DO UPDATE
+  DB-->>R: fila y si se creó o actualizó
+  S->>E: EmitLogCreated / EmitLogUpdated (mejor esfuerzo)
+  E->>H: SendAsync al grupo user:{id}
+  Note over H: con Scaling:Redis, el backplane<br/>lo entrega a las demás réplicas
+  S-->>C: DailyLogResponse
+  C-->>API: 201 o 200 con el registro
+  API-->>FE: registro guardado
+  FE->>ST: saved → mergeLog (sin segunda petición)
+  H-->>ST: log:created / log:updated → useLogSocket → mergeLog
+  Note over ST: las pestañas abiertas del mismo usuario<br/>reciben el evento y se actualizan
+```
+
+Si el evento en tiempo real falla, el emisor lo registra y no lo propaga: la respuesta HTTP ya lleva el
+dato y la fuente de verdad sigue siendo la API (ver «Notificación en tiempo real»). `mergeLog`
+identifica el registro por `logDate`, así que recibir el mismo día por HTTP y por el hub no lo duplica.
+
 ## Decisiones de diseño
 
 ### Sesión: JWT en cookie `httpOnly` (no en `localStorage`)
@@ -321,12 +440,47 @@ mejor esfuerzo (un fallo se registra y no se propaga) y el dato sigue en la API.
 otra). La suite automática usa un almacén en memoria y comprueba el cableado; no hay Redis en `docker-compose.test.yml`
 ni en el CI.
 
+### Modelo de confianza en el proxy: la API no se expone, se alcanza a través de nginx
+
+La API no está pensada para recibir tráfico de Internet. Kestrel solo habla HTTP (`:3000`) y, en
+producción, **no publica puerto**: el único punto de entrada es nginx (el contenedor del frontend,
+`:8080`), que sirve el bundle y proxifica `/api/` y `/hub` por la red interna de Compose. Toda
+decisión que depende de «quién es el cliente» se apoya en esa cadena y en saber de quién fiarse:
+
+```
+cliente ──► [proxy de borde con TLS, opcional] ──► nginx :8080 ──► Kestrel :3000 (red 172.28.0.0/24)
+```
+
+| Reglas del modelo | Dónde se aplican |
+| --- | --- |
+| **Solo se fía de proxies declarados.** `X-Forwarded-For` y `X-Forwarded-Proto` solo se aceptan si la petición llega de una IP de `ReverseProxy:KnownProxies` o de una red de `ReverseProxy:KnownNetworks` (en producción, la subred fija `172.28.0.0/24`). De cualquier otro origen se ignoran y se conserva la IP real del socket. | `ReverseProxyServiceCollectionExtensions` |
+| **Fiarse es explícito.** `UseForwardedHeaders` solo se registra con `ReverseProxy:Enabled=true`, es el **primer** middleware (antes del log de peticiones y del rate limiter), y `Enabled=true` sin proxies ni redes impide arrancar. | `ApiPipeline`, `ReverseProxyOptionsValidator` |
+| **`ForwardLimit=1`: se lee solo la entrada más a la derecha**, la que añade nuestro nginx con `$proxy_add_x_forwarded_for`. Lo que el cliente escriba a la izquierda no cuenta. | `ReverseProxyOptions.ForwardLimit` (detalle en «Rate limiting en memoria») |
+| **El puerto de la API no se publica.** Si se publicara, cualquiera podría saltarse nginx; la protección de arriba se apoya en que desde fuera solo se llega por nginx. | `docker-compose.prod.yml` |
+
+**Qué depende de ello**
+
+| Consumidor | Qué necesita | Consecuencia si falla la confianza |
+| --- | --- | --- |
+| Política de rate limiting `auth` (y su clave en Redis) | La IP real del cliente en `RemoteIpAddress` | Sin proxy de confianza todos comparten la IP de nginx (un atacante bloquearía el login de todos); con confianza de más, un cliente se inventaría IPs y esquivaría la cuota |
+| `ClientIp` del log de peticiones | La misma IP ya resuelta | Logs con la IP del proxy, inútiles para investigar abuso |
+| Esquema de la petición (`X-Forwarded-Proto`) | Saber si el original fue HTTPS | La API no impone HTTPS (ver la sección siguiente); nginx fija esta cabecera con su propio `$scheme`, que en `:8080` es `http`, así que con un proxy de TLS delante habría que propagar la cabecera del proxy de borde en la configuración de nginx |
+
+**Desarrollo y tests**: `ReverseProxy` viene desactivado, así que `RemoteIpAddress` es lo que ve el
+socket. Llamando a `:3000` es el cliente; pasando por Vite (`:5173`, que no añade `X-Forwarded-For`)
+es la IP del proxy de desarrollo. Con un solo usuario no importa, y los tests lo simulan con un
+`IStartupFilter` que fija la IP de origen (`ForwardedHeadersTests`).
+
+**Qué rompe la suposición**: publicar el puerto de la API; poner otro proxy delante de nginx sin subir
+`ForwardLimit` a 2, añadir su red a `KnownNetworks` y configurar nginx para confiar en él (`real_ip`);
+o cambiar la subred de Compose sin actualizarla en `ReverseProxy__KnownNetworks__0`.
+
 ### HTTPS y HSTS: responsabilidad del proxy de borde, no de la API
 
 El contenedor de la API **solo sirve HTTP** (`ASPNETCORE_URLS=http://+:3000`) y no publica
 puerto: en producción solo nginx lo alcanza por la red interna. El TLS termina en el proxy
 de borde que haya delante de nginx (balanceador, CDN o el propio nginx con certificado), y
-**ese proxy es quien debe**:
+**ese proxy es quien debe** (ver «Modelo de confianza en el proxy»):
 
 - redirigir `http://` a `https://`,
 - emitir `Strict-Transport-Security` (HSTS),
@@ -454,9 +608,10 @@ máquina, no una omisión.
 | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Aislamiento por ejecución        | Total: el compose monta `tmpfs` en `/var/lib/postgresql/data`, así que cada `up` parte de una base vacía |
 | Versión de Postgres              | `16-alpine`, idéntica a `docker-compose.yml`                                                              |
-| Coste de arranque                | `~0,2 s` si el contenedor ya está arriba                                                                  |
+| Coste de arranque                | `~0,2 s` si el contenedor ya está arriba (medición original)                                              |
 | Coste de un contenedor nuevo     | `~1,2 s` medido: `0,14 s` de `docker run` + `1,03 s` hasta que `pg_isready` responde                     |
-| Ciclo completo de `make test`    | `~6,9 s` medido, de los cuales `~3 s` son las pruebas                                                    |
+| Ciclo completo de `make test`    | `~21 s` medido con la suite actual (unitarias + integración con cobertura y umbral), de los cuales `~14 s` son las pruebas |
+| En CI                            | El job `Backend tests (.NET + Postgres)` usa un *service container* de GitHub Actions (`postgres:16-alpine`, `5433:5432`, mismas credenciales que el compose de test), sin `TEST_DATABASE_URL`: el valor por defecto de la factory ya apunta ahí |
 | Puerto                           | Fijo, `5433`, separado del `5432` del compose de desarrollo                                              |
 
 **Motivos para no adoptar Testcontainers todavía**
@@ -477,9 +632,14 @@ máquina, no una omisión.
    inyectarse, con un valor por defecto para el compose y otro asignado dinámicamente por
    el puerto mapeado del contenedor. Eso son dos rutas de configuración para la misma base
    de datos y, por tanto, dos maneras de que los tests apunten a la instancia equivocada.
-4. **El detonante todavía no ha llegado.** El beneficio mayor de Testcontainers es
-   simplificar CI, y **este repositorio no tiene CI** (no existe `.github/workflows`). Se
-   estaría pagando la complejidad de dos modos a cambio de una ventaja hipotética.
+4. **El CI ya existe y tampoco lo necesita.** El beneficio mayor de Testcontainers es simplificar
+   el CI, y el CI del repositorio (`.github/workflows/ci.yml`) ya tiene su base: el job
+   `Backend tests (.NET + Postgres)` declara un *service container* de Postgres con *healthcheck*
+   y la factory lee `TEST_DATABASE_URL` o, sin ella, `localhost:5433`, que es justo el puerto
+   que publica ese servicio. Es la misma ruta que usa el desarrollo local, así que no hay dos
+   modos que mantener. Se pagaría la complejidad de Testcontainers a cambio de una ventaja
+   que el CI actual ya da. (La imagen del servicio del CI no lleva el digest que sí llevan
+   los composes.)
 
 **Limitación que sí arrastra la decisión**: el puerto `5433` es fijo. Si otro proceso lo ocupa,
 `make test` falla con un error de binding poco descriptivo en lugar de levantar la base en
@@ -488,12 +648,13 @@ colisión es improbable.
 
 **Cuándo y cómo se adoptaría**
 
-El momento natural es que aparezca CI, y conviene hacerlo junto con consolidar los fixtures:
-hoy las 5 clases de test usan `IClassFixture<CustomWebApplicationFactory>`, así que cada
-una tiene su instancia y las migraciones de `Program.cs` se ejecutan 5 veces por ejecución.
-Un contenedor a nivel de colección encaja con un `ICollectionFixture` único, que resolvería
-las dos cosas de una vez: un solo arranque de Postgres, un solo `MigrateAsync` y un solo
-`Program` en memoria.
+Ya no basta con que exista CI: el detonante sería un CI o un entorno donde no se pueda declarar
+un servicio de Postgres (otro proveedor, un runner sin servicios) o la necesidad de varias bases
+aisladas en paralelo. La consolidación de fixtures que antes iba ligada a esta decisión **ya se
+hizo**: las clases comparten un único `ICollectionFixture<CustomWebApplicationFactory>`, de modo
+que hay un solo arranque de la API y una sola migración por ejecución (solo `RateLimitingTests`
+y `ForwardedHeadersTests` mantienen su propia factory, para aislar contadores). Un contenedor
+a nivel de colección encajaría directamente en ese fixture único.
 
 Los cambios concretos serían: añadir `Testcontainers.PostgreSql` (4.15.0, compatible con
 `net9.0`) al proyecto de tests; un `PostgreSqlBuilder` con `.WithImage("postgres:16-alpine")`
