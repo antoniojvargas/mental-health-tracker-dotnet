@@ -2,6 +2,131 @@
 
 Documento de arquitectura del Mental Health Tracker.
 
+Las decisiones que se han convertido en ADR viven en [`docs/adr/`](adr/README.md) y aquí solo se
+resumen con un enlace: [0001 el cliente decide el día](adr/0001-el-cliente-decide-el-dia.md),
+[0002 tiempo real de mejor esfuerzo](adr/0002-tiempo-real-de-mejor-esfuerzo.md),
+[0003 confianza en el proxy](adr/0003-confianza-en-el-proxy.md) y
+[0004 opciones del formulario 1:1 con los enums](adr/0004-opciones-del-formulario-1-a-1-con-los-enums.md).
+
+## Estructura de módulos
+
+Cómo está organizado el código tras los refactors (módulos del backend, capas del frontend y contrato
+compartido) y cómo viajan los datos. Las flechas indican «usa a»; las discontinuas, lo opcional o
+solo de configuración.
+
+```mermaid
+flowchart LR
+  subgraph FE["Frontend (Vue 3 + Pinia)"]
+    direction TB
+    Views["views<br/>DashboardView, LoginView"]
+    Comps["components<br/>charts, ui, daily-log<br/>(DailyLogModal + steps)"]
+    Comp["composables<br/>useDailyLogForm, useLogSocket"]
+    Mapper["daily-log-mapper<br/>daily-log-options"]
+    Stores["stores<br/>useAuthStore, useLogsStore"]
+    Services["services<br/>api-client, logs.api, auth.api,<br/>hub-client, hub-events"]
+    Shared["utils/date, theme/palette,<br/>types (daily-log, api-error,<br/>api.generated)"]
+    Views --> Comps
+    Views --> Comp
+    Views --> Stores
+    Comps --> Comp
+    Comps --> Mapper
+    Comp --> Stores
+    Comp --> Services
+    Stores --> Services
+    Comps --> Shared
+    Stores --> Shared
+    Services --> Shared
+  end
+
+  subgraph BE["Backend (ASP.NET Core 9)"]
+    direction TB
+    Pipe["Core/Hosting: ApiPipeline<br/>ForwardedHeaders, log de peticiones,<br/>errores, RequestId, cabeceras,<br/>CORS, rate limiter, auth"]
+    subgraph Mods["Modules"]
+      Auth["Auth<br/>AuthController, GoogleOAuthClient,<br/>JwtService, SessionTokenReader"]
+      Log["DailyLog<br/>Controller → Service"]
+      RT["Realtime<br/>LogsHub, LogEventEmitter,<br/>LogHubEvents, HubRoutes"]
+    end
+    Core["Core (transversal)<br/>Configuration, Errors, Health,<br/>Logging, RateLimiting, Scaling,<br/>OpenApi, Serialization"]
+    Pipe --> Auth
+    Pipe --> Log
+    Pipe --> RT
+    Log --> RT
+    Pipe -.-> Core
+    Mods -.-> Core
+  end
+
+  subgraph INF["Infrastructure y Domain"]
+    direction TB
+    Repo["Repositories<br/>AppDbContext, DatabaseInitializer,<br/>DatabaseSeeder"]
+    Dom["Domain<br/>entidades, enums, errores,<br/>IUserRepository, IDailyLogRepository"]
+    Repo --> Dom
+  end
+
+  Nginx["nginx :8080<br/>(proxy de /api y /hub)"]
+  PG[("PostgreSQL 16")]
+  Redis[("Redis<br/>opcional")]
+
+  Services -->|"HTTP /api · WebSocket /hub"| Nginx
+  Nginx --> Pipe
+  Auth --> Repo
+  Log --> Repo
+  Repo --> PG
+  Mods -.-> Dom
+  RT -.->|"backplane"| Redis
+  Core -.->|"cuotas"| Redis
+```
+
+- **El contrato HTTP se comparte por un snapshot**, no por código: `frontend/openapi.json` →
+  `types/api.generated.d.ts` (ver «Tipos del contrato»). El nombre del evento y la ruta del hub
+  también se duplican a propósito en `LogHubEvents`/`HubRoutes` (backend) y `hub-events.ts` (frontend).
+- **Los módulos se tocan en pocos puntos:** `DailyLog` usa de `Auth` el atributo `[RequireAuth]` y de
+  `Realtime` solo la interfaz `ILogEventEmitter`, que no sabe qué transporte hay debajo (memoria o Redis).
+- **`Infrastructure` implementa los contratos de `Domain`** (`IUserRepository`, `IDailyLogRepository`);
+  la API no toca EF Core.
+
+### Flujo de datos: guardar un registro
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Navegador
+  participant FE as DailyLogModal / useDailyLogForm
+  participant API as logs.api + api-client
+  participant N as nginx :8080
+  participant P as ApiPipeline
+  participant C as DailyLogController
+  participant S as DailyLogService
+  participant R as IDailyLogRepository
+  participant DB as PostgreSQL
+  participant E as LogEventEmitter
+  participant H as LogsHub (grupo user:id)
+  participant ST as useLogsStore
+
+  U->>FE: rellena el formulario y envía
+  FE->>API: toCreateDailyLogInput(form, hoy local) → create()
+  API->>N: POST /api/logs (cookie access_token)
+  N->>P: proxifica con X-Forwarded-For
+  P->>P: IP real, RequestId, rate limiter (write: por usuario), auth
+  P->>C: [RequireAuth] + validación
+  C->>S: userId de los claims + petición
+  S->>R: UpsertAsync (ON CONFLICT user_id, log_date)
+  R->>DB: INSERT … ON CONFLICT DO UPDATE
+  DB-->>R: fila y si se creó o actualizó
+  S->>E: EmitLogCreated / EmitLogUpdated (mejor esfuerzo)
+  E->>H: SendAsync al grupo user:{id}
+  Note over H: con Scaling:Redis, el backplane<br/>lo entrega a las demás réplicas
+  S-->>C: DailyLogResponse
+  C-->>API: 201 o 200 con el registro
+  API-->>FE: registro guardado
+  FE->>ST: saved → mergeLog (sin segunda petición)
+  H-->>ST: log:created / log:updated → useLogSocket → mergeLog
+  Note over ST: las pestañas abiertas del mismo usuario<br/>reciben el evento y se actualizan
+```
+
+Si el evento en tiempo real falla, el emisor lo registra y no lo propaga: la respuesta HTTP ya lleva el
+dato y la fuente de verdad sigue siendo la API (ver «Notificación en tiempo real»). `mergeLog`
+identifica el registro por `logDate`, así que recibir el mismo día por HTTP y por el hub no lo duplica.
+
 ## Decisiones de diseño
 
 ### Sesión: JWT en cookie `httpOnly` (no en `localStorage`)
@@ -136,24 +261,10 @@ canal de tiempo real.**
 
 ### Notificación en tiempo real: de mejor esfuerzo, la fuente de verdad es la API
 
-El evento `log:created` / `log:updated` es un **aviso de comodidad**, no un canal fiable de
-datos. Dos reglas lo acotan:
-
-- **En el servidor, un fallo del hub no rompe el guardado.** `LogEventEmitter` se ejecuta
-  cuando el registro ya está confirmado en la base de datos. Si `SendAsync` falla, captura la
-  excepción, la registra en `Warning` (con el nombre del evento y el `userId`) y **no la
-  relanza**: `POST /api/logs` responde igualmente 201. Solo deja pasar
-  `OperationCanceledException`. Además envía con `CancellationToken.None`, de modo que si el
-  cliente que guardó corta la conexión tras el commit, sus otras pestañas se enteran igual.
-- **En el cliente, lo que se pierde se recupera pidiéndolo a la API.** SignalR no reenvía los
-  eventos emitidos mientras una conexión estaba caída. Por eso `useLogSocket` acepta un
-  callback `onReconnected`, que se dispara con `onreconnected` de la reconexión automática, y
-  el dashboard lo usa para volver a pedir la ventana activa (`logsStore.fetch`). Mientras
-  tanto, los eventos que sí llegan se integran con `mergeLog`, que reemplaza por `logDate` y
-  por tanto es idempotente.
-
-Consecuencia de diseño: **nada puede depender de que un evento llegue**. Toda pantalla debe
-poder reconstruirse con una lectura a la API; el hub solo evita tener que recargar.
+`log:created` / `log:updated` son un aviso de comodidad: un fallo del hub no rompe el guardado
+(`LogEventEmitter` lo registra y no lo relanza) y el cliente recupera lo perdido pidiéndolo a la API
+al reconectar. Nada puede depender de que un evento llegue. Detalle:
+[ADR 0002](adr/0002-tiempo-real-de-mejor-esfuerzo.md).
 
 ### Escalado horizontal del canal en tiempo real: señalada limitación, sin backplane (decisión de alcance)
 
@@ -321,12 +432,20 @@ mejor esfuerzo (un fallo se registra y no se propaga) y el dato sigue en la API.
 otra). La suite automática usa un almacén en memoria y comprueba el cableado; no hay Redis en `docker-compose.test.yml`
 ni en el CI.
 
+### Modelo de confianza en el proxy: la API no se expone, se alcanza a través de nginx
+
+Kestrel solo habla HTTP y en producción no publica puerto: el único punto de entrada es nginx. La
+API solo se fía de `X-Forwarded-For` / `X-Forwarded-Proto` si vienen de un proxy declarado
+(`ReverseProxy:KnownProxies` / `KnownNetworks`, con `ForwardLimit=1`), y de ello cuelgan la cuota
+`auth` por IP y el `ClientIp` de los logs. Reglas, dependencias y qué rompe la suposición:
+[ADR 0003](adr/0003-confianza-en-el-proxy.md).
+
 ### HTTPS y HSTS: responsabilidad del proxy de borde, no de la API
 
 El contenedor de la API **solo sirve HTTP** (`ASPNETCORE_URLS=http://+:3000`) y no publica
 puerto: en producción solo nginx lo alcanza por la red interna. El TLS termina en el proxy
 de borde que haya delante de nginx (balanceador, CDN o el propio nginx con certificado), y
-**ese proxy es quien debe**:
+**ese proxy es quien debe** (ver «Modelo de confianza en el proxy»):
 
 - redirigir `http://` a `https://`,
 - emitir `Strict-Transport-Security` (HSTS),
@@ -343,50 +462,10 @@ sin `Location`, incluso con `HTTPS_PORT` configurado.
 
 ### El día del registro lo decide el cliente: el servidor solo lo acota a "UTC + 1 día"
 
-Un registro pertenece a un **día calendario** (`logDate`, `yyyy-MM-dd`), y ese día es el que
-el usuario vive en su zona horaria, no el de la hora UTC del servidor. Entre la medianoche
-local y la UTC los dos días difieren: a las 20:00 en Bogotá (UTC-5) ya es el día siguiente
-en UTC, y a las 08:00 en Tokio (UTC+9) todavía es el anterior. Si el cliente guardaba con su
-fecha local y consultaba con la del servidor, el formulario "de hoy" abría vacío (o con el
-registro de otro día) y el siguiente guardado sobrescribía el registro equivocado.
-
-**La regla**
-
-| Pieza                                   | Qué hace con el día                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------------------- |
-| Frontend (`utils/date.ts`)              | **Única fuente del "hoy"**: `todayIso()` calcula el día en hora local. Lo usan el guardado (`logDate`), la consulta (`GET /api/logs/today?date=`) y la ventana del panel (`from`/`to`). |
-| `POST /api/logs`                        | Guarda el `logDate` que envía el cliente. El upsert es por `(user_id, log_date)`.   |
-| `GET /api/logs/today?date=yyyy-MM-dd`   | Devuelve el registro de **ese** día. Sin `date`, usa el día UTC del servidor (comportamiento anterior, para no romper a otros clientes). |
-| Validadores del servidor                | Solo **acotan** la fecha: no puede superar en más de 1 día la fecha UTC actual (`CreateDailyLogValidator` y `TodayQueryValidator`). |
-
-**Por qué el límite es "UTC + 1 día"**
-
-El servidor no conoce la zona del cliente y no debe fiarse de ella, así que no recalcula el
-día: solo rechaza lo imposible. La zona más adelantada es UTC+14, donde ya es "mañana"
-respecto al día UTC durante hasta 14 horas, de modo que ninguna fecha legítima supera la
-fecha UTC + 1 día. Con `UTC + 1` se aceptan todos los clientes reales y se rechazan las
-fechas claramente futuras (`UTC + 2` en adelante) con el mismo mensaje de antes,
-`logDate cannot be in the future.`, y el sobre `VALIDATION_ERROR`. El pasado no se acota: se
-puede registrar o corregir un día anterior.
-
-**Qué se descarta y por qué**
-
-- **Que el servidor decida el día con la zona del usuario.** Exigiría guardar y fiarse de una
-  zona por usuario (o recibirla en cada petición), y el viaje entre zonas la haría incorrecta.
-  El cliente ya sabe qué día vive.
-- **Seguir con el día UTC en todo.** Es lo que causaba el defecto: en cualquier zona distinta
-  de UTC hay horas del día en las que el "hoy" del usuario no coincide con el del servidor.
-
-**Consecuencias**
-
-- La fecha es un dato del cliente: un usuario puede registrar con un día que no es el suyo
-  (dentro de la cota). No es un problema de seguridad: cada usuario solo escribe en sus propios
-  registros y el campo describe su propio día.
-- Un cliente que llame a `GET /api/logs/today` sin `date` obtiene el día UTC; el frontend
-  siempre envía `date`.
-- Los tests fijan la regla con relojes simulados: la utilidad de fechas se prueba en
-  `Asia/Tokyo` y `America/Bogota`, el modal a las 20:00 de Bogotá (01:00 UTC del día
-  siguiente) y un e2e con `timezoneId: 'America/Bogota'` que guarda, cierra y reabre el modal.
+El día de un registro (`logDate`) es el que vive el usuario en su zona, no el UTC del servidor. El
+frontend lo calcula (`utils/date.ts`) y lo envía; el servidor solo rechaza lo imposible (más de
+UTC + 1 día en el futuro). Razonamiento, alternativas y consecuencias:
+[ADR 0001](adr/0001-el-cliente-decide-el-dia.md).
 
 ### Separación de capas: controller → service → repository
 
@@ -454,9 +533,10 @@ máquina, no una omisión.
 | -------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Aislamiento por ejecución        | Total: el compose monta `tmpfs` en `/var/lib/postgresql/data`, así que cada `up` parte de una base vacía |
 | Versión de Postgres              | `16-alpine`, idéntica a `docker-compose.yml`                                                              |
-| Coste de arranque                | `~0,2 s` si el contenedor ya está arriba                                                                  |
+| Coste de arranque                | `~0,2 s` si el contenedor ya está arriba (medición original)                                              |
 | Coste de un contenedor nuevo     | `~1,2 s` medido: `0,14 s` de `docker run` + `1,03 s` hasta que `pg_isready` responde                     |
-| Ciclo completo de `make test`    | `~6,9 s` medido, de los cuales `~3 s` son las pruebas                                                    |
+| Ciclo completo de `make test`    | `~21 s` medido con la suite actual (unitarias + integración con cobertura y umbral), de los cuales `~14 s` son las pruebas |
+| En CI                            | El job `Backend tests (.NET + Postgres)` usa un *service container* de GitHub Actions (`postgres:16-alpine`, `5433:5432`, mismas credenciales que el compose de test), sin `TEST_DATABASE_URL`: el valor por defecto de la factory ya apunta ahí |
 | Puerto                           | Fijo, `5433`, separado del `5432` del compose de desarrollo                                              |
 
 **Motivos para no adoptar Testcontainers todavía**
@@ -477,9 +557,14 @@ máquina, no una omisión.
    inyectarse, con un valor por defecto para el compose y otro asignado dinámicamente por
    el puerto mapeado del contenedor. Eso son dos rutas de configuración para la misma base
    de datos y, por tanto, dos maneras de que los tests apunten a la instancia equivocada.
-4. **El detonante todavía no ha llegado.** El beneficio mayor de Testcontainers es
-   simplificar CI, y **este repositorio no tiene CI** (no existe `.github/workflows`). Se
-   estaría pagando la complejidad de dos modos a cambio de una ventaja hipotética.
+4. **El CI ya existe y tampoco lo necesita.** El beneficio mayor de Testcontainers es simplificar
+   el CI, y el CI del repositorio (`.github/workflows/ci.yml`) ya tiene su base: el job
+   `Backend tests (.NET + Postgres)` declara un *service container* de Postgres con *healthcheck*
+   y la factory lee `TEST_DATABASE_URL` o, sin ella, `localhost:5433`, que es justo el puerto
+   que publica ese servicio. Es la misma ruta que usa el desarrollo local, así que no hay dos
+   modos que mantener. Se pagaría la complejidad de Testcontainers a cambio de una ventaja
+   que el CI actual ya da. (La imagen del servicio del CI no lleva el digest que sí llevan
+   los composes.)
 
 **Limitación que sí arrastra la decisión**: el puerto `5433` es fijo. Si otro proceso lo ocupa,
 `make test` falla con un error de binding poco descriptivo en lugar de levantar la base en
@@ -488,12 +573,13 @@ colisión es improbable.
 
 **Cuándo y cómo se adoptaría**
 
-El momento natural es que aparezca CI, y conviene hacerlo junto con consolidar los fixtures:
-hoy las 5 clases de test usan `IClassFixture<CustomWebApplicationFactory>`, así que cada
-una tiene su instancia y las migraciones de `Program.cs` se ejecutan 5 veces por ejecución.
-Un contenedor a nivel de colección encaja con un `ICollectionFixture` único, que resolvería
-las dos cosas de una vez: un solo arranque de Postgres, un solo `MigrateAsync` y un solo
-`Program` en memoria.
+Ya no basta con que exista CI: el detonante sería un CI o un entorno donde no se pueda declarar
+un servicio de Postgres (otro proveedor, un runner sin servicios) o la necesidad de varias bases
+aisladas en paralelo. La consolidación de fixtures que antes iba ligada a esta decisión **ya se
+hizo**: las clases comparten un único `ICollectionFixture<CustomWebApplicationFactory>`, de modo
+que hay un solo arranque de la API y una sola migración por ejecución (solo `RateLimitingTests`
+y `ForwardedHeadersTests` mantienen su propia factory, para aislar contadores). Un contenedor
+a nivel de colección encajaría directamente en ese fixture único.
 
 Los cambios concretos serían: añadir `Testcontainers.PostgreSql` (4.15.0, compatible con
 `net9.0`) al proyecto de tests; un `PostgreSqlBuilder` con `.WithImage("postgres:16-alpine")`
@@ -504,6 +590,13 @@ no puede confundirse con el arranque del contenedor. La espera de disponibilidad
 la wait strategy de Testcontainers, que es más fiable que el reintento con backoff que hoy
 ejecuta `DatabaseInitializer.WaitForDatabaseAsync`. El `docker-compose.test.yml` se
 conservaría para el ciclo local, pero la connection string pasaría a ser siempre inyectada.
+### Opciones del formulario: 1:1 con los enums del backend
+
+Los selectores del registro diario ofrecen exactamente los valores de los enums del contrato, con la
+clave igual al valor y las etiquetas en una tabla `Record<Tipo, string>`: un valor nuevo del backend
+rompe la compilación hasta que tenga etiqueta, y desaparecen los mapeos con pérdida del modal.
+Contexto, cambios visibles y alternativas: [ADR 0004](adr/0004-opciones-del-formulario-1-a-1-con-los-enums.md).
+
 ### Tipos del contrato: espejo a mano y OpenAPI como detector de deriva, no como fuente
 
 `frontend/src/types/daily-log.ts` es el punto único donde el frontend describe el contrato

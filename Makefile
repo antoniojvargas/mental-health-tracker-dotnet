@@ -43,8 +43,8 @@ test-frontend: ## Frontend como en el CI: tipos generados al día, build y tests
 	cd frontend && npm run build
 	cd frontend && npm run test:unit:coverage
 
-test-e2e: ## Ejecuta las pruebas end-to-end con Playwright (requiere la pila E2E arriba, ver README)
-	cd e2e && npx playwright test
+test-e2e: ## Ejecuta las pruebas end-to-end con Playwright, proyecto chromium como el CI (requiere la pila E2E arriba, ver README)
+	cd e2e && npm test
 
 lint: ## Lint como en el CI: dotnet format --verify-no-changes, ESLint y Prettier (solo comprueba)
 	cd backend && DOTNET_ROLL_FORWARD=LatestMajor $(DOTNET) format MentalHealthTracker.slnx --verify-no-changes
