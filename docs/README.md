@@ -22,6 +22,8 @@ arrancar, configurar y probar el proyecto; aquí está el porqué.
 | [`accessibility.md`](accessibility.md) | Auditoría y correcciones de accesibilidad del frontend. |
 | [`screenshots/`](screenshots/) | Capturas que usa el `README.md` de la raíz. |
 
+Para contribuir (ramas, commits, verificación y reglas), [`CONTRIBUTING.md`](../CONTRIBUTING.md).
+
 Otros README del repositorio: [raíz](../README.md) (arranque, variables de entorno, comandos, testing, CI),
 [`frontend/`](../frontend/README.md), [`e2e/`](../e2e/README.md) y [`secrets/`](../secrets/README.md).
 

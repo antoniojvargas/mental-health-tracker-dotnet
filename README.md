@@ -284,6 +284,10 @@ La suite E2E vive en `e2e/` (Playwright + TypeScript, solo Chromium) y recorre f
    docker compose up -d --build
    ```
 
+## Contribuir
+
+Convención de ramas y commits, comandos de verificación y las reglas para refactors y correcciones: [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## CI (GitHub Actions) y protección de ramas
 
 El workflow `.github/workflows/ci.yml` corre en cada `pull_request` y en `push` a `main`, y ejecuta estos jobs:
