@@ -2,6 +2,12 @@
 
 Documento de arquitectura del Mental Health Tracker.
 
+Las decisiones que se han convertido en ADR viven en [`docs/adr/`](adr/README.md) y aquí solo se
+resumen con un enlace: [0001 el cliente decide el día](adr/0001-el-cliente-decide-el-dia.md),
+[0002 tiempo real de mejor esfuerzo](adr/0002-tiempo-real-de-mejor-esfuerzo.md),
+[0003 confianza en el proxy](adr/0003-confianza-en-el-proxy.md) y
+[0004 opciones del formulario 1:1 con los enums](adr/0004-opciones-del-formulario-1-a-1-con-los-enums.md).
+
 ## Estructura de módulos
 
 Cómo está organizado el código tras los refactors (módulos del backend, capas del frontend y contrato
@@ -255,24 +261,10 @@ canal de tiempo real.**
 
 ### Notificación en tiempo real: de mejor esfuerzo, la fuente de verdad es la API
 
-El evento `log:created` / `log:updated` es un **aviso de comodidad**, no un canal fiable de
-datos. Dos reglas lo acotan:
-
-- **En el servidor, un fallo del hub no rompe el guardado.** `LogEventEmitter` se ejecuta
-  cuando el registro ya está confirmado en la base de datos. Si `SendAsync` falla, captura la
-  excepción, la registra en `Warning` (con el nombre del evento y el `userId`) y **no la
-  relanza**: `POST /api/logs` responde igualmente 201. Solo deja pasar
-  `OperationCanceledException`. Además envía con `CancellationToken.None`, de modo que si el
-  cliente que guardó corta la conexión tras el commit, sus otras pestañas se enteran igual.
-- **En el cliente, lo que se pierde se recupera pidiéndolo a la API.** SignalR no reenvía los
-  eventos emitidos mientras una conexión estaba caída. Por eso `useLogSocket` acepta un
-  callback `onReconnected`, que se dispara con `onreconnected` de la reconexión automática, y
-  el dashboard lo usa para volver a pedir la ventana activa (`logsStore.fetch`). Mientras
-  tanto, los eventos que sí llegan se integran con `mergeLog`, que reemplaza por `logDate` y
-  por tanto es idempotente.
-
-Consecuencia de diseño: **nada puede depender de que un evento llegue**. Toda pantalla debe
-poder reconstruirse con una lectura a la API; el hub solo evita tener que recargar.
+`log:created` / `log:updated` son un aviso de comodidad: un fallo del hub no rompe el guardado
+(`LogEventEmitter` lo registra y no lo relanza) y el cliente recupera lo perdido pidiéndolo a la API
+al reconectar. Nada puede depender de que un evento llegue. Detalle:
+[ADR 0002](adr/0002-tiempo-real-de-mejor-esfuerzo.md).
 
 ### Escalado horizontal del canal en tiempo real: señalada limitación, sin backplane (decisión de alcance)
 
@@ -442,38 +434,11 @@ ni en el CI.
 
 ### Modelo de confianza en el proxy: la API no se expone, se alcanza a través de nginx
 
-La API no está pensada para recibir tráfico de Internet. Kestrel solo habla HTTP (`:3000`) y, en
-producción, **no publica puerto**: el único punto de entrada es nginx (el contenedor del frontend,
-`:8080`), que sirve el bundle y proxifica `/api/` y `/hub` por la red interna de Compose. Toda
-decisión que depende de «quién es el cliente» se apoya en esa cadena y en saber de quién fiarse:
-
-```
-cliente ──► [proxy de borde con TLS, opcional] ──► nginx :8080 ──► Kestrel :3000 (red 172.28.0.0/24)
-```
-
-| Reglas del modelo | Dónde se aplican |
-| --- | --- |
-| **Solo se fía de proxies declarados.** `X-Forwarded-For` y `X-Forwarded-Proto` solo se aceptan si la petición llega de una IP de `ReverseProxy:KnownProxies` o de una red de `ReverseProxy:KnownNetworks` (en producción, la subred fija `172.28.0.0/24`). De cualquier otro origen se ignoran y se conserva la IP real del socket. | `ReverseProxyServiceCollectionExtensions` |
-| **Fiarse es explícito.** `UseForwardedHeaders` solo se registra con `ReverseProxy:Enabled=true`, es el **primer** middleware (antes del log de peticiones y del rate limiter), y `Enabled=true` sin proxies ni redes impide arrancar. | `ApiPipeline`, `ReverseProxyOptionsValidator` |
-| **`ForwardLimit=1`: se lee solo la entrada más a la derecha**, la que añade nuestro nginx con `$proxy_add_x_forwarded_for`. Lo que el cliente escriba a la izquierda no cuenta. | `ReverseProxyOptions.ForwardLimit` (detalle en «Rate limiting en memoria») |
-| **El puerto de la API no se publica.** Si se publicara, cualquiera podría saltarse nginx; la protección de arriba se apoya en que desde fuera solo se llega por nginx. | `docker-compose.prod.yml` |
-
-**Qué depende de ello**
-
-| Consumidor | Qué necesita | Consecuencia si falla la confianza |
-| --- | --- | --- |
-| Política de rate limiting `auth` (y su clave en Redis) | La IP real del cliente en `RemoteIpAddress` | Sin proxy de confianza todos comparten la IP de nginx (un atacante bloquearía el login de todos); con confianza de más, un cliente se inventaría IPs y esquivaría la cuota |
-| `ClientIp` del log de peticiones | La misma IP ya resuelta | Logs con la IP del proxy, inútiles para investigar abuso |
-| Esquema de la petición (`X-Forwarded-Proto`) | Saber si el original fue HTTPS | La API no impone HTTPS (ver la sección siguiente); nginx fija esta cabecera con su propio `$scheme`, que en `:8080` es `http`, así que con un proxy de TLS delante habría que propagar la cabecera del proxy de borde en la configuración de nginx |
-
-**Desarrollo y tests**: `ReverseProxy` viene desactivado, así que `RemoteIpAddress` es lo que ve el
-socket. Llamando a `:3000` es el cliente; pasando por Vite (`:5173`, que no añade `X-Forwarded-For`)
-es la IP del proxy de desarrollo. Con un solo usuario no importa, y los tests lo simulan con un
-`IStartupFilter` que fija la IP de origen (`ForwardedHeadersTests`).
-
-**Qué rompe la suposición**: publicar el puerto de la API; poner otro proxy delante de nginx sin subir
-`ForwardLimit` a 2, añadir su red a `KnownNetworks` y configurar nginx para confiar en él (`real_ip`);
-o cambiar la subred de Compose sin actualizarla en `ReverseProxy__KnownNetworks__0`.
+Kestrel solo habla HTTP y en producción no publica puerto: el único punto de entrada es nginx. La
+API solo se fía de `X-Forwarded-For` / `X-Forwarded-Proto` si vienen de un proxy declarado
+(`ReverseProxy:KnownProxies` / `KnownNetworks`, con `ForwardLimit=1`), y de ello cuelgan la cuota
+`auth` por IP y el `ClientIp` de los logs. Reglas, dependencias y qué rompe la suposición:
+[ADR 0003](adr/0003-confianza-en-el-proxy.md).
 
 ### HTTPS y HSTS: responsabilidad del proxy de borde, no de la API
 
@@ -497,50 +462,10 @@ sin `Location`, incluso con `HTTPS_PORT` configurado.
 
 ### El día del registro lo decide el cliente: el servidor solo lo acota a "UTC + 1 día"
 
-Un registro pertenece a un **día calendario** (`logDate`, `yyyy-MM-dd`), y ese día es el que
-el usuario vive en su zona horaria, no el de la hora UTC del servidor. Entre la medianoche
-local y la UTC los dos días difieren: a las 20:00 en Bogotá (UTC-5) ya es el día siguiente
-en UTC, y a las 08:00 en Tokio (UTC+9) todavía es el anterior. Si el cliente guardaba con su
-fecha local y consultaba con la del servidor, el formulario "de hoy" abría vacío (o con el
-registro de otro día) y el siguiente guardado sobrescribía el registro equivocado.
-
-**La regla**
-
-| Pieza                                   | Qué hace con el día                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------------------- |
-| Frontend (`utils/date.ts`)              | **Única fuente del "hoy"**: `todayIso()` calcula el día en hora local. Lo usan el guardado (`logDate`), la consulta (`GET /api/logs/today?date=`) y la ventana del panel (`from`/`to`). |
-| `POST /api/logs`                        | Guarda el `logDate` que envía el cliente. El upsert es por `(user_id, log_date)`.   |
-| `GET /api/logs/today?date=yyyy-MM-dd`   | Devuelve el registro de **ese** día. Sin `date`, usa el día UTC del servidor (comportamiento anterior, para no romper a otros clientes). |
-| Validadores del servidor                | Solo **acotan** la fecha: no puede superar en más de 1 día la fecha UTC actual (`CreateDailyLogValidator` y `TodayQueryValidator`). |
-
-**Por qué el límite es "UTC + 1 día"**
-
-El servidor no conoce la zona del cliente y no debe fiarse de ella, así que no recalcula el
-día: solo rechaza lo imposible. La zona más adelantada es UTC+14, donde ya es "mañana"
-respecto al día UTC durante hasta 14 horas, de modo que ninguna fecha legítima supera la
-fecha UTC + 1 día. Con `UTC + 1` se aceptan todos los clientes reales y se rechazan las
-fechas claramente futuras (`UTC + 2` en adelante) con el mismo mensaje de antes,
-`logDate cannot be in the future.`, y el sobre `VALIDATION_ERROR`. El pasado no se acota: se
-puede registrar o corregir un día anterior.
-
-**Qué se descarta y por qué**
-
-- **Que el servidor decida el día con la zona del usuario.** Exigiría guardar y fiarse de una
-  zona por usuario (o recibirla en cada petición), y el viaje entre zonas la haría incorrecta.
-  El cliente ya sabe qué día vive.
-- **Seguir con el día UTC en todo.** Es lo que causaba el defecto: en cualquier zona distinta
-  de UTC hay horas del día en las que el "hoy" del usuario no coincide con el del servidor.
-
-**Consecuencias**
-
-- La fecha es un dato del cliente: un usuario puede registrar con un día que no es el suyo
-  (dentro de la cota). No es un problema de seguridad: cada usuario solo escribe en sus propios
-  registros y el campo describe su propio día.
-- Un cliente que llame a `GET /api/logs/today` sin `date` obtiene el día UTC; el frontend
-  siempre envía `date`.
-- Los tests fijan la regla con relojes simulados: la utilidad de fechas se prueba en
-  `Asia/Tokyo` y `America/Bogota`, el modal a las 20:00 de Bogotá (01:00 UTC del día
-  siguiente) y un e2e con `timezoneId: 'America/Bogota'` que guarda, cierra y reabre el modal.
+El día de un registro (`logDate`) es el que vive el usuario en su zona, no el UTC del servidor. El
+frontend lo calcula (`utils/date.ts`) y lo envía; el servidor solo rechaza lo imposible (más de
+UTC + 1 día en el futuro). Razonamiento, alternativas y consecuencias:
+[ADR 0001](adr/0001-el-cliente-decide-el-dia.md).
 
 ### Separación de capas: controller → service → repository
 
@@ -665,6 +590,13 @@ no puede confundirse con el arranque del contenedor. La espera de disponibilidad
 la wait strategy de Testcontainers, que es más fiable que el reintento con backoff que hoy
 ejecuta `DatabaseInitializer.WaitForDatabaseAsync`. El `docker-compose.test.yml` se
 conservaría para el ciclo local, pero la connection string pasaría a ser siempre inyectada.
+### Opciones del formulario: 1:1 con los enums del backend
+
+Los selectores del registro diario ofrecen exactamente los valores de los enums del contrato, con la
+clave igual al valor y las etiquetas en una tabla `Record<Tipo, string>`: un valor nuevo del backend
+rompe la compilación hasta que tenga etiqueta, y desaparecen los mapeos con pérdida del modal.
+Contexto, cambios visibles y alternativas: [ADR 0004](adr/0004-opciones-del-formulario-1-a-1-con-los-enums.md).
+
 ### Tipos del contrato: espejo a mano y OpenAPI como detector de deriva, no como fuente
 
 `frontend/src/types/daily-log.ts` es el punto único donde el frontend describe el contrato
