@@ -26,14 +26,22 @@ Con base en esos registros, la aplicación genera tendencias semanales y mensual
 
 ## Arranque con Docker
 
-Para levantar el entorno de desarrollo completo:
+Es el flujo que valida el job `Dev stack smoke` del CI: plantilla de entorno, tres secretos y la pila arriba con `--wait` hasta que Postgres y el backend estén *healthy*.
 
 ```bash
 cp .env.example .env
-docker compose up --build
+# Rellena en .env JWT_SECRET, GoogleOAuth__ClientId y GoogleOAuth__ClientSecret:
+# vienen vacíos en la plantilla y, sin ellos, Compose se niega a arrancar.
+docker compose up -d --build --wait --wait-timeout 600 postgres backend
+curl http://localhost:3000/api/health   # -> {"status":"ok","uptime":...}
 ```
 
-El stack levanta tres servicios con hot-reload (los cambios en el código se aplican sin reconstruir la imagen).
+Para el stack completo, con el frontend en `5173`, basta `docker compose up -d --build`. Los servicios tienen hot-reload: los cambios en el código se aplican sin reconstruir la imagen.
+
+Para solo arrancar la pila sirve cualquier valor no vacío en los tres secretos (el CI usa valores desechables). Para iniciar sesión con Google hacen falta credenciales reales de un cliente OAuth de Google Cloud, y la URI de callback tiene que estar dada de alta en él:
+
+- **URI de callback en desarrollo:** `http://localhost:5173/api/auth/google/callback`. Está fijada en `docker-compose.yml` (`GoogleOAuth__RedirectUri`; el valor de `.env.example` no se inyecta a este compose) y debe figurar tal cual en *Authorized redirect URIs* de la consola de Google Cloud.
+- **Va por el puerto del frontend (`5173`), no por el de la API (`3000`):** Vite proxifica `/api` al backend, y así la cookie `oauth_state` se escribe y se lee en el mismo origen. En producción es `http://localhost:8080/api/auth/google/callback` (`GOOGLE_REDIRECT_URI`).
 
 ### Puertos expuestos
 
@@ -45,7 +53,14 @@ El stack levanta tres servicios con hot-reload (los cambios en el código se apl
 
 ### Documentación de la API
 
-Disponible en desarrollo en `http://localhost:3000/openapi/v1.json` (OpenAPI generado por ASP.NET Core).
+Solo en desarrollo (`ASPNETCORE_ENVIRONMENT=Development`; en Testing y producción no se monta), generada por Swashbuckle:
+
+| Qué | URL |
+| --- | --- |
+| Documento OpenAPI (JSON) | `http://localhost:3000/swagger/v1/swagger.json` |
+| Interfaz (Swagger UI) | `http://localhost:3000/api/docs` |
+
+El snapshot versionado `frontend/openapi.json` es una copia de ese documento, de la que se generan los tipos del frontend (ver [`docs/architecture.md`](docs/architecture.md)).
 
 ## Producción con Docker
 
@@ -150,6 +165,27 @@ Las plantillas `.env.example` (desarrollo/E2E) y `.env.production.example` (prod
 
 ## Comandos útiles
 
+### Atajos de Make
+
+`make help` los lista. Se ejecutan desde la raíz; los marcados «como el CI» reproducen el job del mismo nombre.
+
+| Target | Qué hace |
+| --- | --- |
+| `make up` / `make down` / `make logs` | Levanta (`up -d --build`), detiene y sigue los logs del stack de desarrollo. |
+| `make test` | Levanta `postgres-test`, corre las dos capas del backend con cobertura y falla si la cobertura de líneas baja del 77,8 %. Baja `postgres-test` también cuando los tests fallan. |
+| `make coverage` | Fusiona la cobertura del último `make test` en un informe HTML y verifica el umbral. |
+| `make test-frontend` | Como el job `Frontend tests`: tipos generados al día (`generate:types` + `git diff --exit-code`), build y Vitest con umbral de cobertura. |
+| `make test-e2e` | Suite E2E de Playwright; requiere la pila E2E arriba (ver [Pruebas E2E](#pruebas-e2e-playwright)). |
+| `make lint` | Como el job `Lint`: `dotnet format --verify-no-changes`, ESLint y Prettier. Solo comprueba. |
+| `make format` | Corrige el formato: `dotnet format`, `eslint --fix` y `prettier --write`. Modifica ficheros. |
+| `make audit` | Como el job `Security audit`: vulnerabilidades de NuGet (con transitivas) y `npm audit --audit-level=high`. |
+| `make build-images` | Como el job `Build prod images`: construye las imágenes de producción y verifica que el backend no corre como root y que reintenta la conexión a la BD. |
+| `make smoke-prod` | Como el job `Prod smoke`: recorrido crítico de Playwright contra las imágenes de producción en `:8080`; baja la pila siempre, también si falla. |
+| `make ci` | `lint`, `test`, `test-frontend`, `audit`, `build-images` y `smoke-prod`, en ese orden. No incluye `E2E` ni `Dev stack smoke`: necesitan un `.env` en la raíz y la pila de desarrollo (puertos 3000/5173), y no se tocan sin avisar. |
+| `make migrate` / `make seed` | Aplican las migraciones de EF Core / cargan el usuario demo con 60 días de registros. |
+
+Los objetivos no instalan dependencias (`npm ci`, navegadores de Playwright): asumen que ya están instaladas.
+
 ### Backend
 
 Los comandos se ejecutan desde la raíz del repositorio. `dotnet-ef` y `reportgenerator` son herramientas locales fijadas en `.config/dotnet-tools.json`: no hace falta instalar nada global, basta `dotnet tool restore` (los targets de `make` ya lo ejecutan).
@@ -162,13 +198,6 @@ Los comandos se ejecutan desde la raíz del repositorio. `dotnet-ef` y `reportge
 | `dotnet tool run dotnet-ef database update --project backend/MentalHealthTracker.Infrastructure --startup-project backend/MentalHealthTracker.Api` | Aplica las migraciones pendientes. Equivale a `make migrate`. |
 | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj` | Ejecuta las pruebas unitarias (sin base de datos ni HTTP). |
 | `dotnet test backend/tests/MentalHealthTracker.IntegrationTests/MentalHealthTracker.IntegrationTests.csproj` | Ejecuta las pruebas de integración (necesita `postgres-test` en el puerto `5433`, o la cadena de Npgsql de otra base en `TEST_DATABASE_URL`). |
-| `make test` | Levanta `postgres-test`, corre las dos capas con cobertura y falla si queda por debajo del 77,8 %. Baja `postgres-test` también cuando los tests fallan. |
-| `make test-frontend` | Tipos generados al día, build y Vitest con umbral de cobertura (como el job `Frontend tests`). |
-| `make lint` / `make format` | `lint` comprueba (`dotnet format --verify-no-changes`, ESLint, Prettier) como el CI; `format` corrige y modifica ficheros. |
-| `make audit` | Auditoría de vulnerabilidades de NuGet y npm (como el job `Security audit`). |
-| `make build-images` | Construye las imágenes de producción y verifica usuario no root y reintento de BD (como `Build prod images`). |
-| `make smoke-prod` | Recorrido crítico de Playwright contra las imágenes de producción en `:8080`; baja la pila siempre. |
-| `make ci` | `lint`, `test`, `test-frontend`, `audit`, `build-images` y `smoke-prod`. No incluye `E2E` ni `Dev stack smoke`: necesitan un `.env` en la raíz y la pila de desarrollo (puertos 3000/5173), y no se tocan sin avisarte. |
 
 ### Dependencias NuGet
 
@@ -210,16 +239,17 @@ Los comandos se ejecutan dentro de `frontend/`.
 
 | Capa                  | Qué cubre                                                                                                       | Cómo ejecutarla                                                                                                                              | Estado              |
 | --------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| Unitarias (backend)   | Lógica de dominio, validación y casos límite de la API, aislada de la base de datos y de HTTP.                  | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj`                                                | Configurado (52)    |
-| Integración (backend) | Endpoints HTTP, autenticación OAuth, repositorios y SignalR contra una PostgreSQL 16 real (Docker, puerto `5433`). | `make test` — levanta `postgres-test`, ejecuta las dos capas del backend y verifica el umbral de cobertura                                 | Configurado (19)    |
-| Unitarias (frontend)  | Lógica de componentes y *composables* de Vue, sin navegador.                                                    | `cd frontend && npm run test:unit`                                                                                                            | Runner listo (22)  |
-| E2E (Playwright)      | Flujos completos de usuario navegador → frontend → API → PostgreSQL.                                            | Requiere la pila E2E arriba; ver [Pruebas E2E](#pruebas-e2e-playwright)                                                                       | Configurado (5)     |
+| Unitarias (backend)   | Lógica de dominio, validación y casos límite de la API, aislada de la base de datos y de HTTP.                  | `dotnet test backend/tests/MentalHealthTracker.UnitTests/MentalHealthTracker.UnitTests.csproj`                                                | Configurado (478)   |
+| Integración (backend) | Endpoints HTTP, autenticación OAuth, repositorios y SignalR contra una PostgreSQL 16 real (Docker, puerto `5433`). | `make test` — levanta `postgres-test`, ejecuta las dos capas del backend y verifica el umbral de cobertura                                 | Configurado (159)   |
+| Unitarias (frontend)  | Lógica de componentes y *composables* de Vue, sin navegador.                                                    | `cd frontend && npm run test:unit`                                                                                                            | Configurado (392)  |
+| E2E (Playwright)      | Flujos completos de usuario navegador → frontend → API → PostgreSQL.                                            | Requiere la pila E2E arriba; ver [Pruebas E2E](#pruebas-e2e-playwright)                                                                       | Configurado (10)    |
 
 **Notas**
 
-- `make test` fusiona la cobertura de las dos capas del backend (Coverlet + ReportGenerator) y **falla si la cobertura de líneas baja del 77,8 %**; la medición actual es de 79,8 %.
+- **Cómo se contaron** (ejecutando las suites): backend unitarias 478; integración 159 = 158 ejecutadas + 1 omitida (`LogsListingBenchmark`, solo con `RUN_BENCHMARK=1`); frontend 392 en 33 ficheros (Vitest); E2E 10 con el proyecto `chromium` (5 ficheros) y 2 más con `prod-smoke`, contados con `playwright test --list` (la ejecución la hace el CI contra la pila levantada).
+- `make test` fusiona la cobertura de las dos capas del backend (Coverlet + ReportGenerator) y **falla si la cobertura de líneas baja del 77,8 %**; la medición actual es de 93,8 % (unitarias + integración).
 - `npm run test:unit` del frontend usa Vitest y corre sin navegador. El entorno global es `node`, porque el cliente de la API y el store no tocan el DOM; los tests de componente que sí lo necesitan montan la vista con Vue Test Utils sobre `jsdom` mediante un docblock `@vitest-environment`, de modo que solo ese fichero paga el coste de levantar un DOM.
-- La suite de frontend cubre hoy el cliente de la API, el store de autenticación y la vista de login. Los tests de componente montan la vista real con un router de memoria y un Pinia reales, y solo sustituyen `fetch`: la lógica que interesa es la que une el `query` de la ruta, el store y el router, así que falsificar cualquiera de los dos dejaría el cableado real fuera del alcance del test.
+- La suite de frontend (33 ficheros) cubre el cliente de la API, los stores, los composables, los componentes y las vistas. Los tests de componente montan la vista real con un router de memoria y un Pinia reales, y solo sustituyen `fetch`: la lógica que interesa es la que une el `query` de la ruta, el store y el router, así que falsificar cualquiera de los dos dejaría el cableado real fuera del alcance del test.
 - La suite E2E vive en `e2e/`; `make test-e2e` ejecuta la suite completa y requiere la pila E2E levantada. Ver [Pruebas E2E](#pruebas-e2e-playwright) para levantar la pila, instalar los navegadores de Playwright y volver al entorno normal.
 
 ### Pruebas E2E (Playwright)
