@@ -175,7 +175,7 @@ Las plantillas `.env.example` (desarrollo/E2E) y `.env.production.example` (prod
 | `make test` | Levanta `postgres-test`, corre las dos capas del backend con cobertura y falla si la cobertura de líneas baja del 77,8 %. Baja `postgres-test` también cuando los tests fallan. |
 | `make coverage` | Fusiona la cobertura del último `make test` en un informe HTML y verifica el umbral. |
 | `make test-frontend` | Como el job `Frontend tests`: tipos generados al día (`generate:types` + `git diff --exit-code`), build y Vitest con umbral de cobertura. |
-| `make test-e2e` | Suite E2E de Playwright; requiere la pila E2E arriba (ver [Pruebas E2E](#pruebas-e2e-playwright)). |
+| `make test-e2e` | Suite E2E de Playwright (proyecto `chromium`, como el CI); requiere la pila E2E arriba (ver [Pruebas E2E](#pruebas-e2e-playwright)). |
 | `make lint` | Como el job `Lint`: `dotnet format --verify-no-changes`, ESLint y Prettier. Solo comprueba. |
 | `make format` | Corrige el formato: `dotnet format`, `eslint --fix` y `prettier --write`. Modifica ficheros. |
 | `make audit` | Como el job `Security audit`: vulnerabilidades de NuGet (con transitivas) y `npm audit --audit-level=high`. |
