@@ -8,7 +8,7 @@
 # en la imagen, y Dockerfile.prod.dockerignore los saca tambien del contexto de build.
 
 # mcr.microsoft.com/dotnet/sdk:9.0
-FROM mcr.microsoft.com/dotnet/sdk:9.0@sha256:d9ad72f6b3eb5d61adb158db510ae1c3098c12c92d23ab8da833418275f1c652 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0@sha256:65f3c7c6a25a239ab3e6719f2896147e7b68242ff2d8818dd70498bde6ef8bea AS build
 WORKDIR /source
 
 COPY Directory.Build.props ./
